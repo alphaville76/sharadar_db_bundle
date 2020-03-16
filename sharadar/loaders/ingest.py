@@ -12,7 +12,7 @@ from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
-from sharadar.loaders.logger import log
+from sharadar.loaders.logger import log, handler
 from contextlib import closing
 import sqlite3
 from zipline.data.loader import get_data_filepath
@@ -176,6 +176,8 @@ def from_quandl():
         output_dir = os.path.join(get_data_filepath(SEP_BUNDLE_NAME), SEP_BUNDLE_DIR)
         os.makedirs(output_dir, exist_ok = True)
 
+        print("logfiles:", handler._filename)
+
         log.info("Start ingesting SEP and SF1 data into %s ..." % output_dir)
 
         # Check valid trading dates, according to the selected exchange calendar
@@ -285,7 +287,10 @@ def from_quandl():
                     exchange = 'OTC'
 
                 # Synch to the official exchange calendar, if necessary
-                synch_to_calendar(sessions, start_date, end_date, df_ticker, df)
+                date_index = df_ticker.index.get_level_values('date')
+                start_date_df = date_index[0]
+                end_date_df = date_index[-1]
+                synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
 
                 # Add a row to the metadata DataFrame.
                 equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange

@@ -111,6 +111,14 @@ def symbol(ticker, as_of_date=None):
 def symbols(ticker, as_of_date=None):
     return _createAssetFinder(SEP_BUNDLE_NAME, timestr=SEP_BUNDLE_DIR).lookup_symbols(ticker, as_of_date)
 
+@cached
+def sid(sid):
+    return sids((sid,))[0]
+
+@cached
+def sids(sids):
+    return _createAssetFinder(SEP_BUNDLE_NAME, timestr=SEP_BUNDLE_DIR).retrieve_all(sids)
+
 class BundlePipelineEngine(SimplePipelineEngine):
     def run_pipeline(self, pipeline, start_date, end_date):
         for factor in pipeline.columns.values():

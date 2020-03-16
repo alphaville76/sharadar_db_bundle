@@ -132,7 +132,7 @@ class SQLiteDailyBarWriter(object):
             with click.progressbar(length=len(df), label="Inserting price data...") as pbar:     
                 count = 0
                 for index, row in df.iterrows():
-                    sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES ('%s',%d,%d,%d,%d,%d,%d)"
+                    sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES ('%s',%f,%f,%f,%f,%f,%f)"
                     c.execute(sql % (index + tuple(row.values)))
                     count += 1
                     pbar.update(count)

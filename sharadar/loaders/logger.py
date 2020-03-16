@@ -1,6 +1,8 @@
-import os
+import os, sys
 from os import environ as env
-from logbook import Logger, FileHandler, DEBUG
+from logbook import Logger, FileHandler, DEBUG, StreamHandler
 
-FileHandler(os.path.join(env["HOME"], "log", "ingest_sep_db.log"), level=DEBUG).push_application()
-log = Logger('sep_quandl_db.py')
+handler = FileHandler(os.path.join(env["HOME"], "log", "ingest_sharadar.log"), level=DEBUG)
+handler.push_application()
+StreamHandler(sys.stdout, bubble=True).push_application()
+log = Logger('sharadar_db_bundle')
