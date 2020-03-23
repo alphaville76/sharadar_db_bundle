@@ -5,11 +5,12 @@ import click
 from contextlib import closing
 from zipline.utils.calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
+from sharadar.loaders.logger import log
 
 from zipline.assets import AssetFinder, AssetDBWriter
 from zipline.utils.memoize import lazyval
 import math
-
+from toolz import first
 from zipline.errors import (
     EquitiesNotFound,
     FutureContractsNotFound,
@@ -133,7 +134,11 @@ class SQLiteDailyBarWriter(object):
                 count = 0
                 for index, row in df.iterrows():
                     sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES ('%s',%f,%f,%f,%f,%f,%f)"
-                    c.execute(sql % (index + tuple(row.values)))
+                    values = index + tuple(row.values)
+                    try:
+                        c.execute(sql % values)
+                    except sqlite3.OperationalError as e:
+                        log.error(str(e) + "; values: " + str(values))
                     count += 1
                     pbar.update(count)
 
@@ -158,7 +163,14 @@ class SQLiteDailyBarReader(SessionBarReader):
     def _exist_sids(self, sids):
         sql = "SELECT COUNT(DISTINCT(sid)) FROM prices WHERE sid IN (%s)" % ",".join(map(str, sids))
         res = self._query(sql)
-        return res[0][0] == len(sids)        
+        return res[0][0] == len(sids)
+
+    def _check_sids(self, sids):
+        sql = "SELECT DISTINCT(sid) FROM prices WHERE sid IN (%s)" % ",".join(map(str, sids))
+        res = self._query(sql)
+        if len(res) != len(sids):
+            diff = np.setdiff1d(sids, res)
+            raise KeyError('sid ' + str(diff) + ' not in prices.')
 
     def _fmt_date(self, dt):
         return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00"
@@ -180,8 +192,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
 
-        if not self._exist_sids(sids):
-            raise KeyError(",".join(map(str, sids)))
+        self._check_sids(sids)
         raw_arrays = []
         with sqlite3.connect(self._filename) as conn:
             for field in fields:
@@ -371,13 +382,70 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         self._write_df_to_table(tbl, assets, txn, chunk_size)
 
-        pd.DataFrame({
+        df = pd.DataFrame({
             asset_router.c.sid.name: assets.index.values,
             asset_router.c.asset_type.name: asset_type,
-        }).to_sql(
-            asset_router.name,
-            txn.connection,
-            if_exists='append',
-            index=False,
-            chunksize=chunk_size
+        })
+        self._write_df_to_table(asset_router, df, txn, chunk_size, idx=False)
+        #df.to_sql(asset_router.name, txn.connection, if_exists='append', index=False, chunksize=chunk_size)
+
+    def escape(self, name):
+        # See https://stackoverflow.com/questions/6514274/how-do-you-escape-strings\
+        # -for-sqlite-table-column-names-in-python
+        # Ensure the string can be encoded as UTF-8.
+        # Ensure the string does not include any NUL characters.
+        # Replace all " with "".
+        # Wrap the entire thing in double quotes.
+
+        try:
+            uname = str(name).encode("utf-8", "strict").decode("utf-8")
+        except UnicodeError as err:
+            raise ValueError(f"Cannot convert identifier to UTF-8: '{name}'") from err
+        if not len(uname):
+            raise ValueError("Empty table or column name specified")
+
+        nul_index = uname.find("\x00")
+        if nul_index >= 0:
+            raise ValueError("SQLite identifier cannot contain NULs")
+        return '"' + uname.replace('"', '""') + '"'
+
+    def insert_statement(self, df, table_name, index=True, index_label=None, wld='?'):
+        num_rows = df.shape[0]
+
+        names = list(map(str, df.columns))
+
+        if index:
+            if index_label is not None:
+                if not isinstance(index_label, list):
+                    index_label = [index_label]
+                for idx in index_label[::-1]:
+                    names.insert(0, idx)
+            elif df.index.name is not None:
+                for idx in df.index.name[::-1]:
+                    names.insert(0, idx)
+            else:
+                names.insert(0, "index")
+
+        bracketed_names = [self.escape(column) for column in names]
+        col_names = ",".join(bracketed_names)
+
+        wildcards = ",".join([wld] * len(names))
+        insert_statement = (
+            f"INSERT OR REPLACE INTO {self.escape(table_name)} ({col_names}) VALUES ({wildcards})"
         )
+        return insert_statement
+
+    def _write_df_to_table(self, tbl, df, txn, chunk_size=None, idx=True, idx_label=None):
+        engine = txn.connection
+        index_label = (
+            idx_label
+            if idx_label is not None else
+            first(tbl.primary_key.columns).name
+        )
+        cmd = self.insert_statement(df, tbl.name, idx, index_label)
+
+        for index, row in df.iterrows():
+            values = row.values
+            if idx:
+                values = np.insert(values, 0, str(index), axis=0)
+            engine.execute(cmd, tuple(values))

@@ -35,8 +35,10 @@ EXCHANGE_DF = pd.DataFrame([
     ],
     columns= ['exchange', 'canonical_name', 'country_code'])
 
+
 def process_data_table(df):
     log.info("Adjusting for stock splits...")
+
     # Data are adjusted for stock splits, but not for dividends.
     m = df['closeunadj'] / df['close']
 
@@ -47,16 +49,21 @@ def process_data_table(df):
     df['close'] = df['closeunadj']
     df['volume'] /= m
     df['dividends'] *= m
-    
+
     df = df.drop(['closeunadj', 'lastupdated'], axis=1)
-    df = df.fillna({'volume':0})
+    df = df.replace([np.inf, -np.inf, np.nan], 0)
+    df = df.fillna({'volume': 0})
     return df
+
 
 def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
     if start is not None:
         df = fetch_sep_table_date(env["QUANDL_API_KEY"], start, end)
     else:
         df = fetch_data_table(env["QUANDL_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
+
+    # fix where closeunadj == 0
+    df.loc[df['closeunadj']==0, 'closeunadj'] = df['close']
 
     log.info("Adding SIDs to all stocks...")
     df['sid'] = df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
@@ -196,7 +203,8 @@ def from_quandl():
         related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
         # Add a space at the begin and end of relatedtickers, search for ' TICKER '
         related_tickers = ' ' + related_tickers.astype(str) + ' '
-        
+
+
         df = get_data(sharadar_metadata_df, related_tickers, start=start_fetch_date)
 
         # iterate over all the securities and pack data and metadata for writing
