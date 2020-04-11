@@ -1,6 +1,5 @@
-import pandas as pd
 from os import environ as env
-from sharadar.loaders.load import sid, sids
+from sharadar.pipeline.engine import sid, sids
 import quandl
 
 quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
