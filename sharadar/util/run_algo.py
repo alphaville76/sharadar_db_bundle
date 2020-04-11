@@ -1,12 +1,14 @@
-# this file replace zipline/utils/run_algo.py in
+# this file replace zipline/utils/run_algo.py in the __main__ of zipline
+
+import sys
+
 import click
 import os
-import sys
-import warnings
-
-from functools import partial
-
 import pandas as pd
+import warnings
+from functools import partial
+from sharadar.pipeline.engine import load_sep_bundle, make_pipeline_engine
+from sharadar.util.logger import log
 
 try:
     from pygments import highlight
@@ -19,14 +21,11 @@ import six
 from toolz import concatv
 from trading_calendars import get_calendar
 
-from zipline.data import bundles
 from zipline.data.loader import load_market_data
 from zipline.data.data_portal import DataPortal
 from zipline.data.data_portal_live import DataPortalLive
 from zipline.finance import metrics
 from zipline.finance.trading import SimulationParameters
-from zipline.pipeline.data import USEquityPricing
-from zipline.pipeline.loaders import USEquityPricingLoader
 
 import zipline.utils.paths as pth
 from zipline.extensions import load
@@ -101,6 +100,7 @@ def _run(handle_data,
         execution will be aborted.
     execution_id - unique id to identify this execution (backtest or live instance)
     """
+    log.info("Using bundle '%s'." % bundle)
     if benchmark_returns is None:
         benchmark_returns, _ = load_market_data(environ=environ)
 
@@ -171,14 +171,10 @@ def _run(handle_data,
             ),
         )
 
-    bundle_data = bundles.load(
-        bundle,
-        environ,
-        bundle_timestamp,
-    )
+    bundle_data = load_sep_bundle(bundle)
 
     first_trading_day = \
-        bundle_data.equity_minute_bar_reader.first_trading_day
+        bundle_data.equity_daily_bar_reader.first_trading_day
 
     DataPortalClass = (partial(DataPortalLive, broker)
                        if broker
@@ -192,18 +188,6 @@ def _run(handle_data,
         equity_daily_reader=bundle_data.equity_daily_bar_reader,
         adjustment_reader=bundle_data.adjustment_reader,
     )
-
-    pipeline_loader = USEquityPricingLoader(
-        bundle_data.equity_daily_bar_reader,
-        bundle_data.adjustment_reader,
-    )
-
-    def choose_loader(column):
-        if column in USEquityPricing.columns:
-            return pipeline_loader
-        raise ValueError(
-            "No PipelineLoader registered for column %s." % column
-        )
 
     if isinstance(metrics_set, six.string_types):
         try:
@@ -223,10 +207,10 @@ def _run(handle_data,
                                      realtime_bar_target=realtime_bar_target)
                              if broker else TradingAlgorithm)
 
-    perf = TradingAlgorithmClass(
+    algo = TradingAlgorithmClass(
         namespace=namespace,
         data_portal=data,
-        get_pipeline_loader=choose_loader,
+        get_pipeline_loader=None,
         trading_calendar=trading_calendar,
         sim_params=SimulationParameters(
             start_session=start,
@@ -251,7 +235,11 @@ def _run(handle_data,
             'algo_filename': getattr(algofile, 'name', '<algorithm>'),
             'script': algotext,
         }
-    ).run()
+    )
+
+    algo.engine = make_pipeline_engine(bundle_data)
+
+    perf = algo.run()
 
     if output == '-':
         click.echo(str(perf))

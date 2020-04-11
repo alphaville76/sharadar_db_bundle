@@ -2,22 +2,24 @@
 A simple Pipeline algorithm that longs the top 3 stocks by RSI and shorts
 the bottom 3 each day.
 """
+from sharadar.util.universe import NamedUniverse
 from six import viewkeys
 from zipline.api import (
     attach_pipeline,
     order_target_percent,
     pipeline_output,
-    record,
     schedule_function,
 )
-from zipline.algorithm import date_rules
-from zipline.finance import commission, slippage
 from zipline.pipeline.factors import RSI
 import zipline.algorithm as algo
 from zipline.pipeline import Pipeline
-from zipline.pipeline.data import USEquityPricing
-from sharadar.pipeline.filters import TradableStocksUS
-
+from zipline.api import record, get_datetime
+from zipline.utils.pandas_utils import normalize_date
+from zipline.algorithm import log
+from sharadar.pipeline.factors import (
+    Fundamentals,
+    EV
+)
 
 def initialize(context):
     attach_pipeline(make_pipeline(), 'my_pipeline')
@@ -43,18 +45,43 @@ def initialize(context):
 def make_pipeline():
     rsi = RSI()
     return Pipeline(
-        columns={
+        columns = {
             'longs': rsi.top(3),
             'shorts': rsi.bottom(3),
+            'revenue': Fundamentals(field='revenue_art'),
         },
+        # no screen: 1 mo -> ca. 4 minutes;
+        #            1 yr -> 20m
+
+        # base_universe: ca. 1 mo. -> 3 minutes
+        #screen = base_universe()
+
+        # tradable_stocks(): 1 mo. -> ca 1h
+        # 1yr -< 1h 40m
+        #screen = TradableStocksUS()
+
+        # NamedUniverse('tradable_stocks_us'): 1yr 7m
+        screen = NamedUniverse('tradable_stocks_us')
     )
 
 
-def rebalance(context, data):
+def base_universe():
+    #return TradableStocksUS()
+    return (
+        (Fundamentals(field='revenue_art') > 0) &
+        (Fundamentals(field='assets_arq') > 0) &
+        (Fundamentals(field='equity_arq') > 0) &
+        (EV() > 0)
 
+    )
+
+def rebalance(context, data):
+    log.info("rebalance) " + str(normalize_date(get_datetime())))
     # Pipeline data will be a dataframe with boolean columns named 'longs' and
     # 'shorts'.
-    pipeline_data = context.pipeline_data
+    pipeline_data = context.pipeline_data.dropna()
+    log.info(pipeline_data.head())
+
     all_assets = pipeline_data.index
 
     longs = all_assets[pipeline_data.longs]
@@ -88,6 +115,7 @@ def record_vars(context, data):
     """
     Plot variables at the end of each day.
     """
+    log.info("record_vars) " + str(normalize_date(get_datetime())))
     pass
 
 
@@ -98,8 +126,6 @@ def handle_data(context, data):
     pass
 
 
-# Note: this function can be removed if running
-# this algorithm on quantopian.com
 def analyze(context=None, results=None):
     import matplotlib.pyplot as plt
     fig = plt.figure()

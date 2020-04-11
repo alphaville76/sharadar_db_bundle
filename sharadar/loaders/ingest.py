@@ -7,12 +7,13 @@ from sharadar.util.quandl_util import fetch_data_table
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
 from sharadar.util.quandl_util import fetch_sep_table_date, fetch_sf1_table_date
-from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteAssetDBWriter
+from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader
+from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
 from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
-from sharadar.loaders.logger import log, handler
+from sharadar.util.logger import log, handler
 from contextlib import closing
 import sqlite3
 from zipline.data.loader import get_data_filepath
@@ -21,6 +22,10 @@ quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
 
 SEP_BUNDLE_NAME = 'sharadar'
 SEP_BUNDLE_DIR = 'latest'
+
+
+def get_output_dir():
+    return os.path.join(get_data_filepath(SEP_BUNDLE_NAME), SEP_BUNDLE_DIR)
 
 # 'sid' will be used as index
 METADATA_HEADERS = ['symbol', 'asset_name', 'start_date', 'end_date', 'first_traded', 'auto_close_date', 'exchange']
@@ -180,7 +185,7 @@ def from_quandl():
              log.error("%s : %s" % (output_dir, e.strerror))
 
         # use 'latest' (SEP_BUNDLE_DIR) as output dir
-        output_dir = os.path.join(get_data_filepath(SEP_BUNDLE_NAME), SEP_BUNDLE_DIR)
+        output_dir = get_output_dir()
         os.makedirs(output_dir, exist_ok = True)
 
         print("logfiles:", handler._filename)
@@ -228,7 +233,7 @@ def from_quandl():
         log.info("Creating splits data...")
         splits_df = create_splits_df(sharadar_metadata_df, related_tickers, tickers, start_fetch_date)
 
-        # TODO CC mergers
+        # TODO mergers?
         # see also https://github.com/quantopian/zipline/blob/master/zipline/data/adjustments.py
 
         # Write dividends and splits_df

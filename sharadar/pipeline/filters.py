@@ -1,12 +1,14 @@
 from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.loaders.load import (
+from sharadar.pipeline.factors import (
     Exchange,
     Sector,
     IsDomestic,
-    AvgMarketCap,
+    EV,
     MarketCap,
+    Fundamentals
 )
+
 
 def TradableStocksUS():
     return (
@@ -17,5 +19,9 @@ def TradableStocksUS():
         (~Sector().element_of(['Financial Services', 'Real Estate'])) &
         (IsDomestic().eq(1)) &
         (AverageDollarVolume(window_length=200) > 2.5e6) &
-        (MarketCap() > 350e6)
+        (MarketCap() > 350e6) &
+        (Fundamentals(field='revenue_art') > 0) &
+        (Fundamentals(field='assets_arq') > 0) &
+        (Fundamentals(field='equity_arq') > 0) &
+        (EV() > 0)
     )
