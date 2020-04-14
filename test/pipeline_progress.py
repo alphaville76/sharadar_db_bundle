@@ -29,7 +29,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 
 start_time = time.time()
 #stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end)
-stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end)
+stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end, chunksize=125)
 print(stocks)
 print("Elapsed time: %s" % datetime.timedelta(seconds=(time.time() - start_time)))
 
@@ -60,3 +60,6 @@ print("Elapsed time: %s" % datetime.timedelta(seconds=(time.time() - start_time)
 #Elapsed time: 0:00:45.002658
 
 #new method: Elapsed time: 0:00:11.731463 - 4x faster!
+
+#2nd new method chunck 21: Elapsed time: 0:01:52.484754
+#2nd new method no chunks:Elapsed time: 0:01:33.944235

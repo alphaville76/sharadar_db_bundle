@@ -69,7 +69,7 @@ calendar = get_calendar("NYSE")
 #equity_daily_reader = BcolzDailyBarReader(path)
 
 dbpath = '/tmp/prices_new.db'
-sql_writer = SQLiteDailyBarWriter(dbpath, calendar, start, end)
+sql_writer = SQLiteDailyBarWriter(dbpath, calendar)
 sql_writer.write(data, with_progress=True, drop_table=True)
 
 sql_reader = SQLiteDailyBarReader(dbpath)

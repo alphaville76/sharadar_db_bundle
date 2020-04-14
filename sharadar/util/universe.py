@@ -2,14 +2,10 @@ import sqlite3
 from contextlib import closing
 
 import numpy as np
-import os
-import sharadar.pipeline.engine
 from click import progressbar
-from sharadar.loaders.ingest import get_output_dir
 from sharadar.pipeline.engine import make_pipeline_engine
 from sharadar.util.logger import log
 from zipline.pipeline import Pipeline
-from zipline.pipeline.filters import CustomFilter
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "%s" (
@@ -41,15 +37,14 @@ class UniverseWriter(object):
             log.info("Inserting %d SIDs..." % len(stocks.index))
             with progressbar(stocks.index, show_pos=True) as bar:
                 for i in bar:
-                    c.execute("INSERT OR REPLACE INTO %s VALUES ('%s', %d);" % (universe_name, i[0].date(),
-                                                                                sharadar.pipeline.engine.sid))
+                    c.execute("INSERT OR REPLACE INTO %s VALUES ('%s', %d);" % (universe_name, i[0].date(), i[1].sid))
 
         log.info("Universe '%s' successful created/updated" % universe_name)
 
 
     def _execute_pipeline(self, screen, pipe_end, pipe_start):
         pipe = Pipeline(columns={ }, screen = screen)
-        stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end)
+        stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end, chunksize=-1)
         return stocks
 
 
@@ -65,17 +60,3 @@ class UniverseReader(object):
 
         return np.array(cursor.fetchall())
 
-class NamedUniverse(CustomFilter):
-    inputs = []
-    window_length = 1
-
-    def __new__(self, universe_name):
-        self.universe_name = universe_name
-
-        universes_db_path = os.path.join(get_output_dir(), "universes.sqlite")
-        self.universe_reader = UniverseReader(universes_db_path)
-        return super(NamedUniverse, self).__new__(self)
-
-    def compute(self, today, assets, out):
-        sids = self.universe_reader.get_sid(self.universe_name, today.date())
-        out[:] = assets.isin(sids)

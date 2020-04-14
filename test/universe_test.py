@@ -1,13 +1,14 @@
 import pandas as pd
-from sharadar.util.universe import UniverseWriter, UniverseReader, NamedUniverse
+from sharadar.util.universe import UniverseWriter, UniverseReader
+from sharadar.pipeline.filters import NamedUniverse
 from zipline.pipeline.filters import StaticAssets
 from sharadar.pipeline.engine import symbols, make_pipeline_engine
-from sharadar.loaders.ingest import get_output_dir
+from sharadar.util.output_dir import get_output_dir
 import os
 from zipline.pipeline import Pipeline
 from zipline.pipeline.data import USEquityPricing
 
-pipe_start = pd.to_datetime('2020-02-03', utc=True)
+pipe_start = pd.to_datetime('2009-02-03', utc=True)
 pipe_end = pd.to_datetime('2020-02-07', utc=True)
 screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 

@@ -1,11 +1,11 @@
 import pandas as pd
-from sharadar.util.universe import UniverseReader, NamedUniverse
+from sharadar.util.universe import UniverseReader
 from sharadar.pipeline.engine import make_pipeline_engine
-from sharadar.loaders.ingest import get_output_dir
+from sharadar.util.output_dir import get_output_dir
 import os
 from zipline.pipeline import Pipeline
 from zipline.pipeline.data import USEquityPricing
-from sharadar.pipeline.filters import TradableStocksUS
+from sharadar.pipeline.filters import TradableStocksUS, NamedUniverse
 import time
 import datetime
 from zipline.pipeline.factors import CustomFactor

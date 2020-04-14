@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import quandl
+from sharadar.util.output_dir import get_output_dir
 from sharadar.util.quandl_util import fetch_data_table
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
@@ -16,16 +17,10 @@ from pathlib import Path
 from sharadar.util.logger import log, handler
 from contextlib import closing
 import sqlite3
-from zipline.data.loader import get_data_filepath
+from sharadar.util.universe import UniverseWriter
+from sharadar.pipeline.filters import TradableStocksUS
 
 quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
-
-SEP_BUNDLE_NAME = 'sharadar'
-SEP_BUNDLE_DIR = 'latest'
-
-
-def get_output_dir():
-    return os.path.join(get_data_filepath(SEP_BUNDLE_NAME), SEP_BUNDLE_DIR)
 
 # 'sid' will be used as index
 METADATA_HEADERS = ['symbol', 'asset_name', 'start_date', 'end_date', 'first_traded', 'auto_close_date', 'exchange']
@@ -209,7 +204,6 @@ def from_quandl():
         # Add a space at the begin and end of relatedtickers, search for ' TICKER '
         related_tickers = ' ' + related_tickers.astype(str) + ' '
 
-
         df = get_data(sharadar_metadata_df, related_tickers, start=start_fetch_date)
 
         # iterate over all the securities and pack data and metadata for writing
@@ -220,7 +214,7 @@ def from_quandl():
 
         # Write PRICING data
         log.info(("Writing pricing data to '%s'..." % (prices_dbpath)))
-        sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar, start_session, end_session)
+        sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
         df.sort_index(inplace=True)
         sql_daily_bar_writer.write(df, with_progress=show_progress, drop_table=True)
         
@@ -264,7 +258,16 @@ def from_quandl():
             sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date)
         with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
             insert_equity_extra_data_sf1(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
-        
+
+        # Predefined Named Universes
+        universes_dbpath = os.path.join(output_dir, "universes.sqlite")
+        universe_name = 'tradable_stocks_us'
+        screen = TradableStocksUS()
+        universe_start = df.index[0][0].tz_localize('utc')
+        universe_end = df.index[-1][0].tz_localize('utc')
+        log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
+        UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
+
         okay_path = os.path.join(output_dir, "ok")
         Path(okay_path).touch()
         log.info("Ingest finished!")

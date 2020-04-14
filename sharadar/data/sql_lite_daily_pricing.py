@@ -22,58 +22,25 @@ CREATE TABLE IF NOT EXISTS "properties" (
 CREATE INDEX "ix_properties_key" ON "properties" ("key");
 
 CREATE TABLE IF NOT EXISTS "prices" (
-  "date" TIMESTAMP,
-  "sid" INTEGER,
-  "open" REAL,
-  "high" REAL,
-  "low" REAL,
-  "close" REAL,
-  "volume" REAL
+  "date" TIMESTAMP NOT NULL,
+  "sid" INTEGER NOT NULL,
+  "open" REAL NOT NULL,
+  "high" REAL NOT NULL,
+  "low" REAL NOT NULL,
+  "close" REAL NOT NULL,
+  "volume" REAL NOT NULL,
+  PRIMARY KEY (date, sid)
 );
-CREATE INDEX "ix_prices_date_sid" ON "prices" ("date","sid");
+CREATE INDEX "ix_prices_date" ON "prices" ("date");
+CREATE INDEX "ix_prices_sid" ON "prices" ("sid");
 """
 # Sqlite Maximum Number Of Columns in a table or query
 SQLITE_MAX_COLUMN = 2000
 
 @singleton
 class SQLiteDailyBarWriter(object):
-    """
-    Class capable of writing daily OHLCV data to disk in a format that can
-    be read efficiently by BcolzDailyOHLCVReader.
-
-    Parameters
-    ----------
-    filename : str
-        The location at which we should write our output.
-    calendar : zipline.utils.calendar.trading_calendar
-        Calendar to use to compute asset calendar offsets.
-    start_session: pd.Timestamp
-        Midnight UTC session label.
-    end_session: pd.Timestamp
-        Midnight UTC session label.
-
-    See Also
-    --------
-    zipline.data.us_equity_pricing.BcolzDailyBarReader
-    """
-
-
-    def __init__(self, filename, calendar, start_session, end_session):
+    def __init__(self, filename, calendar):
         self._filename = filename
-
-        if start_session != end_session:
-            if not calendar.is_session(start_session):
-                raise ValueError(
-                    "Start session %s is invalid!" % start_session
-                )
-            if not calendar.is_session(end_session):
-                raise ValueError(
-                    "End session %s is invalid!" % end_session
-                )
-
-        self._start_session = start_session
-        self._end_session = end_session
-
         self._calendar = calendar
 
         # Create schema, if not exists
@@ -147,6 +114,22 @@ class SQLiteDailyBarReader(SessionBarReader):
                 raise KeyError(sid)
         return res[0][0]
 
+    def load_raw_arrays(self, fields, start_dt, end_dt, sids):
+        start_day = self._fmt_date(start_dt)
+        end_day = self._fmt_date(end_dt)
+        log.info("Loading raw arrays for %d assets." % (len(sids)))
+
+        raw_arrays = []
+        with sqlite3.connect(self._filename) as conn:
+            for field in fields:
+                query = "SELECT date, sid, %s FROM prices WHERE sid in (%s) and date >= '%s' AND date <= '%s';" \
+                        % (field, ",".join(map(str, sids)), str(start_day), str(end_day))
+                df = pd.read_sql_query(query, conn)
+                result = df.pivot(index='date', columns='sid', values=field)
+                result = result.reindex(columns=sids)
+                raw_arrays.append(result.values)
+        return raw_arrays
+
     def _create_pivot_query(self, field, start_dt, end_dt, sids):
         select = "SELECT "
         select_case = "MAX(CASE WHEN sid = %d THEN " + field +" END) '%d',"
@@ -160,7 +143,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
     @cached
-    def load_raw_arrays(self, fields, start_dt, end_dt, sids):
+    def load_raw_arrays_2(self, fields, start_dt, end_dt, sids):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
 

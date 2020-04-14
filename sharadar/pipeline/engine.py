@@ -6,7 +6,7 @@ import pandas as pd
 from memoization import cached
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
-from sharadar.loaders.ingest import SEP_BUNDLE_NAME, SEP_BUNDLE_DIR
+from sharadar.util.output_dir import SEP_BUNDLE_NAME, SEP_BUNDLE_DIR
 from sharadar.util.logger import log
 from six import iteritems
 from toolz import juxt, groupby
@@ -19,10 +19,16 @@ from zipline.utils import paths as pth
 from zipline.utils.date_utils import compute_date_range_chunks
 from zipline.utils.pandas_utils import categorical_df_concat
 from toolz.curried.operator import getitem
+from zipline.errors import NoFurtherDataError
+
 
 class BundlePipelineEngine(SimplePipelineEngine):
 
-    def run_pipeline(self, pipeline, start_date, end_date, chunksize=21):
+    def run_pipeline(self, pipeline, start_date, end_date, chunksize=120):
+        if chunksize < 0:
+            log.info("Compute pipeline values without chunks.")
+            return self._run_pipeline(pipeline, start_date, end_date)
+
         ranges = compute_date_range_chunks(
             self._calendar,
             start_date,
@@ -60,7 +66,13 @@ class BundlePipelineEngine(SimplePipelineEngine):
             for factor in pipeline.screen.inputs:
                 self._set_asset_finder(factor)
 
-        return super().run_pipeline(pipeline, start_date, end_date)
+        try:
+            return super().run_pipeline(pipeline, start_date, end_date)
+        except NoFurtherDataError as e:
+            new_start_date = self._calendar[self._extra_rows + 1]
+            log.warning("Starting computing universe from %s instead of %s because of insufficient data." % (str(new_start_date.date()), str(start_date.date())))
+            return super().run_pipeline(pipeline, new_start_date, end_date)
+
 
     def _set_asset_finder(self, factor):
         if isinstance(factor, WithAssetFinder):
@@ -163,6 +175,86 @@ class BundlePipelineEngine(SimplePipelineEngine):
             out[name] = workspace[term][graph_extra_rows[term]:]
         return out
 
+    def _compute_root_mask(self, start_date, end_date, extra_rows):
+        """
+        Compute a lifetimes matrix from our AssetFinder, then drop columns that
+        didn't exist at all during the query dates.
+
+        Parameters
+        ----------
+        start_date : pd.Timestamp
+            Base start date for the matrix.
+        end_date : pd.Timestamp
+            End date for the matrix.
+        extra_rows : int
+            Number of extra rows to compute before `start_date`.
+            Extra rows are needed by terms like moving averages that require a
+            trailing window of data.
+
+        Returns
+        -------
+        lifetimes : pd.DataFrame
+            Frame of dtype `bool` containing dates from `extra_rows` days
+            before `start_date`, continuing through to `end_date`.  The
+            returned frame contains as columns all assets in our AssetFinder
+            that existed for at least one day between `start_date` and
+            `end_date`.
+        """
+        calendar = self._calendar
+        finder = self._finder
+        start_idx, end_idx = self._calendar.slice_locs(start_date, end_date)
+        if start_idx < extra_rows:
+            self._extra_rows = extra_rows
+            raise NoFurtherDataError.from_lookback_window(
+                initial_message="Insufficient data to compute Pipeline:",
+                first_date=calendar[0],
+                lookback_start=start_date,
+                lookback_length=extra_rows,
+            )
+
+        # Build lifetimes matrix reaching back to `extra_rows` days before
+        # `start_date.`
+        lifetimes = finder.lifetimes(
+            calendar[start_idx - extra_rows:end_idx],
+            include_start_date=False,
+            country_codes={'??', 'US'},
+        )
+
+        if lifetimes.index[extra_rows] != start_date:
+            raise ValueError(
+                ('The first date (%s) of the lifetimes matrix does not match the'
+                ' start date of the pipeline. Did you forget to align the'
+                ' start_date (%s) to the trading calendar?' % (str(lifetimes.index[extra_rows]), str(start_date)))
+            )
+        if lifetimes.index[-1] != end_date:
+            raise ValueError(
+                ('The last date (%s) of the lifetimes matrix does not match the'
+                ' start date of the pipeline. Did you forget to align the'
+                ' end_date (%s) to the trading calendar?' % (str(lifetimes.index[-1]), str(end_date)))
+            )
+
+        if not lifetimes.columns.unique:
+            columns = lifetimes.columns
+            duplicated = columns[columns.duplicated()].unique()
+            raise AssertionError("Duplicated sids: %d" % duplicated)
+
+        # Filter out columns that didn't exist from the farthest look back
+        # window through the end of the requested dates.
+        existed = lifetimes.any()
+        ret = lifetimes.loc[:, existed]
+        shape = ret.shape
+
+        if shape[0] * shape[1] == 0:
+            raise ValueError(
+                "Found only empty asset-days between {} and {}.\n"
+                "This probably means that either your asset db is out of date"
+                " or that you're trying to run a Pipeline during a period with"
+                " no market days.".format(start_date, end_date),
+            )
+
+        return ret
+
+
 
 class WithAssetFinder:
     _asset_finder = None
@@ -218,9 +310,12 @@ def sids(sids):
     return _asset_finder().retrieve_all(sids)
 
 
-def make_pipeline_engine(bundle=load_sep_bundle(), start=None, end=None):
+def make_pipeline_engine(bundle=None, start=None, end=None):
     """Creates a pipeline engine for the dates in (start, end).
     Using this allows usage very similar to run_pipeline in Quantopian's env."""
+    if bundle is None:
+        bundle = load_sep_bundle()
+
     if start is None:
         start = bundle.equity_daily_bar_reader.first_trading_day
 

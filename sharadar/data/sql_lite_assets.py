@@ -155,7 +155,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         self._write_df_to_table(tbl, assets, txn, chunk_size)
 
         df = pd.DataFrame({
-            sharadar.pipeline.engine.sid.name: assets.index.values,
+            asset_router.c.sid.name: assets.index.values,
             asset_router.c.asset_type.name: asset_type,
         })
         self._write_df_to_table(asset_router, df, txn, chunk_size, idx=False)
