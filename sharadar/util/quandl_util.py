@@ -73,7 +73,7 @@ def load_data_table(file, index_col=None, parse_dates=False):
 
     return data_table
 
-def fetch_data_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
+def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
     log.info("Start loading the entire %s dataset..." % table_name)
     for _ in range(retries):
         try:
@@ -98,15 +98,15 @@ def fetch_data_table(api_key, table_name, index_col=None, parse_dates=False, ret
     else:
         raise ValueError("Failed to download data from '%s' after %d attempts." % (source_url, retries))
 
-def fetch_sep_table_date(api_key, start, end=None, index_col=None):
+def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     """
     Load data from quandl and correct them so that they are unadjusted.
     The index must be the date
     """
 
-    log.info("Start loading Sharadar SEP price data from %s to %s..." % (start, "today" if end is None else end))
+    log.info("Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     quandl.ApiConfig.api_key=api_key
-    df = quandl.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, paginate=True)
+    df = quandl.get_table(table_name, date={'gte':start,'lte':end}, paginate=True)
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
         df.set_index(index_col, inplace=True)

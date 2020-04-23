@@ -5,12 +5,12 @@ from sharadar.pipeline.factors import (
     EV,
     Fundamentals
 )
-from sharadar.pipeline.engine import load_sep_bundle, symbols, make_pipeline_engine
+from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
 
-bundle = load_sep_bundle()
+bundle = load_sharadar_bundle()
 
 spe = make_pipeline_engine()
 

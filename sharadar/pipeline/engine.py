@@ -6,7 +6,7 @@ import pandas as pd
 from memoization import cached
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
-from sharadar.util.output_dir import SEP_BUNDLE_NAME, SEP_BUNDLE_DIR
+from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR
 from sharadar.util.logger import log
 from six import iteritems
 from toolz import juxt, groupby
@@ -276,7 +276,7 @@ def daily_equity_path(bundle_name, timestr, environ=None):
     )
 
 
-def load_sep_bundle(name=SEP_BUNDLE_NAME, timestr=SEP_BUNDLE_DIR, environ=os.environ):
+def load_sharadar_bundle(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return BundleData(
         asset_finder = SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ),),
         equity_minute_bar_reader = None,
@@ -286,7 +286,7 @@ def load_sep_bundle(name=SEP_BUNDLE_NAME, timestr=SEP_BUNDLE_DIR, environ=os.env
 
 
 @cached
-def _asset_finder(name=SEP_BUNDLE_NAME, timestr=SEP_BUNDLE_DIR, environ=os.environ):
+def _asset_finder(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ))
 
 
@@ -314,7 +314,7 @@ def make_pipeline_engine(bundle=None, start=None, end=None):
     """Creates a pipeline engine for the dates in (start, end).
     Using this allows usage very similar to run_pipeline in Quantopian's env."""
     if bundle is None:
-        bundle = load_sep_bundle()
+        bundle = load_sharadar_bundle()
 
     if start is None:
         start = bundle.equity_daily_bar_reader.first_trading_day

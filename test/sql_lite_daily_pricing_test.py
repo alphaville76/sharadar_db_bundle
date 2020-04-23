@@ -3,7 +3,7 @@ from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDai
 import quandl
 from os import environ as env
 import pandas as pd
-from sharadar.loaders import process_data_table
+from sharadar.loaders.ingest import process_data_table
 from zipline.utils.calendars import get_calendar
 from sharadar.util.equity_supplementary_util import lookup_sid
 from zipline.data.bar_reader import (
@@ -70,7 +70,7 @@ calendar = get_calendar("NYSE")
 
 dbpath = '/tmp/prices_new.db'
 sql_writer = SQLiteDailyBarWriter(dbpath, calendar)
-sql_writer.write(data, with_progress=True, drop_table=True)
+sql_writer.write(data)
 
 sql_reader = SQLiteDailyBarReader(dbpath)
 

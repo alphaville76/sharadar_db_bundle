@@ -2,10 +2,13 @@ import sqlite3
 from contextlib import closing
 
 import numpy as np
+import pandas as pd
 from click import progressbar
 from sharadar.pipeline.engine import make_pipeline_engine
 from sharadar.util.logger import log
 from zipline.pipeline import Pipeline
+from singleton_decorator import singleton
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "%s" (
@@ -47,16 +50,30 @@ class UniverseWriter(object):
         stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end, chunksize=-1)
         return stocks
 
-
+@singleton
 class UniverseReader(object):
     def __init__(self, db_path):
-        self.universes_db_path = db_path
+        db = sqlite3.connect(db_path, isolation_level=None)
+        db.row_factory = lambda cursor, row: row[0]
+        self.cursor = db.cursor()
+
+    def _query(self, sql):
+        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+            c.execute(sql)
+            return c.fetchall()
 
     def get_sid(self, universe_name, date):
-        db = sqlite3.connect(self.universes_db_path, isolation_level=None)
-        db.row_factory = lambda cursor, row: row[0]
-        cursor = db.cursor()
-        cursor.execute("SELECT sid FROM %s where date = '%s'" % (universe_name, date))
+        self.cursor.execute("SELECT sid FROM %s where date = '%s'" % (universe_name, date))
+        return np.array(self.cursor.fetchall())
 
-        return np.array(cursor.fetchall())
+    def get_last_date(self, universe_name):
+        sql = "SELECT MAX(date) FROM %s" % universe_name
+        try:
+            self.cursor.execute(sql)
+        except:
+            return pd.NaT
+        res = self.cursor.fetchall()
+        if len(res) == 0:
+            return pd.NaT
+        return pd.Timestamp(res[0], tz='UTC')
 

@@ -19,7 +19,11 @@ universes_db_path = os.path.join(get_output_dir(), "universes.sqlite")
 
 universe_name = 'tradable_stocks_us'
 
-sids = UniverseReader(universes_db_path).get_sid(universe_name, '2020-02-07')
+reader = UniverseReader(universes_db_path)
+print('last date', universe_name, reader.get_last_date(universe_name))
+print('last date not existent table', reader.get_last_date('not_existent'))
+print('last date not existent db', UniverseReader('not_existent').get_last_date('not_existent'))
+sids = reader.get_sid(universe_name, '2020-02-07')
 print(len(sids))
 
 spe = make_pipeline_engine()

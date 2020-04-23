@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from zipline.utils.cli import maybe_show_progress
 
+# 'sid' will be used as index
+METADATA_HEADERS = ['symbol', 'asset_name', 'start_date', 'end_date', 'first_traded', 'auto_close_date', 'exchange']
+
 ONE_DAY = pd.Timedelta(days=1)
 
 def insert_equity_extra_data_basic(sharadar_metadata_df, cursor):

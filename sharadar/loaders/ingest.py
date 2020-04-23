@@ -4,10 +4,10 @@ import pandas as pd
 import numpy as np
 import quandl
 from sharadar.util.output_dir import get_output_dir
-from sharadar.util.quandl_util import fetch_data_table
-from sharadar.util.equity_supplementary_util import lookup_sid
+from sharadar.util.quandl_util import fetch_entire_table
+from sharadar.util.equity_supplementary_util import lookup_sid, METADATA_HEADERS
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
-from sharadar.util.quandl_util import fetch_sep_table_date, fetch_sf1_table_date
+from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
 from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
@@ -17,13 +17,12 @@ from pathlib import Path
 from sharadar.util.logger import log, handler
 from contextlib import closing
 import sqlite3
-from sharadar.util.universe import UniverseWriter
+from sharadar.util.universe import UniverseWriter, UniverseReader
 from sharadar.pipeline.filters import TradableStocksUS
+from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 
 quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
 
-# 'sid' will be used as index
-METADATA_HEADERS = ['symbol', 'asset_name', 'start_date', 'end_date', 'first_traded', 'auto_close_date', 'exchange']
 
 EXCHANGE_DF = pd.DataFrame([
     ['NYSE', 'The New York Stock Exchange', 'US'],
@@ -31,7 +30,9 @@ EXCHANGE_DF = pd.DataFrame([
     ['OTC', 'Over The Counter', 'US'],
     ['NYSEMKT', 'American Stock Exchange', 'US'],
     ['NYSEARCA', 'Archipelago Exchange', 'US'],
-    ['BATS', 'Better Alternative Trading System Exchange', 'US']
+    ['BATS', 'Better Alternative Trading System Exchange', 'US'],
+    ['MACRO', 'Macroeconomic Data', 'US'],
+    ['INDEX', 'Index Data', 'US'],
     ],
     columns= ['exchange', 'canonical_name', 'country_code'])
 
@@ -56,13 +57,27 @@ def process_data_table(df):
     return df
 
 
-def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
+def fetch_data(end, start):
+    """
+    Fetch the Sharadar Equity Prices (SEP) and Sharadar Fund Prices (SFP). Entire dataset or by date.
+    """
     if start is not None:
-        df = fetch_sep_table_date(env["QUANDL_API_KEY"], start, end)
+        df_sep = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/SEP', start, end)
+        df_sfp = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/SFP', start, end)
     else:
-        df = fetch_data_table(env["QUANDL_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
+        df_sep = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
+        df_sfp = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SFP", parse_dates=['date'])
+
+    df = df_sep.append(df_sfp)
+    df = df.drop_duplicates().reset_index(drop=True)
+    return df
+
+
+def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
+    df = fetch_data(end, start)
 
     # fix where closeunadj == 0
+
     df.loc[df['closeunadj']==0, 'closeunadj'] = df['close']
 
     log.info("Adding SIDs to all stocks...")
@@ -74,6 +89,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
     
     df = process_data_table(df)
     return df
+
 
 def create_dividends_df(df, sharadar_metadata_df):
     dividends_df = df
@@ -179,13 +195,13 @@ def from_quandl():
         except OSError as e:
              log.error("%s : %s" % (output_dir, e.strerror))
 
-        # use 'latest' (SEP_BUNDLE_DIR) as output dir
+        # use 'latest' (SHARADAR_BUNDLE_DIR) as output dir
         output_dir = get_output_dir()
         os.makedirs(output_dir, exist_ok = True)
 
         print("logfiles:", handler._filename)
 
-        log.info("Start ingesting SEP and SF1 data into %s ..." % output_dir)
+        log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
         # Check valid trading dates, according to the selected exchange calendar
         sessions = calendar.sessions_in_range(start_session, end_session)
@@ -198,30 +214,30 @@ def from_quandl():
             log.info("Last available date: %s" % start_fetch_date)
         
         log.info("Start loading sharadar metadata...")
-        sharadar_metadata_df = quandl.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
+        sharadar_metadata_df = quandl.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
         sharadar_metadata_df.set_index('ticker', inplace=True)
         related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
         # Add a space at the begin and end of relatedtickers, search for ' TICKER '
         related_tickers = ' ' + related_tickers.astype(str) + ' '
 
-        df = get_data(sharadar_metadata_df, related_tickers, start=start_fetch_date)
+        prices_df = get_data(sharadar_metadata_df, related_tickers, start=start_fetch_date)
 
         # iterate over all the securities and pack data and metadata for writing
-        tickers = df['ticker'].unique()
+        tickers = prices_df['ticker'].unique()
         log.info("Start writing price data for %d equities." % (len(tickers)))
 
-        equities_df = create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progress)
+        equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress)
 
         # Write PRICING data
         log.info(("Writing pricing data to '%s'..." % (prices_dbpath)))
         sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
-        df.sort_index(inplace=True)
-        sql_daily_bar_writer.write(df, with_progress=show_progress, drop_table=True)
+        prices_df.sort_index(inplace=True)
+        sql_daily_bar_writer.write(prices_df)
         
         # DIVIDENDS
         log.info("Creating dividends data...")
         # see also https://github.com/shlomikushchi/zipline-live2/blob/master/zipline/data/bundles/csvdir.py
-        dividends_df = create_dividends_df(df, sharadar_metadata_df)
+        dividends_df = create_dividends_df(prices_df, sharadar_metadata_df)
 
         # SPLITS
         log.info("Creating splits data...")
@@ -253,7 +269,7 @@ def from_quandl():
 
         log.info("Start creating Fundamentals dataframe...")
         if start_fetch_date is None:
-            sf1_df = fetch_data_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
+            sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
         else:
             sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date)
         with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
@@ -263,10 +279,25 @@ def from_quandl():
         universes_dbpath = os.path.join(output_dir, "universes.sqlite")
         universe_name = 'tradable_stocks_us'
         screen = TradableStocksUS()
-        universe_start = df.index[0][0].tz_localize('utc')
-        universe_end = df.index[-1][0].tz_localize('utc')
+        prices_start = prices_df.index[0][0]
+        prices_end = prices_df.index[-1][0]
+        universe_start = prices_start.tz_localize('utc')
+        universe_end = prices_end.tz_localize('utc')
+
+        universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
+        if universe_last_date is not pd.NaT:
+            universe_start = universe_last_date
+
         log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
         UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
+
+        # Additional MACRO data
+        log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
+        macro_equities_df = create_macro_equities_df(prices_start, prices_end)
+        asset_db_writer.write(equities=macro_equities_df)
+
+        macro_prices_df = create_macro_prices_df(prices_start, prices_end)
+        sql_daily_bar_writer.write(macro_prices_df)
 
         okay_path = os.path.join(output_dir, "ok")
         Path(okay_path).touch()
@@ -293,10 +324,10 @@ def from_quandl():
                 end_date = sharadar_metadata.loc['lastpricedate']
 
                 # The first date we have trade data for this asset.
-                first_traded = sharadar_metadata.loc['firstpricedate']
+                first_traded = start_date
 
                 # The date on which to close any positions in this asset.
-                auto_close_date = sharadar_metadata.loc['lastpricedate'] + pd.Timedelta(days=1)
+                auto_close_date = end_date + pd.Timedelta(days=1)
 
                 exchange = sharadar_metadata.loc['exchange']
                 if (exchange is None) or (exchange == 'None'):

@@ -56,7 +56,7 @@ class SQLiteDailyBarWriter(object):
         if data.index.names != ['date', 'sid']:
             raise ValueError("data indexes must be ['date', 'sid'].")
 
-    def write(self, data, with_progress=True, drop_table=False):
+    def write(self, data):
         self._validate(data)
 
         df = data[['open', 'high', 'low', 'close', 'volume']]
@@ -114,6 +114,7 @@ class SQLiteDailyBarReader(SessionBarReader):
                 raise KeyError(sid)
         return res[0][0]
 
+    @cached
     def load_raw_arrays(self, fields, start_dt, end_dt, sids):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
@@ -128,40 +129,6 @@ class SQLiteDailyBarReader(SessionBarReader):
                 result = df.pivot(index='date', columns='sid', values=field)
                 result = result.reindex(columns=sids)
                 raw_arrays.append(result.values)
-        return raw_arrays
-
-    def _create_pivot_query(self, field, start_dt, end_dt, sids):
-        select = "SELECT "
-        select_case = "MAX(CASE WHEN sid = %d THEN " + field +" END) '%d',"
-        for sid in sids:
-            select += (select_case % (sid, sid))
-
-        return select[:-1] + " FROM prices WHERE date >= '" + str(start_dt) + "' and date <= '" + str(end_dt) + "' GROUP BY date"
-
-
-    def _chunker(self, seq, size):
-        return (seq[pos:pos + size] for pos in range(0, len(seq), size))
-
-    @cached
-    def load_raw_arrays_2(self, fields, start_dt, end_dt, sids):
-        start_day = self._fmt_date(start_dt)
-        end_day = self._fmt_date(end_dt)
-
-        log.info("Loading raw arrays for %d assets." % (len(sids)))
-
-        raw_arrays = []
-        for field in fields:
-            result_chunks = []
-            for sids_chunk in self._chunker(sids, SQLITE_MAX_COLUMN):
-                sid_from = 1 + len(result_chunks)*SQLITE_MAX_COLUMN
-                sid_to = min(sid_from + SQLITE_MAX_COLUMN-1, len(sids))
-                log.info("Loading raw array for field '%s' from the assets no. %d to the assets no. %d." \
-                         % (field, sid_from, sid_to))
-                pivot_query = self._create_pivot_query(field, start_day, end_day, sids_chunk)
-                result_chunks.append(self._query(pivot_query))
-            #result = np.hstack(result_chunks)
-            result = np.concatenate(result_chunks, axis=1)
-            raw_arrays.append(np.array(result,  dtype=float))
         return raw_arrays
 
     def get_last_traded_dt(self, sid, dt):

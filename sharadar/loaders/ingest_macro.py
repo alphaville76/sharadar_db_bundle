@@ -1,0 +1,110 @@
+import quandl
+import os
+from os import environ as env
+from pandas.tseries.offsets import DateOffset
+import pandas as pd
+from sharadar.util.equity_supplementary_util import METADATA_HEADERS
+from sharadar.util.output_dir import get_output_dir
+
+quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+
+
+def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
+    # The first date we have trade data for this asset.
+    first_traded = start_date
+
+    # The date on which to close any positions in this asset.
+    auto_close_date = end_date + pd.Timedelta(days=1)
+
+    exchange = 'MACRO'
+    df.loc[sid] = (ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange)
+
+def _quandl_get_monthly_to_daily(name, start_date, end_date, transform=None):
+    m_start = start_date - DateOffset(months=3)
+    df = quandl.get(name, start_date=m_start, end_date=end_date, transform=transform)
+    new_index = pd.date_range(start=m_start, end=end_date)
+    return df.reindex(new_index, method='ffill').loc[pd.date_range(start=start_date, end=end_date)]
+
+
+def _to_prices_df(df, sid):
+    df['sid'] = sid
+    df.set_index('sid', append=True, inplace=True)
+    df = _append_ohlc(df)
+    return df
+
+
+def _append_ohlc(df):
+    df.index.names = ['date', 'sid']
+    df.columns = ['open']
+    df['high'] = df['low'] = df['close'] = df['open']
+    df['volume'] = 100.0
+    df['dividends'] = 0.0
+    return df
+
+
+def create_macro_equities_df(start_date, end_date):
+    df = pd.DataFrame(columns=METADATA_HEADERS)
+    _add_macro_def(df, 10001, start_date, end_date, 'TR1M', 'US Treasury Bill 1 MO')
+    _add_macro_def(df, 10002, start_date, end_date, 'TR2M', 'US Treasury Bill 2 MO')
+    _add_macro_def(df, 10003, start_date, end_date, 'TR3M', 'US Treasury Bill 3 MO')
+    _add_macro_def(df, 10006, start_date, end_date, 'TR6M', 'US Treasury Bill 6 MO')
+    _add_macro_def(df, 10012, start_date, end_date, 'TR1Y', 'US Treasury Bond 1 YR')
+    _add_macro_def(df, 10024, start_date, end_date, 'TR2Y', 'US Treasury Bond 2 YR')
+    _add_macro_def(df, 10036, start_date, end_date, 'TR3Y', 'US Treasury Bond 3 YR')
+    _add_macro_def(df, 10060, start_date, end_date, 'TR5Y', 'US Treasury Bond 5 YR')
+    _add_macro_def(df, 10084, start_date, end_date, 'TR7Y', 'US Treasury Bond 7 YR')
+    _add_macro_def(df, 10120, start_date, end_date, 'TR10Y', 'US Treasury Bond 10 YR')
+    _add_macro_def(df, 10240, start_date, end_date, 'TR20Y', 'US Treasury Bond 20 YR')
+    _add_macro_def(df, 10360, start_date, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
+    _add_macro_def(df, 10400, start_date, end_date, 'CORP_BOND', 'US Corporate Bond Yield')
+    _add_macro_def(df, 10410, start_date, end_date, 'INDPRO', 'Industrial Production Index')
+    _add_macro_def(df, 10420, start_date, end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
+    _add_macro_def(df, 10430, start_date, end_date, 'PMI_COMP', 'Purchasing Managers Index')
+    _add_macro_def(df, 10440, start_date, end_date, 'UNRATE', 'Civilian Unemployment Rate')
+    _add_macro_def(df, 10450, start_date, end_date, 'RATEINF', 'US Inflation Rates YoY')
+    return df
+
+
+def create_macro_prices_df(start, end):
+    # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
+    tres_df = quandl.get("USTREASURY/YIELD", start_date=start, end_date=end)
+    # sids
+    tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
+
+    prices = tres_df.unstack().to_frame()
+    prices = prices.swaplevel()
+    prices = _append_ohlc(prices)
+
+    # https://www.quandl.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
+    corp_bond_df = _to_prices_df(quandl.get("ML/USEY", start_date=start, end_date=end), 10400)
+    prices = prices.append(corp_bond_df)
+
+    # Industrial Production Change
+    # Frequency: monthly
+    indpro_df = _to_prices_df(_quandl_get_monthly_to_daily("FRED/INDPRO", start_date=start, end_date=end), 10410)
+    prices = prices.append(indpro_df)
+
+    # rdiff: row-on-row % change
+    indpro_p_df = _to_prices_df(
+        _quandl_get_monthly_to_daily("FRED/INDPRO", start_date=start, end_date=end, transform="rdiff"), 10420)
+    prices = prices.append(indpro_p_df)
+
+    # ISM Purchasing Managers Index
+    # https://www.quandl.com/data/ISM/MAN_PMI-PMI-Composite-Index
+    # Frequency: monthly
+    pmi_df = _to_prices_df(_quandl_get_monthly_to_daily("ISM/MAN_PMI", start_date=start, end_date=end), 10430)
+    prices = prices.append(pmi_df)
+
+    # Civilian Unemployment Rate
+    # https://www.quandl.com/data/FRED/UNRATE-Civilian-Unemployment-Rate
+    # Frequency: monthly
+    unrate_df = _to_prices_df(_quandl_get_monthly_to_daily("FRED/UNRATE", start_date=start, end_date=end), 10440)
+    prices = prices.append(unrate_df)
+
+    # https://www.quandl.com/data/RATEINF/INFLATION_USA-Inflation-YOY-USA
+    # Frequency: monthly
+    inf_df = _to_prices_df(_quandl_get_monthly_to_daily("RATEINF/INFLATION_USA", start_date=start, end_date=end), 10450)
+    prices = prices.append(inf_df)
+
+    prices.sort_index(inplace=True)
+    return prices

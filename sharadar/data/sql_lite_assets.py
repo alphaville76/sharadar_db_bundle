@@ -1,7 +1,6 @@
 import math
 import numpy as np
 import pandas as pd
-import sharadar.pipeline.engine
 import warnings
 from memoization import cached
 from singleton_decorator import singleton

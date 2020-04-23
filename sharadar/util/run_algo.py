@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import warnings
 from functools import partial
-from sharadar.pipeline.engine import load_sep_bundle, make_pipeline_engine
+from sharadar.pipeline.engine import load_sharadar_bundle, make_pipeline_engine
 from sharadar.util.logger import log
 
 try:
@@ -171,7 +171,7 @@ def _run(handle_data,
             ),
         )
 
-    bundle_data = load_sep_bundle(bundle)
+    bundle_data = load_sharadar_bundle(bundle)
 
     first_trading_day = \
         bundle_data.equity_daily_bar_reader.first_trading_day
