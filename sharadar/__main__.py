@@ -54,7 +54,7 @@ except NameError:
     help='Any custom command line arguments to define, in key=value form.'
 )
 def main(extension, strict_extensions, default_extension, x):
-    """Top level zipline entry point.
+    """Top level zipline entry point for Sharadar Datasets.
     """
 
     # install a logbook handler before performing any other operations
@@ -155,7 +155,7 @@ def ipython_only(option):
 @click.option(
     '-b',
     '--bundle',
-    default='quandl',
+    default='sharadar',
     metavar='BUNDLE-NAME',
     show_default=True,
     help='The data bundle to use for the simulation.',
@@ -404,7 +404,7 @@ def zipline_magic(line, cell=None):
 @click.option(
     '-b',
     '--bundle',
-    default='quandl',
+    default='sharadar',
     metavar='BUNDLE-NAME',
     show_default=True,
     help='The data bundle to ingest.',
@@ -436,7 +436,7 @@ def ingest(bundle, assets_version, show_progress):
 @click.option(
     '-b',
     '--bundle',
-    default='quandl',
+    default='sharadar',
     metavar='BUNDLE-NAME',
     show_default=True,
     help='The data bundle to clean.',
