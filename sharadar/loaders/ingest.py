@@ -20,9 +20,9 @@ import sqlite3
 from sharadar.util.universe import UniverseWriter, UniverseReader
 from sharadar.pipeline.filters import TradableStocksUS
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
+import traceback
 
-quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
-
+quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 EXCHANGE_DF = pd.DataFrame([
     ['NYSE', 'The New York Stock Exchange', 'US'],
@@ -33,8 +33,8 @@ EXCHANGE_DF = pd.DataFrame([
     ['BATS', 'Better Alternative Trading System Exchange', 'US'],
     ['MACRO', 'Macroeconomic Data', 'US'],
     ['INDEX', 'Index Data', 'US'],
-    ],
-    columns= ['exchange', 'canonical_name', 'country_code'])
+],
+    columns=['exchange', 'canonical_name', 'country_code'])
 
 
 def process_data_table(df):
@@ -78,7 +78,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
     # fix where closeunadj == 0
 
-    df.loc[df['closeunadj']==0, 'closeunadj'] = df['close']
+    df.loc[df['closeunadj'] == 0, 'closeunadj'] = df['close']
 
     log.info("Adding SIDs to all stocks...")
     df['sid'] = df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
@@ -86,7 +86,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
     unknown_sids = df[df['sid'] == -1]
     df.drop(unknown_sids.index, inplace=True)
     df.set_index(['date', 'sid'], inplace=True)
-    
+
     df = process_data_table(df)
     return df
 
@@ -100,42 +100,44 @@ def create_dividends_df(df, sharadar_metadata_df):
     dividends_df = dividends_df.rename(columns={'dividends': 'amount'})
     dividends_df = dividends_df.drop(['open', 'high', 'low', 'close', 'volume', 'ticker'], axis=1)
     dividends_df.index = dividends_df.index.get_level_values('date')
-    dividends_df['record_date'] = dividends_df['declared_date'] = dividends_df['pay_date'] = dividends_df['ex_date'] = dividends_df.index
+    dividends_df['record_date'] = dividends_df['declared_date'] = dividends_df['pay_date'] = dividends_df[
+        'ex_date'] = dividends_df.index
 
     # Workaround to avoid dividend warning: This is because dividends are applied to the previous trading day
     # we don't have price data before 2009-01-02
-    first_day =  pd.to_datetime('2009-01-02') # it was friday
+    first_day = pd.to_datetime('2009-01-02')  # it was friday
     if first_day in dividends_df.index:
         second_day = pd.to_datetime('2009-01-05')
         dividends_df.loc[first_day, ['record_date', 'declared_date', 'pay_date', 'ex_date']] = second_day
         # and finally, replace the index
         dividends_df = dividends_df.rename(index={first_day: second_day})
-    
+
     return dividends_df
 
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
     splits_df = quandl.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
 
-    #Remove splits_df entries, whose ticker doesn't exist
+    # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
     tickers_intersect = set(existing_tickers).intersection(tickers_splits)
     splits_df = splits_df.loc[splits_df['ticker'].isin(tickers_intersect)]
 
-    #The date dtype is already datetime64[ns]
+    # The date dtype is already datetime64[ns]
     splits_df['value'] = 1.0 / splits_df['value']
     splits_df.rename(
-            columns={
-                'value': 'ratio',
-                'date': 'effective_date',
-            },
-            inplace=True,
-            copy=False,
-        )
+        columns={
+            'value': 'ratio',
+            'date': 'effective_date',
+        },
+        inplace=True,
+        copy=False,
+    )
     splits_df['ratio'] = splits_df['ratio'].astype(float)
     splits_df['sid'] = splits_df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
     splits_df.drop(['action', 'name', 'contraticker', 'contraname', 'ticker'], axis=1, inplace=True)
     return splits_df
+
 
 def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
     this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
@@ -146,22 +148,23 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         ticker = df_ticker['ticker'][0]
         log.info("Fixing missing interstitial dates for %s (%d)." % (ticker, sid))
 
-        sids = np.full(len(this_cal), sid)      
+        sids = np.full(len(this_cal), sid)
         synch_index = pd.MultiIndex.from_arrays([this_cal.tz_localize(None), sids], names=('date', 'sid'))
         df_ticker_synch = df_ticker.reindex(synch_index)
 
         # Forward fill missing data, volume and dividens must remain 0
         columns_ffill = ['ticker', 'open', 'high', 'low', 'close']
         df_ticker_synch[columns_ffill] = df_ticker_synch[columns_ffill].fillna(method='ffill')
-        df_ticker_synch = df_ticker_synch.fillna({'volume':0, 'dividends':0})
-        
+        df_ticker_synch = df_ticker_synch.fillna({'volume': 0, 'dividends': 0})
+
         # Drop remaining NaN
         df_ticker_synch.dropna(inplace=True)
-    
+
         # drop the existing sub dataframe
         df.drop(df_ticker.index, inplace=True)
         # and replace if with the new one with all the dates.
         df.append(df_ticker_synch)
+
 
 def from_quandl():
     """
@@ -175,29 +178,25 @@ def from_quandl():
 
     register("sharadar", from_quandl(), create_writers=False)
     """
-        
 
-    def ingest(environ,
-           asset_db_writer,
-           minute_bar_writer,
-           daily_bar_writer,
-           adjustment_writer,
-           calendar,
-           start_session,
-           end_session,
-           cache,
-           show_progress,
-           output_dir):
-
+    def ingest(environ, asset_db_writer, minute_bar_writer, daily_bar_writer, adjustment_writer, calendar,
+               start_session, end_session, cache, show_progress, output_dir):
         # remove the output_dir with the timestamp, it should be empty
         try:
             os.rmdir(output_dir)
         except OSError as e:
-             log.error("%s : %s" % (output_dir, e.strerror))
+            log.error("%s : %s" % (output_dir, e.strerror))
 
+        try:
+            _ingest(calendar, start_session, end_session)
+        except Exception as e:
+            log.error(traceback.format_exc())
+
+
+    def _ingest(calendar, start_session, end_session):
         # use 'latest' (SHARADAR_BUNDLE_DIR) as output dir
         output_dir = get_output_dir()
-        os.makedirs(output_dir, exist_ok = True)
+        os.makedirs(output_dir, exist_ok=True)
 
         print("logfiles:", logfilename)
 
@@ -207,12 +206,12 @@ def from_quandl():
         sessions = calendar.sessions_in_range(start_session, end_session)
 
         prices_dbpath = os.path.join(output_dir, "prices.sqlite")
-        
+
         start_fetch_date = None
         if os.path.exists(prices_dbpath):
             start_fetch_date = SQLiteDailyBarReader(prices_dbpath).last_available_dt.strftime('%Y-%m-%d')
             log.info("Last available date: %s" % start_fetch_date)
-        
+
         log.info("Start loading sharadar metadata...")
         sharadar_metadata_df = quandl.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
         sharadar_metadata_df.set_index('ticker', inplace=True)
@@ -226,14 +225,14 @@ def from_quandl():
         tickers = prices_df['ticker'].unique()
         log.info("Start writing price data for %d equities." % (len(tickers)))
 
-        equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress)
+        equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress=True)
 
         # Write PRICING data
         log.info(("Writing pricing data to '%s'..." % (prices_dbpath)))
         sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
         prices_df.sort_index(inplace=True)
         sql_daily_bar_writer.write(prices_df)
-        
+
         # DIVIDENDS
         log.info("Creating dividends data...")
         # see also https://github.com/shlomikushchi/zipline-live2/blob/master/zipline/data/bundles/csvdir.py
@@ -250,11 +249,11 @@ def from_quandl():
         sql_daily_bar_reader = SQLiteDailyBarReader(prices_dbpath)
         adjustment_dbpath = os.path.join(output_dir, "adjustments.sqlite")
         adjustment_writer = SQLiteAdjustmentWriter(adjustment_dbpath, sql_daily_bar_reader, sessions, overwrite=True)
-        
+
         log.info("Start writing %d splits and %d dividends data..." % (len(splits_df), len(dividends_df)))
         adjustment_writer.write(splits=splits_df, dividends=dividends_df)
         adjustment_writer.close()
-               
+
         # Write equity metadata
         log.info("Start writing equities and supplementary_mappings data...")
         asset_dbpath = os.path.join(output_dir, ("assets-%d.sqlite" % ASSET_DB_VERSION))
@@ -285,7 +284,6 @@ def from_quandl():
 
         macro_prices_df = create_macro_prices_df(prices_start, prices_end)
         sql_daily_bar_writer.write(macro_prices_df)
-
 
         # Predefined Named Universes
         create_tradable_stocks_universe(output_dir, prices_start, prices_end)
