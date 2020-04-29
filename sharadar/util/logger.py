@@ -1,8 +1,9 @@
 import os, sys
 from os import environ as env
-from logbook import Logger, FileHandler, DEBUG, StreamHandler
+from logbook import Logger, FileHandler, DEBUG, INFO, StreamHandler
 
-handler = FileHandler(os.path.join(env["HOME"], "log", "ingest_sharadar.log"), level=DEBUG)
-handler.push_application()
-StreamHandler(sys.stdout, bubble=True).push_application()
+logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline.log")
 log = Logger('sharadar_db_bundle')
+log.handlers.append(FileHandler(logfilename, level=DEBUG, bubble=True))
+log.handlers.append(StreamHandler(sys.stdout, level=INFO))
+

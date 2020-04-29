@@ -14,7 +14,7 @@ from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
-from sharadar.util.logger import log, handler
+from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
 from sharadar.util.universe import UniverseWriter, UniverseReader
@@ -199,7 +199,7 @@ def from_quandl():
         output_dir = get_output_dir()
         os.makedirs(output_dir, exist_ok = True)
 
-        print("logfiles:", handler._filename)
+        print("logfiles:", logfilename)
 
         log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
