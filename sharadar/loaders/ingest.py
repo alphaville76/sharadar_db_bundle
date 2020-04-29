@@ -275,23 +275,10 @@ def from_quandl():
         with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
             insert_equity_extra_data_sf1(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
 
-        # Predefined Named Universes
-        universes_dbpath = os.path.join(output_dir, "universes.sqlite")
-        universe_name = 'tradable_stocks_us'
-        screen = TradableStocksUS()
+        # Additional MACRO data
         prices_start = prices_df.index[0][0]
         prices_end = prices_df.index[-1][0]
-        universe_start = prices_start.tz_localize('utc')
-        universe_end = prices_end.tz_localize('utc')
 
-        universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
-        if universe_last_date is not pd.NaT:
-            universe_start = universe_last_date
-
-        log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
-        UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
-
-        # Additional MACRO data
         log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
         macro_equities_df = create_macro_equities_df(prices_start, prices_end)
         asset_db_writer.write(equities=macro_equities_df)
@@ -299,9 +286,25 @@ def from_quandl():
         macro_prices_df = create_macro_prices_df(prices_start, prices_end)
         sql_daily_bar_writer.write(macro_prices_df)
 
+
+        # Predefined Named Universes
+        create_tradable_stocks_universe(output_dir, prices_start, prices_end)
+
         okay_path = os.path.join(output_dir, "ok")
         Path(okay_path).touch()
         log.info("Ingest finished!")
+
+    def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
+        universes_dbpath = os.path.join(output_dir, "universes.sqlite")
+        universe_name = 'tradable_stocks_us'
+        screen = TradableStocksUS()
+        universe_start = prices_start.tz_localize('utc')
+        universe_end = prices_end.tz_localize('utc')
+        universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
+        if universe_last_date is not pd.NaT:
+            universe_start = universe_last_date
+        log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
+        UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
 
     def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progress):
         # Prepare an empty DataFrame for equities, the index of this dataframe is the sid.
