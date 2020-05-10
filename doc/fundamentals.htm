@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+	font-family: sans-serif;
+}
+
+pre {
+	background-color: powderblue; 
+	font-size: 150%;
+	margin-top: 0px;
+	margin-bottom: 0px 
+}
+
+div {
+	margin-bottom: 30px 
+}
+
+</style>
+</head>
+<body>
+<div id="section">
+<pre>assets</pre>
+Balance Sheet/Total Assets, unit: currency
+<br/>
+Sum of the carrying amounts as of the balance sheet date of all assets that are recognized. Major components are [CashnEq]; [Investments];[Intangibles]; [PPNENet];[TaxAssets] and [Receivables].
+</div>
+<div id="section">
+<pre>cashneq</pre>
+Balance Sheet/Cash and Equivalents, unit: currency
+<br/>
+A component of [Assets] representing the amount of currency on hand as well as demand deposits with banks or financial institutions.
+</div>
+<div id="section">
+<pre>investments</pre>
+Balance Sheet/Investments, unit: currency
+<br/>
+A component of [Assets] representing the total amount of marketable and non-marketable securties; loans receivable and other invested assets.
+</div>
+<div id="section">
+<pre>investmentsc</pre>
+Balance Sheet/Investments Current, unit: currency
+<br/>
+The current portion of [Investments]; reported if the company operates a classified balance sheet that segments current and non-current assets.
+</div>
+<div id="section">
+<pre>investmentsnc</pre>
+Balance Sheet/Investments Non-Current, unit: currency
+<br/>
+The non-current portion of [Investments]; reported if the company operates a classified balance sheet that segments current and non-current assets.
+</div>
+<div id="section">
+<pre>deferredrev</pre>
+Balance Sheet/Deferred Revenue, unit: currency
+<br/>
+A component of [Liabilities] representing the carrying amount of consideration received or receivable on potential earnings that were not recognized as revenue; including sales; license fees; and royalties; but excluding interest income.
+</div>
+<div id="section">
+<pre>deposits</pre>
+Balance Sheet/Deposit Liabilities, unit: currency
+<br/>
+A component of [Liabilities] representing the total of all deposit liabilities held; including foreign and domestic; interest and noninterest bearing. May include demand deposits; saving deposits; Negotiable Order of Withdrawal and time deposits among others.
+</div>
+<div id="section">
+<pre>ppnenet</pre>
+Balance Sheet/Property Plant & Equipment Net, unit: currency
+<br/>
+A component of [Assets] representing the amount after accumulated depreciation; depletion and amortization of physical assets used in the normal conduct of business to produce goods and services and not intended for resale.
+</div>
+<div id="section">
+<pre>inventory</pre>
+Balance Sheet/Inventory, unit: currency
+<br/>
+A component of [Assets] representing the amount after valuation and reserves of inventory expected to be sold; or consumed within one year or operating cycle; if longer.
+</div>
+<div id="section">
+<pre>taxassets</pre>
+Balance Sheet/Tax Assets, unit: currency
+<br/>
+A component of [Assets] representing tax assets and receivables.
+</div>
+<div id="section">
+<pre>receivables</pre>
+Balance Sheet/Trade and Non-Trade Receivables, unit: currency
+<br/>
+A component of [Assets] representing trade and non-trade receivables.
+</div>
+<div id="section">
+<pre>payables</pre>
+Balance Sheet/Trade and Non-Trade Payables, unit: currency
+<br/>
+A component of [Liabilities] representing trade and non-trade payables.
+</div>
+<div id="section">
+<pre>intangibles</pre>
+Balance Sheet/Goodwill and Intangible Assets, unit: currency
+<br/>
+A component of [Assets] representing the carrying amounts of all intangible assets and goodwill as of the balance sheet date; net of accumulated amortization and impairment charges.
+</div>
+<div id="section">
+<pre>liabilities</pre>
+Balance Sheet/Total Liabilities, unit: currency
+<br/>
+Sum of the carrying amounts as of the balance sheet date of all liabilities that are recognized. Principal components are [Debt]; [DeferredRev]; [Payables];[Deposits]; and [TaxLiabilities].
+</div>
+<div id="section">
+<pre>equity</pre>
+Balance Sheet/Shareholders Equity, unit: currency
+<br/>
+A principal component of the balance sheet; in addition to [Liabilities] and [Assets]; that represents the total of all stockholders' equity (deficit) items; net of receivables from officers; directors; owners; and affiliates of the entity which are attributable to the parent.
+</div>
+<div id="section">
+<pre>retearn</pre>
+Balance Sheet/Accumulated Retained Earnings (Deficit), unit: currency
+<br/>
+A component of [Equity] representing the cumulative amount of the entities undistributed earnings or deficit. May only be reported annually by certain companies; rather than quarterly.
+</div>
+<div id="section">
+<pre>accoci</pre>
+Balance Sheet/Accumulated Other Comprehensive Income, unit: currency
+<br/>
+A component of [Equity] representing the accumulated change in equity from transactions and other events and circumstances from non-owner sources; net of tax effect; at period end. Includes foreign currency translation items; certain pension adjustments; unrealized gains and losses on certain investments in debt and equity securities.
+</div>
+<div id="section">
+<pre>assetsc</pre>
+Balance Sheet/Current Assets, unit: currency
+<br/>
+The current portion of [Assets]; reported if a company operates a classified balance sheet that segments current and non-current assets.
+</div>
+<div id="section">
+<pre>assetsnc</pre>
+Balance Sheet/Assets Non-Current, unit: currency
+<br/>
+Amount of non-current assets; for companies that operate a classified balance sheet. Calculated as the different between Total Assets [Assets] and Current Assets [AssetsC].
+</div>
+<div id="section">
+<pre>liabilitiesc</pre>
+Balance Sheet/Current Liabilities, unit: currency
+<br/>
+The current portion of [Liabilities]; reported if the company operates a classified balance sheet that segments current and non-current liabilities.
+</div>
+<div id="section">
+<pre>liabilitiesnc</pre>
+Balance Sheet/Liabilities Non-Current, unit: currency
+<br/>
+The non-current portion of [Liabilities]; reported if the company operates a classified balance sheet that segments current and non-current liabilities.
+</div>
+<div id="section">
+<pre>taxliabilities</pre>
+Balance Sheet/Tax Liabilities, unit: currency
+<br/>
+A component of [Liabilities] representing outstanding tax liabilities.
+</div>
+<div id="section">
+<pre>debt</pre>
+Balance Sheet/Total Debt, unit: currency
+<br/>
+A component of [Liabilities] representing the total amount of current and non-current debt owed. Includes secured and unsecured bonds issued; commercial paper; notes payable; credit facilities; lines of credit; capital lease obligations; and convertible notes.
+</div>
+<div id="section">
+<pre>debtc</pre>
+Balance Sheet/Debt Current, unit: currency
+<br/>
+The current portion of [Debt]; reported if the company operates a classified balance sheet that segments current and non-current liabilities.
+</div>
+<div id="section">
+<pre>debtnc</pre>
+Balance Sheet/Debt Non-Current, unit: currency
+<br/>
+The non-current portion of [Debt] reported if the company operates a classified balance sheet that segments current and non-current liabilities.
+</div>
+<div id="section">
+<pre>equityusd</pre>
+Balance Sheet/Shareholders Equity (USD), unit: USD
+<br/>
+[Equity] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>cashnequsd</pre>
+Balance Sheet/Cash and Equivalents (USD), unit: USD
+<br/>
+[CashnEq] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>debtusd</pre>
+Balance Sheet/Total Debt (USD), unit: USD
+<br/>
+[Debt] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>capex</pre>
+Cash Flow Statement/Capital Expenditure, unit: currency
+<br/>
+A component of [NCFI] representing the net cash inflow (outflow) associated with the acquisition & disposal of long-lived; physical & intangible assets that are used in the normal conduct of business to produce goods and services and are not intended for resale. Includes cash inflows/outflows to pay for construction of self-constructed assets & software.
+</div>
+<div id="section">
+<pre>ncfbus</pre>
+Cash Flow Statement/Net Cash Flow - Business Acquisitions and Disposals, unit: currency
+<br/>
+A component of [NCFI] representing the net cash inflow (outflow) associated with the acquisition & disposal of businesses; joint-ventures; affiliates; and other named investments.
+</div>
+<div id="section">
+<pre>ncfinv</pre>
+Cash Flow Statement/Net Cash Flow - Investment Acquisitions and Disposals, unit: currency
+<br/>
+A component of [NCFI] representing the net cash inflow (outflow) associated with the acquisition & disposal of investments; including marketable securities and loan originations.
+</div>
+<div id="section">
+<pre>ncff</pre>
+Cash Flow Statement/Net Cash Flow from Financing, unit: currency
+<br/>
+A component of [NCF] representing the amount of cash inflow (outflow) from financing activities; from continuing and discontinued operations. Principal components of financing cash flow are: issuance (purchase) of equity shares; issuance (repayment) of debt securities; and payment of dividends & other cash distributions.
+</div>
+<div id="section">
+<pre>ncfdebt</pre>
+Cash Flow Statement/Issuance (Repayment) of Debt Securities , unit: currency
+<br/>
+A component of [NCFF] representing the net cash inflow (outflow) from issuance (repayment) of debt securities.
+</div>
+<div id="section">
+<pre>ncfcommon</pre>
+Cash Flow Statement/Issuance (Purchase) of Equity Shares, unit: currency
+<br/>
+A component of [NCFF] representing the net cash inflow (outflow) from common equity changes. Includes additional capital contributions from share issuances and exercise of stock options; and outflow from share repurchases. 
+</div>
+<div id="section">
+<pre>ncfdiv</pre>
+Cash Flow Statement/Payment of Dividends & Other Cash Distributions   , unit: currency
+<br/>
+A component of [NCFF] representing dividends and dividend equivalents paid on common stock and restricted stock units.
+</div>
+<div id="section">
+<pre>ncfi</pre>
+Cash Flow Statement/Net Cash Flow from Investing, unit: currency
+<br/>
+A component of [NCF] representing the amount of cash inflow (outflow) from investing activities; from continuing and discontinued operations. Principal components of investing cash flow are: capital (expenditure) disposal of equipment [CapEx]; business (acquisitions) disposition [NCFBus] and investment (acquisition) disposal [NCFInv].
+</div>
+<div id="section">
+<pre>ncfo</pre>
+Cash Flow Statement/Net Cash Flow from Operations, unit: currency
+<br/>
+A component of [NCF] representing the amount of cash inflow (outflow) from operating activities; from continuing and discontinued operations.
+</div>
+<div id="section">
+<pre>ncfx</pre>
+Cash Flow Statement/Effect of Exchange Rate Changes on Cash , unit: currency
+<br/>
+A component of Net Cash Flow [NCF] representing the amount of increase (decrease) from the effect of exchange rate changes on cash and cash equivalent balances held in foreign currencies.
+</div>
+<div id="section">
+<pre>ncf</pre>
+Cash Flow Statement/Net Cash Flow / Change in Cash & Cash Equivalents, unit: currency
+<br/>
+Principal component of the cash flow statement representing the amount of increase (decrease) in cash and cash equivalents. Includes [NCFO]; investing [NCFI] and financing [NCFF] for continuing and discontinued operations; and the effect of exchange rate changes on cash [NCFX].
+</div>
+<div id="section">
+<pre>sbcomp</pre>
+Cash Flow Statement/Share Based Compensation, unit: currency
+<br/>
+A component of [NCFO] representing the total amount of noncash; equity-based employee remuneration. This may include the value of stock or unit options; amortization of restricted stock or units; and adjustment for officers' compensation. As noncash; this element is an add back when calculating net cash generated by operating activities using the indirect method.
+</div>
+<div id="section">
+<pre>depamor</pre>
+Cash Flow Statement/Depreciation Amortization & Accretion, unit: currency
+<br/>
+A component of operating cash flow representing the aggregate net amount of depreciation; amortization; and accretion recognized during an accounting period. As a non-cash item; the net amount is added back to net income when calculating cash provided by or used in operations using the indirect method.
+</div>
+<div id="section">
+<pre>sharesbas</pre>
+Entity/Shares (Basic), unit: units
+<br/>
+The number of shares or other units outstanding of the entity's capital or common stock or other ownership interests; as stated on the cover of related periodic report (10-K/10-Q); after adjustment for stock splits.
+</div>
+<div id="section">
+<pre>sharefactor</pre>
+Entity/Share Factor, unit: ratio
+<br/>
+Share factor is a multiplicant in the calculation of [MarketCap] and is used to adjust for: American Depository Receipts (ADRs) that represent more or less than 1 underlying share; and; companies which have different earnings share for different share classes (eg Berkshire Hathaway - BRKB).
+</div>
+<div id="section">
+<pre>price</pre>
+Entity/Share Price (Adjusted Close), unit: USD/share
+<br/>
+The price per common share adjusted for stock splits but not adjusted for dividends; used in the computation of [PE1]; [PS1]; [DivYield] and [SPS].
+</div>
+<div id="section">
+<pre>ticker</pre>
+Entity/Ticker Symbol, unit: text
+<br/>
+The ticker is a unique identifer for an issuer in the database. Where a ticker contains a . or a - this is removed from the ticker we use. For example BRK.B is BRKB in this dataset. We include the BRK.B ticker in the Related Tickers field of the ticker listing. Where a company is delisted and the ticker is recycled; we utilise that ticker for the currently active company and append a number to the ticker of the delisted company. For example GM represents the current actively traded General Motors entity; and GM1 represents the entity that filed for bankruptcy in 2009. Where we have identified that multiple classes of shares exist for a company; we include the alternative share classes in the Related Tickers field of the ticker listing. For example we provide data for GOOGL; and you find GOOG in the Related Ticker field. This should not be considered an exhaustive list of alternative share classes.
+</div>
+<div id="section">
+<pre>dimension</pre>
+Entity/Dimension, unit: text
+<br/>
+The dimension field allows you to take different dimensional views of data over time. ARQ: Quarterly; excluding restatements; MRQ: Quarterly; including restatements; ARY: annual; excluding restatements; MRY: annual; including restatements; ART: trailing-twelve-months; excluding restatements; MRT: trailing-twelve-months; including restatements.
+</div>
+<div id="section">
+<pre>calendardate</pre>
+Entity/Calendar Date, unit: date (YYYY-MM-DD)
+<br/>
+The Calendar Date represents the normalized [ReportPeriod]. This provides a common date to query for which is necessary due to irregularity in report periods across companies. For example; if the report period is "2015-09-26"; the calendar date will be "2015-09-30" for quarterly and trailing-twelve-month dimensions (ARQ;MRQ;ART;MRT); and "2015-12-31" for annual dimensions (ARY;MRY). We also employ offsets in order to maximise comparability of the period across companies. For example consider two companies: one with a quarter ending on 2018-07-24; and the other with a quarter ending on 2018-06-28. A naive normalization process would assign these to differing calendar quarters of 2018-09-30 and 2018-06-30 respectively. However, we assign these both to the 2018-06-30 calendar quarter because this maximises the overlap in the report periods in question and therefore the comparability of this period.
+</div>
+<div id="section">
+<pre>datekey</pre>
+Entity/Date Key, unit: date (YYYY-MM-DD)
+<br/>
+The Date Key represents the SEC filing date for AR dimensions (ARQ;ART;ARY); and the [REPORTPERIOD] for MR dimensions (MRQ;MRT;MRY). In addition; this is the observation date used for [Price] based data such as [MarketCap]; [Price] and [PE].
+</div>
+<div id="section">
+<pre>reportperiod</pre>
+Entity/Report Period, unit: date (YYYY-MM-DD)
+<br/>
+The Report Period represents the end date of the fiscal period.
+</div>
+<div id="section">
+<pre>lastupdated</pre>
+Entity/Last Updated Date, unit: date (YYYY-MM-DD)
+<br/>
+Last Updated represents the last date that this database entry was updated; which is useful to users when updating their local records.
+</div>
+<div id="section">
+<pre>revenue</pre>
+Income Statement/Revenues, unit: currency
+<br/>
+Amount of Revenue recognized from goods sold; services rendered; insurance premiums; or other activities that constitute an earning process. Interest income for financial institutions is reported net of interest expense and provision for credit losses.
+</div>
+<div id="section">
+<pre>cor</pre>
+Income Statement/Cost of Revenue, unit: currency
+<br/>
+The aggregate cost of goods produced and sold and services rendered during the reporting period.
+</div>
+<div id="section">
+<pre>sgna</pre>
+Income Statement/Selling General and Administrative Expense, unit: currency
+<br/>
+A component of [OpEx] representing the aggregate total costs related to selling a firm's product and services; as well as all other general and administrative expenses. Direct selling expenses (for example; credit; warranty; and advertising) are expenses that can be directly linked to the sale of specific products. Indirect selling expenses are expenses that cannot be directly linked to the sale of specific products; for example telephone expenses; Internet; and postal charges. General and administrative expenses include salaries of non-sales personnel; rent; utilities; communication; etc.
+</div>
+<div id="section">
+<pre>rnd</pre>
+Income Statement/Research and Development Expense, unit: currency
+<br/>
+A component of [OpEx] representing the aggregate costs incurred in a planned search or critical investigation aimed at discovery of new knowledge with the hope that such knowledge will be useful in developing a new product or service.
+</div>
+<div id="section">
+<pre>opex</pre>
+Income Statement/Operating Expenses, unit: currency
+<br/>
+Operating expenses represents the total expenditure on [SGnA]; [RnD] and other operating expense items; it excludes [CoR].
+</div>
+<div id="section">
+<pre>intexp</pre>
+Income Statement/Interest Expense, unit: currency
+<br/>
+Amount of the cost of borrowed funds accounted for as interest expense.
+</div>
+<div id="section">
+<pre>taxexp</pre>
+Income Statement/Income Tax Expense, unit: currency
+<br/>
+Amount of current income tax expense (benefit) and deferred income tax expense (benefit) pertaining to continuing operations.
+</div>
+<div id="section">
+<pre>netincdis</pre>
+Income Statement/Net Loss Income from Discontinued Operations, unit: currency
+<br/>
+Amount of loss (income) from a disposal group; net of income tax; reported as a separate component of income.
+</div>
+<div id="section">
+<pre>consolinc</pre>
+Income Statement/Consolidated Income, unit: currency
+<br/>
+The portion of profit or loss for the period; net of income taxes; which is attributable to the consolidated entity; before the deduction of [NetIncNCI].
+</div>
+<div id="section">
+<pre>netincnci</pre>
+Income Statement/Net Income to Non-Controlling Interests, unit: currency
+<br/>
+The portion of income which is attributable to non-controlling interest shareholders; subtracted from [ConsolInc] in order to obtain [NetInc].
+</div>
+<div id="section">
+<pre>netinc</pre>
+Income Statement/Net Income, unit: currency
+<br/>
+The portion of profit or loss for the period; net of income taxes; which is attributable to the parent after the deduction of [NetIncNCI] from [ConsolInc]; and before the deduction of [PrefDivIS].
+</div>
+<div id="section">
+<pre>prefdivis</pre>
+Income Statement/Preferred Dividends Income Statement Impact, unit: currency
+<br/>
+Income statement item reflecting dividend payments to preferred stockholders. Subtracted from Net Income to Parent [NetInc] to obtain Net Income to Common Stockholders [NetIncCmn].
+</div>
+<div id="section">
+<pre>netinccmn</pre>
+Income Statement/Net Income Common Stock, unit: currency
+<br/>
+The amount of net income (loss) for the period due to common shareholders. Typically differs from [NetInc] to the parent entity due to the deduction of [PrefDivIS].
+</div>
+<div id="section">
+<pre>eps</pre>
+Income Statement/Earnings per Basic Share, unit: currency/share
+<br/>
+Earnings per share as calculated and reported by the company. Approximates to the amount of [NetIncCmn] for the period per each [SharesWA] after adjusting for [ShareFactor].
+</div>
+<div id="section">
+<pre>epsdil</pre>
+Income Statement/Earnings per Diluted Share, unit: currency/share
+<br/>
+Earnings per diluted share as calculated and reported by the company. Approximates to the amount of [NetIncCmn] for the period per each [SharesWADil] after adjusting for [ShareFactor]..
+</div>
+<div id="section">
+<pre>shareswa</pre>
+Income Statement/Weighted Average Shares, unit: units
+<br/>
+The weighted average number of shares or units issued and outstanding that are used by the company to calculate [EPS]; determined based on the timing of issuance of shares or units in the period.
+</div>
+<div id="section">
+<pre>shareswadil</pre>
+Income Statement/Weighted Average Shares Diluted, unit: units
+<br/>
+The weighted average number of shares or units issued and outstanding that are used by the company to calculate [EPSDil]; determined based on the timing of issuance of shares or units in the period.
+</div>
+<div id="section">
+<pre>ebit</pre>
+Income Statement/Earning Before Interest & Taxes (EBIT), unit: currency
+<br/>
+Earnings Before Interest and Tax is calculated by adding [TaxExp] and [IntExp] back to [NetInc].
+</div>
+<div id="section">
+<pre>epsusd</pre>
+Income Statement/Earnings per Basic Share (USD), unit: USD/share
+<br/>
+[EPS] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>revenueusd</pre>
+Income Statement/Revenues (USD), unit: USD
+<br/>
+[Revenue] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>netinccmnusd</pre>
+Income Statement/Net Income Common Stock (USD), unit: USD
+<br/>
+[NetIncCmn] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>ebitusd</pre>
+Income Statement/Earning Before Interest & Taxes (USD), unit: USD
+<br/>
+[EBIT] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>dps</pre>
+Income Statement/Dividends per Basic Common Share, unit: USD/share
+<br/>
+Aggregate dividends declared during the period for each split-adjusted share of common stock outstanding. Includes spinoffs where identified.
+</div>
+<div id="section">
+<pre>gp</pre>
+Income Statement/Gross Profit, unit: currency
+<br/>
+Aggregate revenue [Revenue] less cost of revenue [CoR] directly attributable to the revenue generation activity.
+</div>
+<div id="section">
+<pre>opinc</pre>
+Income Statement/Operating Income, unit: currency
+<br/>
+Operating income is a measure of financial performance before the deduction of [IntExp]; [TaxExp] and other Non-Operating items. It is calculated as [GP] minus [OpEx].
+</div>
+<div id="section">
+<pre>ebt</pre>
+Metrics/Earnings before Tax, unit: currency
+<br/>
+Earnings Before Tax is calculated by adding [TaxExp] back to [NetInc].
+</div>
+<div id="section">
+<pre>ebitda</pre>
+Metrics/Earnings Before Interest Taxes & Depreciation Amortization (EBITDA), unit: currency
+<br/>
+EBITDA is a non-GAAP accounting metric that is widely used when assessing the performance of companies; calculated by adding [DepAmor] back to [EBIT].
+</div>
+<div id="section">
+<pre>fxusd</pre>
+Metrics/Foreign Currency to USD Exchange Rate, unit: ratio
+<br/>
+The exchange rate used for the conversion of foreign currency to USD for non-US companies that do not report in USD.
+</div>
+<div id="section">
+<pre>ebitdausd</pre>
+Metrics/Earnings Before Interest Taxes & Depreciation Amortization (USD), unit: USD
+<br/>
+[EBITDA] in USD; converted by [FXUSD].
+</div>
+<div id="section">
+<pre>marketcap</pre>
+Metrics/Market Capitalization, unit: USD
+<br/>
+Represents the product of [SharesBas]; [Price] and [ShareFactor].
+</div>
+<div id="section">
+<pre>ev</pre>
+Metrics/Enterprise Value, unit: USD
+<br/>
+Enterprise value is a measure of the value of a business as a whole; calculated as [MarketCap] plus [DebtUSD] minus [CashnEqUSD].
+</div>
+<div id="section">
+<pre>invcap</pre>
+Metrics/Invested Capital, unit: currency
+<br/>
+Invested capital is an input into the calculation of [ROIC]; and is calculated as: [Debt] plus [Assets] minus [Intangibles] minus [CashnEq] minus [LiabilitiesC]. Please note this calculation method is subject to change.
+</div>
+<div id="section">
+<pre>equityavg</pre>
+Metrics/Average Equity, unit: currency
+<br/>
+Average equity value for the period used in calculation of [ROE]; derived from [Equity].
+</div>
+<div id="section">
+<pre>assetsavg</pre>
+Metrics/Average Assets, unit: currency
+<br/>
+Average asset value for the period used in calculation of [ROE] and [ROA]; derived from [Assets].
+</div>
+<div id="section">
+<pre>invcapavg</pre>
+Metrics/Invested Capital Average, unit: currency
+<br/>
+Average invested capital value for the period used in the calculation of [ROIC]; and derived from [InvCap]. Invested capital is an input into the calculation of [ROIC]; and is calculated as: [Debt] plus [Assets] minus [Intangibles] minus [CashnEq] minus [LiabilitiesC]. Please note this calculation method is subject to change.
+</div>
+<div id="section">
+<pre>tangibles</pre>
+Metrics/Tangible Asset Value, unit: currency
+<br/>
+The value of tangibles assets calculated as the difference between [Assets] and [Intangibles].
+</div>
+<div id="section">
+<pre>roe</pre>
+Metrics/Return on Average Equity, unit: %
+<br/>
+Return on equity measures a corporation's profitability by calculating the amount of [NetIncCmn] returned as a percentage of [EquityAvg].
+</div>
+<div id="section">
+<pre>roa</pre>
+Metrics/Return on Average Assets, unit: %
+<br/>
+Return on assets measures how profitable a company is [NetIncCmn] relative to its total assets [AssetsAvg].
+</div>
+<div id="section">
+<pre>fcf</pre>
+Metrics/Free Cash Flow, unit: currency
+<br/>
+Free Cash Flow is a measure of financial performance calculated as [NCFO] minus [CapEx].
+</div>
+<div id="section">
+<pre>roic</pre>
+Metrics/Return on Invested Capital, unit: %
+<br/>
+Return on Invested Capital is ratio estimated by dividing [EBIT] by [InvCapAvg]. [InvCap] is calculated as: [Debt] plus [Assets] minus [Intangibles] minus [CashnEq] minus [LiabilitiesC]. Please note this calculation method is subject to change.
+</div>
+<div id="section">
+<pre>grossmargin</pre>
+Metrics/Gross Margin, unit: %
+<br/>
+Gross Margin measures the ratio between a company's [GP] and [Revenue].
+</div>
+<div id="section">
+<pre>netmargin</pre>
+Metrics/Profit Margin, unit: %
+<br/>
+Measures the ratio between a company's [NetIncCmn] and [Revenue].
+</div>
+<div id="section">
+<pre>ebitdamargin</pre>
+Metrics/EBITDA Margin, unit: %
+<br/>
+Measures the ratio between a company's [EBITDA] and [Revenue].
+</div>
+<div id="section">
+<pre>ros</pre>
+Metrics/Return on Sales, unit: %
+<br/>
+Return on Sales is a ratio to evaluate a company's operational efficiency; calculated by dividing [EBIT] by [Revenue]. ROS is often a component of DuPont ROE analysis.
+</div>
+<div id="section">
+<pre>assetturnover</pre>
+Metrics/Asset Turnover, unit: %
+<br/>
+Asset turnover is a measure of a firms operating efficiency; calculated by dividing [Revenue] by [AssetsAVG]. Often a component of DuPont ROE analysis.
+</div>
+<div id="section">
+<pre>payoutratio</pre>
+Metrics/Payout Ratio, unit: %
+<br/>
+The percentage of earnings paid as dividends to common stockholders. Calculated by dividing [DPS] by [EPSUSD].
+</div>
+<div id="section">
+<pre>evebitda</pre>
+Metrics/Enterprise Value over EBITDA, unit: ratio
+<br/>
+Measures the ratio between [EV] and [EBITDAUSD].
+</div>
+<div id="section">
+<pre>evebit</pre>
+Metrics/Enterprise Value over EBIT, unit: ratio
+<br/>
+Measures the ratio between [EV] and [EBITUSD].
+</div>
+<div id="section">
+<pre>pe</pre>
+Metrics/Price Earnings (Damodaran Method), unit: ratio
+<br/>
+Measures the ratio between [MarketCap] and [NetIncCmnUSD]
+</div>
+<div id="section">
+<pre>pe1</pre>
+Metrics/Price to Earnings Ratio, unit: ratio
+<br/>
+An alternative to [PE] representing the ratio between [Price] and [EPSUSD].
+</div>
+<div id="section">
+<pre>sps</pre>
+Metrics/Sales per Share, unit: USD/share
+<br/>
+Sales per Share measures the ratio between [RevenueUSD] and [SharesWA] as adjusted by [ShareFactor].
+</div>
+<div id="section">
+<pre>ps1</pre>
+Metrics/Price to Sales Ratio, unit: ratio
+<br/>
+An alternative calculation method to [PS]; that measures the ratio between a company's [Price] and it's [SPS].
+</div>
+<div id="section">
+<pre>ps</pre>
+Metrics/Price Sales (Damodaran Method), unit: ratio
+<br/>
+Measures the ratio between [MarketCap] and [RevenueUSD].
+</div>
+<div id="section">
+<pre>pb</pre>
+Metrics/Price to Book Value, unit: ratio
+<br/>
+Measures the ratio between [MarketCap] and [EquityUSD].
+</div>
+<div id="section">
+<pre>de</pre>
+Metrics/Debt to Equity Ratio, unit: ratio
+<br/>
+Measures the ratio between [Liabilities] and [Equity].
+</div>
+<div id="section">
+<pre>divyield</pre>
+Metrics/Dividend Yield, unit: %
+<br/>
+Dividend Yield measures the ratio between a company's [DPS] and its [Price].
+</div>
+<div id="section">
+<pre>currentratio</pre>
+Metrics/Current Ratio, unit: ratio
+<br/>
+The ratio between [AssetsC] and [LiabilitiesC]; for companies that operate a classified balance sheet.
+</div>
+<div id="section">
+<pre>workingcapital</pre>
+Metrics/Working Capital, unit: currency
+<br/>
+Working capital measures the difference between [AssetsC] and [LiabilitiesC].
+</div>
+<div id="section">
+<pre>fcfps</pre>
+Metrics/Free Cash Flow per Share, unit: currency/share
+<br/>
+Free Cash Flow per Share is a valuation metric calculated by dividing [FCF] by [SharesWA] and [ShareFactor].
+</div>
+<div id="section">
+<pre>bvps</pre>
+Metrics/Book Value per Share, unit: currency/share
+<br/>
+Measures the ratio between [Equity] and [SharesWA] as adjusted by [ShareFactor].
+</div>
+<div id="section">
+<pre>tbvps</pre>
+Metrics/Tangible Assets Book Value per Share, unit: currency/share
+<br/>
+Measures the ratio between [Tangibles] and [SharesWA] as adjusted by [ShareFactor].
+</div>
+
+
+
+</body>
+</html>
