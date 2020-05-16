@@ -118,7 +118,10 @@ class SQLiteDailyBarReader(SessionBarReader):
     def load_raw_arrays(self, fields, start_dt, end_dt, sids):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
-        log.info("Loading raw arrays for %d assets." % (len(sids)))
+        log.info("Loading raw arrays for %d assets (%s)." % (len(sids), type(sids)))
+
+        if any(not isinstance(x, int) for x in sids):
+            sids = [x.sid for x in sids]
 
         raw_arrays = []
         with sqlite3.connect(self._filename) as conn:

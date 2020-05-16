@@ -19,6 +19,9 @@ class Fundamentals(CustomFactor, WithAssetFinder):
             field_name += '_arq'
         out[:] = self.get_asset_finder().get_fundamentals(assets, field_name, today, n=self.window_length)
 
+    def __str__(self):
+        return "Fundamentals" + str(self.params)
+
 
 class FundamentalsTTM(Fundamentals):
     def compute(self, today, assets, out, field):

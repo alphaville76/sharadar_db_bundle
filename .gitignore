@@ -91,3 +91,8 @@ ENV/
 .idea/
 .DS_Store
 algo/
+*.pickle
+*_report.htm
+/algo/
+/algo/wwws.py
+/algo/

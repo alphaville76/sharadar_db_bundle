@@ -126,7 +126,7 @@ def handle_data(context, data):
     pass
 
 
-def analyze(context=None, results=None):
+def analyze(context, results):
     import matplotlib.pyplot as plt
     fig = plt.figure()
     ax = fig.add_subplot(111)

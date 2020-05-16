@@ -312,7 +312,7 @@ def run_algorithm(start,
                   before_trading_start=None,
                   analyze=None,
                   data_frequency='daily',
-                  bundle='quantopian-quandl',
+                  bundle='sharadar',
                   bundle_timestamp=None,
                   trading_calendar=None,
                   metrics_set='default',
@@ -329,7 +329,8 @@ def run_algorithm(start,
                   stop_execution_callback=None,
                   execution_id=None,
                   state_filename=None,
-                  realtime_bar_target=None
+                  realtime_bar_target=None,
+                  output=os.devnull
                   ):
     """
     Run a trading algorithm.
@@ -426,7 +427,7 @@ def run_algorithm(start,
         bundle_timestamp=bundle_timestamp,
         start=start,
         end=end,
-        output=os.devnull,
+        output=output,
         trading_calendar=trading_calendar,
         print_algo=False,
         metrics_set=metrics_set,
