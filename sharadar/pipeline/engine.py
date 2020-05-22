@@ -37,13 +37,12 @@ class BundlePipelineEngine(SimplePipelineEngine):
         )
 
         start_ix, end_ix = self._calendar.slice_locs(start_date, end_date)
-        n_ranges = max(len(self._calendar[start_ix:end_ix])/chunksize, 1)
-        log.info("Compute pipeline values in chunks of %d days. Number of chunks: %d." % (chunksize, n_ranges))
+        log.info("Compute pipeline values in chunks of %d days." % (chunksize))
 
         chunks = []
         for s, e in ranges:
-            log.info("Compute values for pipeline from %s to %s (period %d of %d)." \
-                     % (str(s.date()), str(e.date()), len(chunks)+1, n_ranges))
+            log.info("Compute values for pipeline from %s to %s (period %d)." \
+                     % (str(s.date()), str(e.date()), len(chunks)+1))
             chunks.append(self._run_pipeline(pipeline, s, e))
 
         if len(chunks) == 1:
@@ -71,7 +70,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
         except NoFurtherDataError as e:
             new_start_date = self._calendar[self._extra_rows + 1]
             log.warning("Starting computing universe from %s instead of %s because of insufficient data." % (str(new_start_date.date()), str(start_date.date())))
-            return super().run_pipeline(pipeline, new_start_date, end_date)
+            return self.run_pipeline(pipeline, new_start_date, end_date)
 
 
     def _set_asset_finder(self, factor):

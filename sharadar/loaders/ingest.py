@@ -18,7 +18,7 @@ from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
 from sharadar.util.universe import UniverseWriter, UniverseReader
-from sharadar.pipeline.filters import TradableStocksUS
+from sharadar.pipeline.filters import TradableStocksUS, TRADABLE_STOCKS_US
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
@@ -294,7 +294,7 @@ def from_quandl():
 
     def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
         universes_dbpath = os.path.join(output_dir, "universes.sqlite")
-        universe_name = 'tradable_stocks_us'
+        universe_name = TRADABLE_STOCKS_US
         screen = TradableStocksUS()
         universe_start = prices_start.tz_localize('utc')
         universe_end = prices_end.tz_localize('utc')

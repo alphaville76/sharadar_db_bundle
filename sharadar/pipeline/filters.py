@@ -13,6 +13,7 @@ from sharadar.pipeline.factors import (
     Fundamentals
 )
 
+TRADABLE_STOCKS_US = 'tradable_stocks_us'
 
 def TradableStocksUS():
     return (

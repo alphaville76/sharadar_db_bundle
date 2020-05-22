@@ -101,6 +101,14 @@ def _run(handle_data,
     execution_id - unique id to identify this execution (backtest or live instance)
     """
     log.info("Using bundle '%s'." % bundle)
+
+    bundle_data = load_sharadar_bundle(bundle)
+    if start is None:
+        start = bundle_data.equity_daily_bar_reader.first_trading_day
+
+    if end is None:
+        end = bundle_data.equity_daily_bar_reader.last_available_dt
+
     if benchmark_returns is None:
         benchmark_returns, _ = load_market_data(environ=environ)
 
@@ -170,8 +178,6 @@ def _run(handle_data,
                 end.date(),
             ),
         )
-
-    bundle_data = load_sharadar_bundle(bundle)
 
     first_trading_day = \
         bundle_data.equity_daily_bar_reader.first_trading_day
@@ -304,10 +310,10 @@ def load_extensions(default, extensions, strict, environ, reload=False):
             _loaded_extensions.add(ext)
 
 
-def run_algorithm(start,
-                  end,
-                  initialize,
-                  capital_base,
+def run_algorithm(initialize,
+                  start=None,
+                  end=None,
+                  capital_base=1e6,
                   handle_data=None,
                   before_trading_start=None,
                   analyze=None,

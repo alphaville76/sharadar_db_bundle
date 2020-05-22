@@ -1,9 +1,7 @@
 from zipline.api import order_target, record, symbol
 import matplotlib.pyplot as plt
-import pyfolio as pf
 import pandas as pd
 from sharadar.util.run_algo import run_algorithm
-from collections import OrderedDict
 from sharadar.util import performance
 from sharadar.util.performance import change_extension
 from logbook import Logger, FileHandler, DEBUG, INFO, StreamHandler
@@ -77,12 +75,11 @@ def analyze_old(context, perf):
 def analyze(context, perf):
     performance.analyze(context, perf, __file__)
 
-def run_this_algorithm(initial_input=1e6, start_date='2011-01-01', end_date='2020-01-01'):
+def run_this_algorithm():
+    #start = pd.Timestamp('2011-01-01', tz='utc'),
+    #end = pd.Timestamp('2020-01-01', tz='utc'),
     # runs the zipline ALGO function
-    run_algorithm(start=pd.Timestamp(start_date, tz='utc'),
-                  end=pd.Timestamp(end_date, tz='utc'),
-                  capital_base=initial_input,
-                  initialize=initialize,
+    run_algorithm(initialize=initialize,
                   handle_data=handle_data,
                   analyze=analyze,
                   output=change_extension(__file__, '_perf.pickle'),
