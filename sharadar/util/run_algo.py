@@ -20,8 +20,6 @@ except ImportError:
 import six
 from toolz import concatv
 from trading_calendars import get_calendar
-
-from zipline.data.loader import load_market_data
 from zipline.data.data_portal import DataPortal
 from zipline.data.data_portal_live import DataPortalLive
 from zipline.finance import metrics
@@ -109,8 +107,7 @@ def _run(handle_data,
     if end is None:
         end = bundle_data.equity_daily_bar_reader.last_available_dt
 
-    if benchmark_returns is None:
-        benchmark_returns, _ = load_market_data(environ=environ)
+    benchmark_returns = load_benchmark_data_bundle(bundle_data.equity_daily_bar_reader, 'SPY')
 
     emission_rate = 'daily'
     if broker:
@@ -257,6 +254,17 @@ def _run(handle_data,
 
 # All of the loaded extensions. We don't want to load an extension twice.
 _loaded_extensions = set()
+
+
+def load_benchmark_data_bundle(price_reader, ticker):
+    benchmark = symbol(ticker)
+
+    first_date = benchmark.start_date
+    last_date = benchmark.end_date
+
+    benchmark_prices = price_reader.load_series(['close'], first_date, last_date, benchmark.sid).dropna()
+    benchmark_returns = benchmark_prices.sort_index().pct_change(1).iloc[1:]
+    return benchmark_returns
 
 
 def load_extensions(default, extensions, strict, environ, reload=False):

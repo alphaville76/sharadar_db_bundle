@@ -1,6 +1,5 @@
 import datetime
 import time
-
 import os
 import pandas as pd
 from memoization import cached
@@ -20,11 +19,21 @@ from zipline.utils.date_utils import compute_date_range_chunks
 from zipline.utils.pandas_utils import categorical_df_concat
 from toolz.curried.operator import getitem
 from zipline.errors import NoFurtherDataError
+from zipline.pipeline.factors import CustomFactor
+
+def to_string(obj):
+    try:
+        return str(obj)
+    except AttributeError:
+        return type(obj).__name__
 
 
 class BundlePipelineEngine(SimplePipelineEngine):
 
-    def run_pipeline(self, pipeline, start_date, end_date, chunksize=120):
+    def run_pipeline(self, pipeline, start_date, end_date=None, chunksize=120):
+        if end_date is None:
+            end_date = start_date
+
         if chunksize < 0:
             log.info("Compute pipeline values without chunks.")
             return self._run_pipeline(pipeline, start_date, end_date)
@@ -41,8 +50,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
 
         chunks = []
         for s, e in ranges:
-            log.info("Compute values for pipeline from %s to %s (period %d)." \
-                     % (str(s.date()), str(e.date()), len(chunks)+1))
+            log.info("Compute values for pipeline from %s to %s." % (str(s.date()), str(e.date())))
             chunks.append(self._run_pipeline(pipeline, s, e))
 
         if len(chunks) == 1:
@@ -59,26 +67,12 @@ class BundlePipelineEngine(SimplePipelineEngine):
         if end_date is None:
             end_date = pd.to_datetime('today', utc=True)
 
-        for factor in pipeline.columns.values():
-            self._set_asset_finder(factor)
-        if pipeline.screen is not None:
-            for factor in pipeline.screen.inputs:
-                self._set_asset_finder(factor)
-
         try:
             return super().run_pipeline(pipeline, start_date, end_date)
         except NoFurtherDataError as e:
             new_start_date = self._calendar[self._extra_rows + 1]
             log.warning("Starting computing universe from %s instead of %s because of insufficient data." % (str(new_start_date.date()), str(start_date.date())))
             return self.run_pipeline(pipeline, new_start_date, end_date)
-
-
-    def _set_asset_finder(self, factor):
-        if isinstance(factor, WithAssetFinder):
-            factor.set_asset_finder(self._finder)
-        for factor_input in factor.inputs:
-            if isinstance(factor_input, WithAssetFinder):
-                factor_input.set_asset_finder(self._finder)
 
     def run_chunked_pipeline(self, pipeline, start_date, end_date, chunksize):
         raise NotImplementedError("because run_pipeline is always chuncked.")
@@ -113,7 +107,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
         for term in graph.execution_order(refcounts):
             start_time = time.time()
             i += 1
-            log.info("Computing term %d of %d [%s]" % (i,l, str(term)))
+            log.info("Computing term %d of %d [%s]" % (i,l, to_string(term)))
 
 
             # `term` may have been supplied in `initial_workspace`, and in the
@@ -254,19 +248,21 @@ class BundlePipelineEngine(SimplePipelineEngine):
         return ret
 
 
-
-class WithAssetFinder:
+class BundleLoader:
     _asset_finder = None
+    _bar_reader = None
 
-    def get_asset_finder(self):
+    def asset_finder(self):
         if self._asset_finder is None:
             self._asset_finder = _asset_finder()
 
         return self._asset_finder
 
-    def set_asset_finder(self, asset_finder):
-        self._asset_finder = asset_finder
+    def bar_reader(self):
+        if self._bar_reader is None:
+            self._bar_reader = _bar_reader()
 
+        return self._bar_reader
 
 def daily_equity_path(bundle_name, timestr, environ=None):
     return pth.data_path(
@@ -288,6 +284,9 @@ def load_sharadar_bundle(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR,
 def _asset_finder(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ))
 
+@cached
+def _bar_reader(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
+    return SQLiteDailyBarReader(daily_equity_path(name, timestr, environ=environ))
 
 @cached
 def symbol(ticker, as_of_date=None):

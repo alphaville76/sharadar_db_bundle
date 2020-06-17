@@ -94,30 +94,45 @@ class SQLiteDailyBarReader(SessionBarReader):
             c.execute(sql)
             return c.fetchall()
         
-    def _exist_sids(self, sids):
-        sql = "SELECT COUNT(DISTINCT(sid)) FROM prices WHERE sid IN (%s)" % ",".join(map(str, sids))
+    def _exist_sid(self, sid):
+        sql = "SELECT COUNT(DISTINCT(sid)) FROM prices WHERE sid = %d" % sid
         res = self._query(sql)
-        return res[0][0] == len(sids)
+        return res[0][0] == 1
 
     def _fmt_date(self, dt):
         return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00"
-    
+
     @cached
     def get_value(self, sid, dt, field):
         day = self._fmt_date(dt)
         sql = "SELECT %s FROM prices WHERE sid = %d and date = '%s'" % (field, sid, day)
         res = self._query(sql)
         if len(res) == 0:
-            if self._exist_sids([sid]):
+            if self._exist_sid(sid):
                 raise NoDataBeforeDate("No data on or before day={0} for sid={1}".format(dt, sid))
             else:
                 raise KeyError(sid)
         return res[0][0]
 
     @cached
+    def load_dataframe(self, field, start_dt, end_dt, sids):
+        data = self.load_raw_arrays(['close'], start_dt, end_dt, sids)
+        sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
+        df = pd.DataFrame(data[0], index=sessions)
+        df.columns = sids
+        return df
+
+    @cached
+    def load_series(self, field, start_dt, end_dt, sid):
+        data = self.load_raw_arrays(['close'], start_dt, end_dt, [sid])
+        sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
+        return pd.Series(data[0][:, 0], index=sessions)
+
+    @cached
     def load_raw_arrays(self, fields, start_dt, end_dt, sids):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
+        sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         log.info("Loading raw arrays for %d assets (%s)." % (len(sids), type(sids)))
 
         if any(not isinstance(x, int) for x in sids):
@@ -130,8 +145,9 @@ class SQLiteDailyBarReader(SessionBarReader):
                         % (field, ",".join(map(str, sids)), str(start_day), str(end_day))
                 df = pd.read_sql_query(query, conn)
                 result = df.pivot(index='date', columns='sid', values=field)
-                result = result.reindex(columns=sids)
+                result = result.reindex(index=list(map(self._fmt_date, sessions)), columns=sids)
                 raw_arrays.append(result.values)
+
         return raw_arrays
 
     def get_last_traded_dt(self, sid, dt):
@@ -139,7 +155,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         sql = "SELECT date FROM prices WHERE sid = %d and date = '%s'" % (sid, day)
         res = self._query(sql)
         if len(res) == 0:
-            if self._exist_sids([sid]):
+            if self._exist_sid(sid):
                 return pd.NaT
             else:
                 raise KeyError(sid)

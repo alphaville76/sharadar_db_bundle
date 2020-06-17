@@ -9,7 +9,9 @@ from sharadar.util.output_dir import get_output_dir
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 
-def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
+def _add_macro_def(df, sid, end_date, ticker, asset_name):
+    start_date = pd.to_datetime("1998-01-01")
+
     # The first date we have trade data for this asset.
     first_traded = start_date
 
@@ -42,26 +44,26 @@ def _append_ohlc(df):
     return df
 
 
-def create_macro_equities_df(start_date, end_date):
+def create_macro_equities_df(end_date):
     df = pd.DataFrame(columns=METADATA_HEADERS)
-    _add_macro_def(df, 10001, start_date, end_date, 'TR1M', 'US Treasury Bill 1 MO')
-    _add_macro_def(df, 10002, start_date, end_date, 'TR2M', 'US Treasury Bill 2 MO')
-    _add_macro_def(df, 10003, start_date, end_date, 'TR3M', 'US Treasury Bill 3 MO')
-    _add_macro_def(df, 10006, start_date, end_date, 'TR6M', 'US Treasury Bill 6 MO')
-    _add_macro_def(df, 10012, start_date, end_date, 'TR1Y', 'US Treasury Bond 1 YR')
-    _add_macro_def(df, 10024, start_date, end_date, 'TR2Y', 'US Treasury Bond 2 YR')
-    _add_macro_def(df, 10036, start_date, end_date, 'TR3Y', 'US Treasury Bond 3 YR')
-    _add_macro_def(df, 10060, start_date, end_date, 'TR5Y', 'US Treasury Bond 5 YR')
-    _add_macro_def(df, 10084, start_date, end_date, 'TR7Y', 'US Treasury Bond 7 YR')
-    _add_macro_def(df, 10120, start_date, end_date, 'TR10Y', 'US Treasury Bond 10 YR')
-    _add_macro_def(df, 10240, start_date, end_date, 'TR20Y', 'US Treasury Bond 20 YR')
-    _add_macro_def(df, 10360, start_date, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
-    _add_macro_def(df, 10400, start_date, end_date, 'CORP_BOND', 'US Corporate Bond Yield')
-    _add_macro_def(df, 10410, start_date, end_date, 'INDPRO', 'Industrial Production Index')
-    _add_macro_def(df, 10420, start_date, end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
-    _add_macro_def(df, 10430, start_date, end_date, 'PMI_COMP', 'Purchasing Managers Index')
-    _add_macro_def(df, 10440, start_date, end_date, 'UNRATE', 'Civilian Unemployment Rate')
-    _add_macro_def(df, 10450, start_date, end_date, 'RATEINF', 'US Inflation Rates YoY')
+    _add_macro_def(df, 10001, end_date, 'TR1M', 'US Treasury Bill 1 MO')
+    _add_macro_def(df, 10002, end_date, 'TR2M', 'US Treasury Bill 2 MO')
+    _add_macro_def(df, 10003, end_date, 'TR3M', 'US Treasury Bill 3 MO')
+    _add_macro_def(df, 10006, end_date, 'TR6M', 'US Treasury Bill 6 MO')
+    _add_macro_def(df, 10012, end_date, 'TR1Y', 'US Treasury Bond 1 YR')
+    _add_macro_def(df, 10024, end_date, 'TR2Y', 'US Treasury Bond 2 YR')
+    _add_macro_def(df, 10036, end_date, 'TR3Y', 'US Treasury Bond 3 YR')
+    _add_macro_def(df, 10060, end_date, 'TR5Y', 'US Treasury Bond 5 YR')
+    _add_macro_def(df, 10084, end_date, 'TR7Y', 'US Treasury Bond 7 YR')
+    _add_macro_def(df, 10120, end_date, 'TR10Y', 'US Treasury Bond 10 YR')
+    _add_macro_def(df, 10240, end_date, 'TR20Y', 'US Treasury Bond 20 YR')
+    _add_macro_def(df, 10360, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
+    _add_macro_def(df, 10400, end_date, 'CBOND', 'US Corporate Bond Yield')
+    _add_macro_def(df, 10410, end_date, 'INDPRO', 'Industrial Production Index')
+    _add_macro_def(df, 10420, end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
+    _add_macro_def(df, 10430, end_date, 'PMICMP', 'Purchasing Managers Index')
+    _add_macro_def(df, 10440, end_date, 'UNRATE', 'Civilian Unemployment Rate')
+    _add_macro_def(df, 10450, end_date, 'RATEINF', 'US Inflation Rates YoY')
     return df
 
 

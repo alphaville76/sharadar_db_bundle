@@ -687,6 +687,20 @@ Metrics/Tangible Assets Book Value per Share, unit: currency/share
 Measures the ratio between [Tangibles] and [SharesWA] as adjusted by [ShareFactor].
 </div>
 
+<h3>Dimensions</h3>
+<ul>
+    <li><b>arq</b>: As Reported, Quarterly</li>
+    <li><b>art</b>: As Reported, Trailing Twelve Months</li>
+</ul>
+
+<h3>Example</h3>
+<xmp>
+    from sharadar.pipeline.factors import Fundamentals
+
+    revenue_ttm = Fundamentals(field='revenue_art')
+    eps_last_quarter = Fundamentals(field='eps_arq')
+
+</xmp>
 
 
 </body>

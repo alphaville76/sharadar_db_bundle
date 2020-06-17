@@ -9,3 +9,18 @@ Step 1. Make sure you can access Quandl, and you have a Quandl api key. I have s
 Step 2. Clone or download the code and install it using:
 
 >python setup.py install 
+
+The new entry point is **sharadar-zipline** (it replaces *zipline*).
+
+For example to ingest data use:
+> sharadar-zipline ingest
+
+or to run an algorithm
+> sharadar-zipline -f algo.py -s 2017-01-01 -e 2020-01-01
+
+
+To start a notebook 
+> cd notebook
+> jupyter notebook
+
+

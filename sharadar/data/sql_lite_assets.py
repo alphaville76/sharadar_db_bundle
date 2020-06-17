@@ -14,7 +14,7 @@ from zipline.assets.asset_db_schema import (
 )
 from zipline.utils.calendars import get_calendar
 from zipline.utils.memoize import lazyval
-
+from pandas.tseries.offsets import DateOffset
 
 @singleton
 class SQLiteAssetFinder(AssetFinder):
@@ -73,8 +73,8 @@ class SQLiteAssetFinder(AssetFinder):
     @cached
     def get_fundamentals(self, sids, field_name, as_of_date=None, n=1):
         """
-        n=1 is the most recent quarter, n=2 indicate the previous quarter and so on...
-        It's different from windows_lenght
+        n=1 is the most recent quarter or last ttm, n=2 indicate the previous quarter or ttm and so on...
+        It's different from the original zipline windows_lenght
         """
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
         #shape: (windows lenghts=1, num of assets)
@@ -82,26 +82,32 @@ class SQLiteAssetFinder(AssetFinder):
     
     @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):
-        offset = 5*math.ceil(window_length/20)*2.592e+15
-        sql = "SELECT sid, start_date, value FROM equity_supplementary_mappings WHERE sid IN (%s) AND field = '%s' AND start_date <= %d AND start_date >= %d"
-        cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, (as_of_date.value-offset))
-        result = self.engine.execute(cmd).fetchall()  
-        
-        df = pd.DataFrame(result).set_index([0,1])
-        #TODO get calendar from bundle
-        calendar = get_calendar('XNYS')
-        sessions = calendar.sessions_window(as_of_date, 1-window_length)
-        full_index = pd.MultiIndex.from_product([sids, [x.value for x in sessions]])
-        # an empty dataframe with the full index
-        df_empty = pd.DataFrame(index=full_index)
-        df_full = pd.concat([df, df_empty], axis=1).fillna(method='ffill').loc[full_index]
-        df_full.columns=['value']
-        df_full = df_full.astype('float64')
+        """
+        it returns an array of this form:
 
-        pivot = df_full.reset_index().pivot(index='level_1', columns='level_0', values='value')[sids]
-        pivot.index.name = ''
-        pivot.columns.name = ''
-        return pivot
+            value_(t,   sid 1)	value_(t,   sid 2)	...	value_(t,   sid m)
+            value_(t-1, sid 1)	value_(t-1, sid 2)	...	value_(t-1, sid m)
+            value_(t-2, sid 1)	value_(t-2, sid 2)	...	value_(t-2, sid m)
+            value_(t-3, sid 1)	value_(t-3, sid 2)	...	value_(t-3, sid m)
+            ...                 ...                 ... ...
+            value_(t-n, sid 1)	value_(t-n, sid 2)	...	value_(t-n, sid m)
+
+        where n is the window_length (for example n=4 for the last four quarters)
+
+        """
+        if as_of_date is None:
+            as_of_date = pd.Timestamp.today()
+        start_date = as_of_date - DateOffset(months=(window_length + 1) * 3)
+
+        sql = "SELECT * FROM (SELECT ROW_NUMBER() OVER (PARTITION BY sid ORDER BY start_date DESC) row_num," \
+              "sid, start_date, value FROM equity_supplementary_mappings WHERE sid IN (%s) AND field = '%s' " \
+              "AND start_date >= %d AND start_date <= %d) t WHERE row_num <= %d"
+        cmd = sql % (', '.join(map(str, sids)), field_name, start_date.value, as_of_date.value, window_length)
+
+        df = pd.read_sql_query(cmd, self.engine)
+        df = df.pivot(index='row_num', columns='sid', values='value')
+        df = df.reindex(columns=sids)
+        return df.values.astype('float64')
         
     @cached
     def get_fundamentals_ttm(self, sids, field_name, as_of_date=None, k=1):

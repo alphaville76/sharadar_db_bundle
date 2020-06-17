@@ -93,7 +93,6 @@ ENV/
 algo/
 *.pickle
 *_report.htm
-/algo/
-/algo/wwws/wwws.py
-/algo/
-/examples/dma.log
+/algo/*
+*.log
+*.dump

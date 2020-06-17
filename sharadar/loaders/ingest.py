@@ -31,8 +31,8 @@ EXCHANGE_DF = pd.DataFrame([
     ['NYSEMKT', 'American Stock Exchange', 'US'],
     ['NYSEARCA', 'Archipelago Exchange', 'US'],
     ['BATS', 'Better Alternative Trading System Exchange', 'US'],
-    ['MACRO', 'Macroeconomic Data', 'US'],
     ['INDEX', 'Index Data', 'US'],
+    ['MACRO', 'Macroeconomic Data', 'US'],
 ],
     columns=['exchange', 'canonical_name', 'country_code'])
 
@@ -102,15 +102,6 @@ def create_dividends_df(df, sharadar_metadata_df):
     dividends_df.index = dividends_df.index.get_level_values('date')
     dividends_df['record_date'] = dividends_df['declared_date'] = dividends_df['pay_date'] = dividends_df[
         'ex_date'] = dividends_df.index
-
-    # Workaround to avoid dividend warning: This is because dividends are applied to the previous trading day
-    # we don't have price data before 2009-01-02
-    first_day = pd.to_datetime('2009-01-02')  # it was friday
-    if first_day in dividends_df.index:
-        second_day = pd.to_datetime('2009-01-05')
-        dividends_df.loc[first_day, ['record_date', 'declared_date', 'pay_date', 'ex_date']] = second_day
-        # and finally, replace the index
-        dividends_df = dividends_df.rename(index={first_day: second_day})
 
     return dividends_df
 
@@ -269,6 +260,7 @@ def from_quandl():
         log.info("Start creating Fundamentals dataframe...")
         if start_fetch_date is None:
             sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
+            #TODO filter out dimensions other than 'ARQ' and 'ART'
         else:
             sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date)
         with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
@@ -278,10 +270,10 @@ def from_quandl():
         prices_start = prices_df.index[0][0]
         prices_end = prices_df.index[-1][0]
 
-        log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
-        macro_equities_df = create_macro_equities_df(prices_start, prices_end)
+        macro_equities_df = create_macro_equities_df(prices_end)
         asset_db_writer.write(equities=macro_equities_df)
 
+        log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
         macro_prices_df = create_macro_prices_df(prices_start, prices_end)
         sql_daily_bar_writer.write(macro_prices_df)
 
