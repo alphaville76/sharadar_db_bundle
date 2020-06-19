@@ -96,3 +96,4 @@ algo/
 /algo/*
 *.log
 *.dump
+/notebook/Haugen Regressions.ipynb

@@ -10,14 +10,14 @@ import time
 import datetime
 from zipline.pipeline.factors import CustomFactor, DailyReturns, Returns
 from sharadar.pipeline.engine import BundleLoader
-from sharadar.pipeline.factors import ForwarsReturns
+from sharadar.pipeline.factors import ForwardsReturns
 
 
 universe = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
     'monthly_ret': Returns(window_length=2),
-    'monthly_fret': ForwarsReturns(window_length=3, mask=universe)
+    'monthly_fret': ForwardsReturns(window_length=3, mask=universe)
 },
 screen = universe
 )

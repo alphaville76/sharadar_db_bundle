@@ -387,7 +387,7 @@ class InvestmentToAssetsTrend(CustomFactor, BundleLoader):
         out.trend = 2.0 * np.arctan(out.trend) / np.pi
 
 
-class ForwarsReturns(CustomFactor, BundleLoader):
+class ForwardsReturns(CustomFactor, BundleLoader):
     """
     Calculates the percent change in close price over the given window_length in the future.
     Only for research purposes.
