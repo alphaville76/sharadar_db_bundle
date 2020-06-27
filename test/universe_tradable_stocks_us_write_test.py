@@ -1,8 +1,7 @@
 import pandas as pd
-from sharadar.util.universe import UniverseWriter
+from sharadar.pipeline.universes import UniverseWriter, TradableStocksUS
 from sharadar.util.output_dir import get_output_dir
 import os
-from sharadar.pipeline.filters import TradableStocksUS
 from sharadar.pipeline.factors import (
     Fundamentals,
     EV

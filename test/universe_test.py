@@ -1,6 +1,5 @@
 import pandas as pd
-from sharadar.util.universe import UniverseWriter, UniverseReader
-from sharadar.pipeline.filters import NamedUniverse
+from sharadar.pipeline.universes import UniverseWriter, UniverseReader, NamedUniverse
 from zipline.pipeline.filters import StaticAssets
 from sharadar.pipeline.engine import symbols, make_pipeline_engine
 from sharadar.util.output_dir import get_output_dir

@@ -2,7 +2,7 @@
 A simple Pipeline algorithm that longs the top 3 stocks by RSI and shorts
 the bottom 3 each day.
 """
-from sharadar.pipeline.filters import NamedUniverse
+from sharadar.pipeline.universes import NamedUniverse
 from six import viewkeys
 from zipline.api import (
     attach_pipeline,

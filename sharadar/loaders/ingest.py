@@ -17,8 +17,7 @@ from pathlib import Path
 from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
-from sharadar.util.universe import UniverseWriter, UniverseReader
-from sharadar.pipeline.filters import TradableStocksUS, TRADABLE_STOCKS_US
+from sharadar.pipeline.universes import create_tradable_stocks_universe
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
@@ -284,17 +283,7 @@ def from_quandl():
         Path(okay_path).touch()
         log.info("Ingest finished!")
 
-    def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
-        universes_dbpath = os.path.join(output_dir, "universes.sqlite")
-        universe_name = TRADABLE_STOCKS_US
-        screen = TradableStocksUS()
-        universe_start = prices_start.tz_localize('utc')
-        universe_end = prices_end.tz_localize('utc')
-        universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
-        if universe_last_date is not pd.NaT:
-            universe_start = universe_last_date
-        log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
-        UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
+
 
     def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progress):
         # Prepare an empty DataFrame for equities, the index of this dataframe is the sid.

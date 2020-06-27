@@ -24,7 +24,7 @@ def _to_img(figure):
     return '<img width="60%" height="60%" src="data:image/png;base64, ' + pic_hash.decode("utf-8") + '" />'
 
 
-def analyze(perf, filename, duration=None, show_image=True):
+def analyze(perf, filename, doc, duration=None, show_image=True):
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -35,7 +35,7 @@ def analyze(perf, filename, duration=None, show_image=True):
 
     serialise(perf, filename)
 
-    create_report(perf, filename, duration, show_image)
+    create_report(perf, filename, doc, duration, show_image)
 
 
 def serialise(perf, filename):
@@ -45,7 +45,7 @@ def serialise(perf, filename):
     perf.to_pickle(perf_dump_file)
 
 
-def create_report(perf, filename, duration=None, show_image=True):
+def create_report(perf, filename, doc, duration=None, show_image=True):
     returns, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
     if len(returns.index) > 0:
@@ -78,7 +78,9 @@ def create_report(perf, filename, duration=None, show_image=True):
         except:
             pass
 
-    reportfile = change_extension(filename, '_report.htm')
+    now = datetime.datetime.now()
+    report_suffix = '_' + now.strftime('%Y%m%d%H%M') + '_report.htm'
+    reportfile = change_extension(filename, report_suffix)
     with open(reportfile, 'w') as f:
         print("""<!DOCTYPE html>
 <html>
@@ -123,10 +125,10 @@ def create_report(perf, filename, duration=None, show_image=True):
    </head>
    <body>""", file=f)
         print("<h1>Performance report for " + os.path.basename(filename) + "</h1>", file=f)
-        print("<p>Created on %s</p>" % (datetime.datetime.now() ), file=f)
+        print("<p>Created on %s</p>" % (now), file=f)
         if duration is not None:
             print("<p>Backtest executed in %s</p>" % (time.strftime("%H:%M:%S", time.gmtime(duration))), file=f)
-        print("<br/>", file=f)
+        print('<p style="white-space: pre">%s</p>' % (doc), file=f)
         print(to_html_table(
             perf_stats,
             float_format='{0:.2f}'.format,

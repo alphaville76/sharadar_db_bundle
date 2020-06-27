@@ -4,7 +4,7 @@ This is a template algorithm on Quantopian for you to adapt and fill in.
 import zipline.algorithm as algo
 from zipline.pipeline import Pipeline
 from zipline.pipeline.data import USEquityPricing
-from sharadar.pipeline.filters import TradableStocksUS
+from sharadar.pipeline.universes import TradableStocksUS
 
 
 def initialize(context):

@@ -5,10 +5,16 @@ import numpy as np
 import pandas as pd
 from click import progressbar
 from sharadar.pipeline.engine import make_pipeline_engine
+from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
 from sharadar.util.logger import log
-from zipline.pipeline import Pipeline
+from sharadar.util.output_dir import get_output_dir
+from zipline.pipeline import Pipeline, CustomFilter
 from singleton_decorator import singleton
+import os
+from zipline.pipeline.data import USEquityPricing
+from zipline.pipeline.factors import AverageDollarVolume
 
+TRADABLE_STOCKS_US = 'tradable_stocks_us'
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "%s" (
@@ -77,3 +83,47 @@ class UniverseReader(object):
             return pd.NaT
         return pd.Timestamp(res[0], tz='UTC')
 
+
+def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
+    universes_dbpath = os.path.join(output_dir, "universes.sqlite")
+    universe_name = TRADABLE_STOCKS_US
+    screen = TradableStocksUS()
+    universe_start = prices_start.tz_localize('utc')
+    universe_end = prices_end.tz_localize('utc')
+    universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
+    if universe_last_date is not pd.NaT:
+        universe_start = universe_last_date
+    log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
+    UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
+
+
+def TradableStocksUS():
+    return (
+        (USEquityPricing.close.latest > 3) &
+        Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
+        (Sector().notnull()) &
+        (~Sector().element_of(['Financial Services', 'Real Estate'])) &
+        (IsDomestic().eq(1)) &
+        (AverageDollarVolume(window_length=200) > 2.5e6) &
+        (MarketCap() > 350e6) &
+        (Fundamentals(field='revenue_arq') > 0) &
+        (Fundamentals(field='assets_arq') > 0) &
+        (Fundamentals(field='equity_arq') > 0) &
+        (EV() > 0)
+    )
+
+
+class NamedUniverse(CustomFilter):
+    inputs = []
+    window_length = 1
+
+    def __new__(self, universe_name):
+        self.universe_name = universe_name
+
+        universes_db_path = os.path.join(get_output_dir(), "universes.sqlite")
+        self.universe_reader = UniverseReader(universes_db_path)
+        return super(NamedUniverse, self).__new__(self)
+
+    def compute(self, today, assets, out):
+        sids = self.universe_reader.get_sid(self.universe_name, today.date())
+        out[:] = assets.isin(sids)

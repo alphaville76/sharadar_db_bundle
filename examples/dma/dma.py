@@ -73,7 +73,7 @@ def analyze_old(context, perf):
     plt.show()
 
 def analyze(context, perf):
-    performance.analyze(perf, __file__, show_image=True)
+    performance.analyze(perf, __file__, __doc__, show_image=True)
 
 def run_this_algorithm():
     #start = pd.Timestamp('2011-01-01', tz='utc'),

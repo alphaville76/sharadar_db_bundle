@@ -157,7 +157,8 @@ class FundamentalsTrend(CustomFactor, BundleLoader):
     inputs = []
     outputs = ['trend', 'std_err']
     # 20 quarters = 5 years
-    window_length = 20
+    # 12 quarters = 3 years
+    window_length = 12
     params = ('field',)
 
     def retrieve_data(self, assets, field, today):
@@ -192,7 +193,7 @@ class LogFundamentalsTrend(FundamentalsTrend):
 
 class TimeTrend(CustomFactor):
     outputs = ['trend', 'std_err']
-    window_length = 260
+    window_length = 756
     params = ('periodic',)
 
     def compute(self, today, assets, out, data, periodic):
