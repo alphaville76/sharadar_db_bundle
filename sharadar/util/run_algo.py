@@ -262,7 +262,7 @@ def load_benchmark_data_bundle(price_reader, ticker):
     first_date = benchmark.start_date
     last_date = benchmark.end_date
 
-    benchmark_prices = price_reader.load_series(['close'], first_date, last_date, benchmark.sid).dropna()
+    benchmark_prices = price_reader.load_series('close', first_date, last_date, benchmark.sid).dropna()
     benchmark_returns = benchmark_prices.sort_index().pct_change(1).iloc[1:]
     return benchmark_returns
 

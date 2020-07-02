@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='sharadar_db_bundle',
     version='1.0',
-    packages=['sharadar', 'sharadar.data', 'sharadar.loaders', 'sharadar.pipeline', 'sharadar.util'],
+    packages=['sharadar', 'sharadar.data', 'sharadar.loaders', 'sharadar.pipeline', 'sharadar.util', 'sharadar.stat'],
     url='',
     license='',
     author='Costantino',

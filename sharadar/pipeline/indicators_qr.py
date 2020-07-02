@@ -5,7 +5,7 @@ from sharadar.pipeline.factors import Fundamentals, EV
 
 class EarningYieldEV(CustomFactor):
     inputs = [
-        Fundamentals(field='netinccmnusd_art'),
+        Fundamentals(field='netinccmnusd_arq'),
         EV(),
         InterestRate(),
         InflationRate()
@@ -21,7 +21,7 @@ class EarningYieldEV(CustomFactor):
 
 class BookValueYieldEV(CustomFactor):
     inputs = [
-        Fundamentals(field='equityusd_art'),
+        Fundamentals(field='equityusd_arq'),
         EV(),
         InterestRate(),
         InflationRate()
@@ -37,7 +37,7 @@ class BookValueYieldEV(CustomFactor):
 
 class CashFlowYieldEV(CustomFactor):
     inputs = [
-        Fundamentals(field='ncfo_art'),
+        Fundamentals(field='ncfo_arq'),
         EV(),
         InterestRate(),
         InflationRate()
@@ -53,7 +53,7 @@ class CashFlowYieldEV(CustomFactor):
 
 class SalesYieldEV(CustomFactor):
     inputs = [
-        Fundamentals(field='revenueusd_art'),
+        Fundamentals(field='revenueusd_arq'),
         EV(),
         InterestRate(),
         InflationRate()

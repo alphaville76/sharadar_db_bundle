@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 
 def normalize(data_nostd):
+    """
+    Transform features by scaling each feature to a [0, 1] range
+    """
     data = data_nostd / np.nanstd(data_nostd, axis=0)
     min = data.min(axis=0)
     max = data.max(axis=0)

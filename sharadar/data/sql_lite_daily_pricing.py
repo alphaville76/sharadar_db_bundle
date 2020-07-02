@@ -116,7 +116,7 @@ class SQLiteDailyBarReader(SessionBarReader):
 
     @cached
     def load_dataframe(self, field, start_dt, end_dt, sids):
-        data = self.load_raw_arrays(['close'], start_dt, end_dt, sids)
+        data = self.load_raw_arrays([field], start_dt, end_dt, sids)
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         df = pd.DataFrame(data[0], index=sessions)
         df.columns = sids
@@ -124,7 +124,7 @@ class SQLiteDailyBarReader(SessionBarReader):
 
     @cached
     def load_series(self, field, start_dt, end_dt, sid):
-        data = self.load_raw_arrays(['close'], start_dt, end_dt, [sid])
+        data = self.load_raw_arrays([field], start_dt, end_dt, [sid])
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         return pd.Series(data[0][:, 0], index=sessions)
 

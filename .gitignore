@@ -92,8 +92,9 @@ ENV/
 .DS_Store
 algo/
 *.pickle
+*.pkl
 *_report.htm
 /algo/*
 *.log
 *.dump
-/notebook/Haugen Regressions.ipynb
+/notebook/Haugen Regressions*

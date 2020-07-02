@@ -15,6 +15,10 @@ import time
 import gc
 import psutil
 import datetime
+from sharadar.pipeline.engine import symbol, returns
+
+DATETIME_FMT = '%Y-%m-%d_%H%M'
+
 
 def _to_img(figure):
     pic_IObytes = io.BytesIO()
@@ -24,7 +28,7 @@ def _to_img(figure):
     return '<img width="60%" height="60%" src="data:image/png;base64, ' + pic_hash.decode("utf-8") + '" />'
 
 
-def analyze(perf, filename, doc, duration=None, show_image=True):
+def analyze(perf, filename, doc=None, duration=None, param=None, show_image=True):
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -33,53 +37,61 @@ def analyze(perf, filename, doc, duration=None, show_image=True):
     mem = psutil.virtual_memory()
     log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))
 
-    serialise(perf, filename)
+    now = datetime.datetime.now()
 
-    create_report(perf, filename, doc, duration, show_image)
+    serialise(perf, filename, now)
+
+    create_report(perf, filename, now, doc, duration, param, show_image)
 
 
-def serialise(perf, filename):
-    perf_dump_file = change_extension(filename, '_perf.dump')
+def serialise(perf, filename, now):
+    suffix = '_' + now.strftime(DATETIME_FMT) + '_perf.dump'
+    perf_dump_file = change_extension(filename, suffix)
     log.info("Serialise performance date in %s" % perf_dump_file)
     # joblib.dump(perf, perf_dump_file)
     perf.to_pickle(perf_dump_file)
 
 
-def create_report(perf, filename, doc, duration=None, show_image=True):
-    returns, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
+def create_report(perf, filename, now, doc=None, duration=None, param=None, show_image=True):
+    rets, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
-    if len(returns.index) > 0:
-        date_rows['Start date'] = returns.index[0].strftime('%Y-%m-%d')
-        date_rows['End date'] = returns.index[-1].strftime('%Y-%m-%d')
-        date_rows['Total months'] = int(len(returns) / 21)
-    perf_stats = pf.timeseries.perf_stats(returns, positions=positions, transactions=transactions)
-    perf_stats = pd.DataFrame(perf_stats, columns=['Backtest'])
-    for column in perf_stats.columns:
-        for stat, value in perf_stats[column].iteritems():
-            if stat in STAT_FUNCS_PCT:
-                perf_stats.loc[stat, column] = str(np.round(value * 100, 2)) + '%'
-    drawdown_df = pf.timeseries.gen_drawdown_table(returns, top=5)
-    rets_interesting = pf.timeseries.extract_interesting_date_ranges(returns)
-    positions = utils.check_intraday('infer', returns, positions, transactions)
+    if len(rets.index) > 0:
+        date_rows['Start date'] = rets.index[0].strftime('%Y-%m-%d')
+        date_rows['End date'] = rets.index[-1].strftime('%Y-%m-%d')
+        date_rows['Total months'] = int(len(rets) / 21)
+
+    perf_stats_series = pf.timeseries.perf_stats(rets, positions=positions, transactions=transactions)
+
+    benchmark_rets = returns(symbol('SPY'), rets.index[0], rets.index[-1])
+    benchmark_perf_stats = pf.timeseries.perf_stats(benchmark_rets)
+
+    perf_stats_df = pd.DataFrame(perf_stats_series, columns=['Backtest'])
+    perf_stats_df['Benchmark'] = benchmark_perf_stats
+    perf_stats_df['Spread'] = perf_stats_df['Backtest'] - perf_stats_df['Benchmark']
+    format_perf_stats(perf_stats_df)
+
+    drawdown_df = pf.timeseries.gen_drawdown_table(rets, top=5)
+    rets_interesting = pf.timeseries.extract_interesting_date_ranges(rets)
+    positions = utils.check_intraday('infer', rets, positions, transactions)
     transactions_closed = rt.add_closing_transactions(positions, transactions)
     trades = rt.extract_round_trips(
         transactions_closed,
-        portfolio_value=positions.sum(axis='columns') / (1 + returns)
+        portfolio_value=positions.sum(axis='columns') / (1 + rets)
     )
 
     if show_image:
-        fig1 = pf.create_returns_tear_sheet(returns, positions, transactions, return_fig=True)
-        fig2 = pf.create_position_tear_sheet(returns, positions, return_fig=True)
-        fig3 = pf.create_txn_tear_sheet(returns, positions, transactions, return_fig=True)
-        fig4 = pf.create_interesting_times_tear_sheet(returns, return_fig=True)
+        fig0 = create_log_returns_chart(rets, benchmark_rets)
+        fig1 = pf.create_returns_tear_sheet(rets, positions, transactions, benchmark_rets=benchmark_rets, return_fig=True)
+        fig2 = pf.create_position_tear_sheet(rets, positions, return_fig=True)
+        fig3 = pf.create_txn_tear_sheet(rets, positions, transactions, return_fig=True)
+        fig4 = pf.create_interesting_times_tear_sheet(rets, return_fig=True)
         fig5 = None
         try:
-            fig5 = pf.create_round_trip_tear_sheet(returns, positions, transactions, return_fig=True)
+            fig5 = pf.create_round_trip_tear_sheet(rets, positions, transactions, return_fig=True)
         except:
             pass
 
-    now = datetime.datetime.now()
-    report_suffix = '_' + now.strftime('%Y%m%d%H%M') + '_report.htm'
+    report_suffix = "_%s_%.2f_report.htm" % (now.strftime(DATETIME_FMT), 100. * perf_stats_series['Annual return'])
     reportfile = change_extension(filename, report_suffix)
     with open(reportfile, 'w') as f:
         print("""<!DOCTYPE html>
@@ -128,13 +140,22 @@ def create_report(perf, filename, doc, duration=None, show_image=True):
         print("<p>Created on %s</p>" % (now), file=f)
         if duration is not None:
             print("<p>Backtest executed in %s</p>" % (time.strftime("%H:%M:%S", time.gmtime(duration))), file=f)
-        print('<p style="white-space: pre">%s</p>' % (doc), file=f)
+        if doc is not None:
+            print('<h3>Description</h3>', file=f)
+            print('<p style="white-space: pre">%s</p>' % doc.strip(), file=f)
+        if param is not None and len(param) > 0:
+            print('<h3>Parameters</h3>', file=f)
+            print('<pre>%s</pre><br/>' % str(param), file=f)
         print(to_html_table(
-            perf_stats,
+            perf_stats_df,
             float_format='{0:.2f}'.format,
             header_rows=date_rows
         ), file=f)
         print("<br/>", file=f)
+        if show_image:
+            print("<h3>Log Returns</h3>", file=f)
+            print(_to_img(fig0), file=f)
+            print("<br/>", file=f)
         print(to_html_table(
             drawdown_df.sort_values('Net drawdown in %', ascending=False),
             name='Worst drawdown periods',
@@ -184,6 +205,27 @@ def create_report(perf, filename, doc, duration=None, show_image=True):
         print('</pre>', file=f)
 
         print("</body>\n</html>", file=f)
+
+
+def format_perf_stats(perf_stats_df):
+    for column in perf_stats_df.columns:
+        for stat, value in perf_stats_df[column].iteritems():
+            if stat in STAT_FUNCS_PCT:
+                perf_stats_df.loc[stat, column] = str(np.round(value * 100, 2)) + '%'
+
+
+def create_log_returns_chart(rets, benchmark_rets):
+    cum_log_returns = np.log1p(rets).cumsum()
+    cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
+
+    fig, ax = plt.subplots()
+    cum_log_returns.plot(ax=ax, figsize=(20, 10))
+    cum_log_benchmark_rets.plot(ax=ax)
+    ax.grid(True)
+    ax.axhline(y=0, linestyle='--', color='black')
+    ax.legend(['Backtest', 'Benchmark'])
+    plt.title("Log returns")
+    return fig
 
 
 def change_extension(filename, new_ext):
@@ -241,3 +283,11 @@ def to_html_table(table,
         html = html.replace('<thead>', '<thead>' + rows)
 
     return html
+
+
+if __name__ == "__main__":
+    algo_file = '../../algo/haugen20/haugen20.py'
+    perf_dump_file = '../../algo/haugen20/haugen20_202006300552_perf.dump'
+    perf = pd.read_pickle(perf_dump_file)
+    now = datetime.datetime.now()
+    create_report(perf, algo_file, now)

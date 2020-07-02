@@ -336,3 +336,53 @@ def make_pipeline_engine(bundle=None, start=None, end=None):
                                calendar=cal2,
                                asset_finder=bundle.asset_finder)
     return spe
+
+
+def trading_date(date):
+    """
+    Given a date, return the same date if a trading session or the next valid one
+    """
+    if isinstance(date, str):
+        date = pd.to_datetime(date, utc=True)
+    cal = _bar_reader().trading_calendar
+    if not cal.is_session(date):
+        date = cal.next_close(date)
+        # trick to fix the time (from 21:00 to 00:00)
+        date = pd.to_datetime(date.date(), utc=True)
+    return date
+
+
+def to_sids(assets):
+    if hasattr(assets, '__iter__'):
+        return [x.sid for x in assets]
+    return [assets.sid]
+
+
+def prices(assets, start, end, field='close', offset=0):
+    """
+    Get price data for assets between start and end.
+    """
+    start = trading_date(start)
+    end = trading_date(end)
+
+    if offset > 0:
+        start = _bar_reader().trading_calendar.sessions_window(start, -offset)[0]
+
+    df = _bar_reader().load_dataframe(field, start, end, to_sids(assets))
+
+    # use Equity objects as column names
+    if hasattr(assets, '__iter__'):
+        df.columns = assets
+        return df
+    else:
+        series = df.iloc[:, 0]
+        series.name = assets
+        return series
+
+
+def returns(assets, start, end, periods=1, field='close'):
+    """
+    Fetch returns for one or more assets in a date range.
+    """
+    df = prices(assets, start, end, field, periods).sort_index().pct_change(1).iloc[1:]
+    return df

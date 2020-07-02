@@ -188,7 +188,9 @@ class LogFundamentalsTrend(FundamentalsTrend):
 
         # The arctan of a slope is the the angle θ with the origin between −π/2 and π/2
         # Then divide by π/2 to get a measure in [-1,1]
-        out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        # Then add π/2 and divide by π to get a measure in [0,1]
+        #out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        out.trend = (np.arctan(out.trend) + np.pi/2) / np.pi
 
 
 class TimeTrend(CustomFactor):
@@ -208,7 +210,9 @@ class LogTimeTrend(TimeTrend):
 
         # The arctan of a slope is the the angle θ with the origin between −π/2 and π/2
         # Then divide by π/2 to get a measure in [-1,1]
-        out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        # Then add π/2 and divide by π to get a measure in [0,1]
+        #out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        out.trend = (np.arctan(out.trend) + np.pi/2) / np.pi
 
 class LogLatest(CustomFactor):
     window_length = 1
