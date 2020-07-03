@@ -24,3 +24,25 @@ To start a notebook
 > jupyter notebook
 
 
+Sharadar Fundamentals could be use as follows:
+>from zipline.pipeline import Pipeline
+from zipline.pipeline.data import USEquityPricing
+from sharadar.pipeline.factors import (
+    MarketCap,
+    EV,
+    Fundamentals
+)
+from sharadar.pipeline.engine import symbol, symbols, make_pipeline_engine
+from zipline.pipeline.filters import StaticAssets
+>
+> pipe = Pipeline(columns={
+    'mkt_cap': MarketCap(),
+    'ev': EV(),
+    'debt': Fundamentals(field='debtusd_arq'),
+    'cash': Fundamentals(field='cashnequsd_arq')
+},
+screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
+)
+
+>stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+stocks

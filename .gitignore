@@ -98,3 +98,4 @@ algo/
 *.log
 *.dump
 /notebook/Haugen Regressions*
+/notebook/sandbox/*
