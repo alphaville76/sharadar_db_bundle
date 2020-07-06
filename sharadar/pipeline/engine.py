@@ -107,7 +107,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
         for term in graph.execution_order(refcounts):
             start_time = time.time()
             i += 1
-            log.info("Computing term %d of %d [%s]" % (i,l, to_string(term)))
+            log.debug("Computing term %d of %d [%s]" % (i,l, to_string(term)))
 
 
             # `term` may have been supplied in `initial_workspace`, and in the
@@ -115,7 +115,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
             # dataset.  In either case, we will already have an entry for this
             # term, which we shouldn't re-compute.
             if term in workspace:
-                log.info("Term already in workspace: no computation needed")
+                log.debug("Term already in workspace: no computation needed")
                 continue
 
             # Asset labels are always the same, but date labels vary by how
@@ -159,7 +159,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
                 for garbage_term in graph.decref_dependencies(term, refcounts):
                     del workspace[garbage_term]
 
-            log.info("Elapsed time: %s" % datetime.timedelta(seconds=(time.time() - start_time)))
+            log.debug("Elapsed time: %s" % datetime.timedelta(seconds=(time.time() - start_time)))
 
         out = {}
         graph_extra_rows = graph.extra_rows

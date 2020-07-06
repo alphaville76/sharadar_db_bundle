@@ -1,18 +1,18 @@
 from zipline.api import order_target, record, symbol
 import matplotlib.pyplot as plt
 import pandas as pd
+from sharadar.util.logger import BacktestLogger
 from sharadar.util.run_algo import run_algorithm
 from sharadar.util import performance
 from sharadar.util.performance import change_extension
 from logbook import Logger, FileHandler, DEBUG, INFO, StreamHandler
 import sys
 import os
-log = Logger('Algorithm')
-path, ext = os.path.splitext(__file__)
-log.handlers.append(FileHandler(path + ".log", level=DEBUG, bubble=True))
-log.handlers.append(StreamHandler(sys.stdout, level=INFO))
+log = BacktestLogger(__file__)
 
+import tracemalloc
 
+tracemalloc.start()
 
 # silence warnings
 import warnings
@@ -37,6 +37,7 @@ def handle_data(context, data):
     long_mavg = data.history(context.asset, 'price', bar_count=300, frequency="1d").mean()
 
     # Trading logic
+    log.info("short_mavg > long_mavg: %s" % (short_mavg > long_mavg))
     if short_mavg > long_mavg:
         # order_target orders as many shares as needed to
         # achieve the desired number of shares.
@@ -73,6 +74,13 @@ def analyze_old(context, perf):
     plt.show()
 
 def analyze(context, perf):
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+
+    print("[ Top 10 ]")
+    for stat in top_stats[:10]:
+        print(stat)
+
     performance.analyze(perf, __file__, __doc__, show_image=True)
 
 def run_this_algorithm():
@@ -80,7 +88,7 @@ def run_this_algorithm():
     #end = pd.Timestamp('2020-01-01', tz='utc'),
     # runs the zipline ALGO function
     run_algorithm(initialize=initialize,
-                  #start=pd.Timestamp('2020-01-02', tz='utc'),
+                  start=pd.Timestamp('2019-01-02', tz='utc'),
                   handle_data=handle_data,
                   analyze=analyze,
                   state_filename=change_extension(__file__, '_context.pickle')

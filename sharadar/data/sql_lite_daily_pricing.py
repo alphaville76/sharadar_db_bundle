@@ -133,7 +133,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
-        log.info("Loading raw arrays for %d assets (%s)." % (len(sids), type(sids)))
+        log.debug("Loading raw arrays for %d assets (%s)." % (len(sids), type(sids)))
 
         if any(not isinstance(x, int) for x in sids):
             sids = [x.sid for x in sids]

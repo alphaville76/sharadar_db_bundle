@@ -16,6 +16,10 @@ from zipline.utils.calendars import get_calendar
 from zipline.utils.memoize import lazyval
 from pandas.tseries.offsets import DateOffset
 
+
+
+
+
 @singleton
 class SQLiteAssetFinder(AssetFinder):
     @lazyval

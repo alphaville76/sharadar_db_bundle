@@ -127,3 +127,17 @@ class NamedUniverse(CustomFilter):
     def compute(self, today, assets, out):
         sids = self.universe_reader.get_sid(self.universe_name, today.date())
         out[:] = assets.isin(sids)
+
+if __name__ == "__main__":
+    universe_start = pd.to_datetime('1998-10-20', utc=True)
+    universe_end = pd.to_datetime('2020-07-06', utc=True)
+
+    from sharadar.util.output_dir import get_output_dir
+    universes_dbpath = os.path.join(get_output_dir(), "universes1.sqlite")
+    universe_name = TRADABLE_STOCKS_US
+    screen = TradableStocksUS()
+    universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
+    if universe_last_date is not pd.NaT:
+        universe_start = universe_last_date
+    log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
+    UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)

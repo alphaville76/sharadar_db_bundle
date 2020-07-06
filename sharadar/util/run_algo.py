@@ -107,6 +107,8 @@ def _run(handle_data,
     if end is None:
         end = bundle_data.equity_daily_bar_reader.last_available_dt
 
+    log.info("Backtest from %s to %s." % (str(start.date()), str(end.date())))
+
     benchmark_returns = load_benchmark_data_bundle(bundle_data.equity_daily_bar_reader, 'SPY')
 
     emission_rate = 'daily'
@@ -414,7 +416,8 @@ def run_algorithm(initialize,
                               True, then algo execution will be aborted.
     execution_id : unique id to identify this execution instance (backtest or live) will be used to mark and get logs
                    for this specific execution instance.
-    state_filename : path to pickle file storing the algorithm "context" (similar to self)
+    state_filename : path to pickle file storing the algorithm "context" (similar to self).
+                     Use only for live trading, otherwise a cache expired error may occur.
 
     Returns
     -------
