@@ -12,7 +12,7 @@ from zipline.data.bar_reader import (
 )
 
 from singleton_decorator import singleton
-from memoization import cached
+from sharadar.util.cache import cached
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "properties" (

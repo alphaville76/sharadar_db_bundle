@@ -2,7 +2,7 @@ import datetime
 import time
 import os
 import pandas as pd
-from memoization import cached
+from sharadar.util.cache import cached
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
 from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR

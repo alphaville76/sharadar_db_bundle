@@ -238,7 +238,7 @@ def from_quandl():
         # Write dividends and splits_df
         sql_daily_bar_reader = SQLiteDailyBarReader(prices_dbpath)
         adjustment_dbpath = os.path.join(output_dir, "adjustments.sqlite")
-        adjustment_writer = SQLiteAdjustmentWriter(adjustment_dbpath, sql_daily_bar_reader, sessions, overwrite=True)
+        adjustment_writer = SQLiteAdjustmentWriter(adjustment_dbpath, sql_daily_bar_reader, sessions)
 
         log.info("Start writing %d splits and %d dividends data..." % (len(splits_df), len(dividends_df)))
         adjustment_writer.write(splits=splits_df, dividends=dividends_df)

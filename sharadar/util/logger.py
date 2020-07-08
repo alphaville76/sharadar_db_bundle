@@ -12,7 +12,7 @@ LOG_ENTRY_FMT = '{record.time:%Y-%m-%d} {record.level_name}:{record.lineno} {rec
 logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline.log")
 log = Logger('sharadar_db_bundle')
 log.handlers.append(FileHandler(logfilename, level=DEBUG, bubble=True))
-log.handlers.append(StreamHandler(sys.stdout, level=DEBUG))
+log.handlers.append(StreamHandler(sys.stdout, level=INFO))
 
 
 def log_top_mem_usage(logger, snapshot, key_type='lineno', limit=10):

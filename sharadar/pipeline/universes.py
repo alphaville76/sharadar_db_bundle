@@ -53,7 +53,7 @@ class UniverseWriter(object):
 
     def _execute_pipeline(self, screen, pipe_end, pipe_start):
         pipe = Pipeline(columns={ }, screen = screen)
-        stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end, chunksize=-1)
+        stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end, chunksize=120)
         return stocks
 
 @singleton

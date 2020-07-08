@@ -2,7 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 import warnings
-from memoization import cached
+from sharadar.util.cache import cached
 from singleton_decorator import singleton
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
@@ -81,6 +81,8 @@ class SQLiteAssetFinder(AssetFinder):
         It's different from the original zipline windows_lenght
         """
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
+        if len(result) == 0:
+            return []
         #shape: (windows lenghts=1, num of assets)
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
     
@@ -120,6 +122,8 @@ class SQLiteAssetFinder(AssetFinder):
         It's different from windows_lenght
         """
         result = self._get_result_ttm(sids, field_name + '_arq', as_of_date, k)
+        if len(result) == 0:
+            return []
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
     
     @cached
@@ -129,6 +133,8 @@ class SQLiteAssetFinder(AssetFinder):
         because np.nan isn't supported in LabelArray
         """
         result = self._get_result(sids, field_name, as_of_date, n=1, enforce_date=False)
+        if len(result) == 0:
+            return []
         return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
 
 

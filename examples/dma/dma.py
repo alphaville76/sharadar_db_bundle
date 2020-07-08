@@ -74,6 +74,11 @@ def analyze_old(context, perf):
     plt.show()
 
 def analyze(context, perf):
+
+    from sharadar.util.cache import wrappers
+    for wrapper in wrappers:
+        print(wrapper, wrapper.cache_info())
+
     snapshot = tracemalloc.take_snapshot()
     top_stats = snapshot.statistics('lineno')
 
