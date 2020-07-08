@@ -17,7 +17,7 @@ from pathlib import Path
 from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
-from sharadar.pipeline.universes import create_tradable_stocks_universe
+
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
@@ -277,6 +277,7 @@ def from_quandl():
         sql_daily_bar_writer.write(macro_prices_df)
 
         # Predefined Named Universes
+        from sharadar.pipeline.universes import create_tradable_stocks_universe
         create_tradable_stocks_universe(output_dir, prices_start, prices_end)
 
         okay_path = os.path.join(output_dir, "ok")

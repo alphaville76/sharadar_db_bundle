@@ -37,6 +37,7 @@ except NameError:
 @click.option(
     '--strict-extensions/--non-strict-extensions',
     is_flag=True,
+    default=True,
     help='If --strict-extensions is passed then zipline will not run if it'
     ' cannot load all of the specified extensions. If this is not passed or'
     ' --non-strict-extensions is passed then the failure will be logged but'
