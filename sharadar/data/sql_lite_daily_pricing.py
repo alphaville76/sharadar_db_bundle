@@ -6,6 +6,12 @@ from contextlib import closing
 from zipline.utils.calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
 from sharadar.util.logger import log
+from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
+from six import (
+    iteritems,
+    string_types,
+    viewkeys,
+)
 
 from zipline.data.bar_reader import (
     NoDataBeforeDate,
@@ -31,8 +37,73 @@ CREATE TABLE IF NOT EXISTS "prices" (
   "volume" REAL NOT NULL,
   PRIMARY KEY (date, sid)
 );
-CREATE INDEX "ix_prices_date" ON "prices" ("date");
+CREATE INDEX  "ix_prices_date" ON "prices" ("date");
 CREATE INDEX "ix_prices_sid" ON "prices" ("sid");
+"""
+
+SCHEMA_ADJUST = """
+CREATE TABLE IF NOT EXISTS "splits" (
+"index" INTEGER,
+  "effective_date" INTEGER,
+  "ratio" REAL,
+  "sid" INTEGER,
+  PRIMARY KEY (effective_date, sid)
+);
+CREATE INDEX IF NOT EXISTS "ix_splits_index"ON "splits" ("index");
+
+CREATE TABLE IF NOT EXISTS "mergers" (
+"index" INTEGER,
+  "effective_date" INTEGER,
+  "ratio" REAL,
+  "sid" INTEGER,
+  PRIMARY KEY (effective_date, sid)
+);
+CREATE INDEX IF NOT EXISTS "ix_mergers_index"ON "mergers" ("index");
+
+CREATE TABLE IF NOT EXISTS "dividend_payouts" (
+"date" TIMESTAMP,
+  "amount" REAL,
+  "sid" INTEGER,
+  "record_date" INTEGER,
+  "declared_date" INTEGER,
+  "pay_date" INTEGER,
+  "ex_date" INTEGER,
+  PRIMARY KEY (date, sid)
+);
+CREATE INDEX IF NOT EXISTS "ix_dividend_payouts_date"ON "dividend_payouts" ("date");
+
+CREATE TABLE IF NOT EXISTS "stock_dividend_payouts" (
+"index" INTEGER,
+  "sid" INTEGER,
+  "ex_date" INTEGER,
+  "declared_date" INTEGER,
+  "record_date" INTEGER,
+  "pay_date" INTEGER,
+  "payment_sid" INTEGER,
+  "ratio" REAL,
+  PRIMARY KEY (sid, ex_date)
+);
+CREATE INDEX IF NOT EXISTS "ix_stock_dividend_payouts_index"ON "stock_dividend_payouts" ("index");
+
+CREATE TABLE IF NOT EXISTS "dividends" (
+"index" INTEGER,
+  "effective_date" INTEGER,
+  "ratio" REAL,
+  "sid" INTEGER,
+  PRIMARY KEY (effective_date, sid)
+);
+
+CREATE INDEX IF NOT EXISTS "ix_dividends_index"ON "dividends" ("index");
+CREATE INDEX IF NOT EXISTS splits_sids ON splits(sid);
+CREATE INDEX IF NOT EXISTS splits_effective_date ON splits(effective_date);
+CREATE INDEX IF NOT EXISTS mergers_sids ON mergers(sid);
+CREATE INDEX IF NOT EXISTS mergers_effective_date ON mergers(effective_date);
+CREATE INDEX IF NOT EXISTS dividends_sid ON dividends(sid);
+CREATE INDEX IF NOT EXISTS dividends_effective_date ON dividends(effective_date);
+CREATE INDEX IF NOT EXISTS dividend_payouts_sid ON dividend_payouts(sid);
+CREATE INDEX IF NOT EXISTS dividends_payouts_ex_date ON dividend_payouts(ex_date);
+CREATE INDEX IF NOT EXISTS stock_dividend_payouts_sid ON stock_dividend_payouts(sid);
+CREATE INDEX IF NOT EXISTS stock_dividends_payouts_ex_date ON stock_dividend_payouts(ex_date);
 """
 # Sqlite Maximum Number Of Columns in a table or query
 SQLITE_MAX_COLUMN = 2000
@@ -190,3 +261,67 @@ class SQLiteDailyBarReader(SessionBarReader):
     def sessions(self):
         cal = self.trading_calendar
         return cal.sessions_in_range(self.first_trading_day, self.last_available_dt)
+
+
+class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
+
+
+    def __init__(self, filename, equity_daily_bar_reader, calendar):
+        self._filename = filename
+        self._equity_daily_bar_reader = equity_daily_bar_reader
+        self._calendar = calendar
+
+        # Create schema, if not exists
+        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+            c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='dividends'")
+            if c.fetchone()[0] == 0:
+                c.executescript(SCHEMA_ADJUST)
+
+    def _write(self, tablename, expected_dtypes, frame):
+        if frame is None or frame.empty:
+            # keeping the dtypes correct for empty frames is not easy
+            frame = pd.DataFrame(
+                np.array([], dtype=list(expected_dtypes.items())),
+            )
+        else:
+            if frozenset(frame.columns) != frozenset(expected_dtypes):
+                raise ValueError(
+                    "Unexpected frame columns:\n"
+                    "Expected Columns: %s\n"
+                    "Received Columns: %s" % (
+                        set(expected_dtypes),
+                        frame.columns.tolist(),
+                    )
+                )
+
+            actual_dtypes = frame.dtypes
+            for colname, expected in iteritems(expected_dtypes):
+                actual = actual_dtypes[colname]
+                if not np.issubdtype(actual, expected):
+                    raise TypeError(
+                        "Expected data of type {expected} for column"
+                        " '{colname}', but got '{actual}'.".format(
+                            expected=expected,
+                            colname=colname,
+                            actual=actual,
+                        ),
+                    )
+
+        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+            with click.progressbar(length=len(frame), label="Inserting price data...") as pbar:
+                count = 0
+                for index, row in frame.iterrows():
+                    sql = "INSERT OR REPLACE INTO %s VALUES ('%s', %s)"
+                    cmd = sql % (tablename, index, ', '.join(map(str, row.values)))
+                    try:
+                        c.execute(cmd)
+                    except sqlite3.OperationalError as e:
+                        log.error(str(e) + ": " + cmd)
+                    count += 1
+                    pbar.update(count)
+
+    def write(self, splits=None, mergers=None, dividends=None, stock_dividends=None):
+        self.write_frame('splits', splits)
+        self.write_frame('mergers', mergers)
+        self.write_dividend_data(dividends, stock_dividends)
+

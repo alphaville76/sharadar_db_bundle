@@ -36,14 +36,14 @@ class TBillBeta(CustomFactor):
 
 class TBillBondSpreadBeta(CustomFactor):
     """
-    the difference in the returns to 30y and 3m government bonds,
+    the difference in the returns to 20y and 3m government bonds,
     """
     inputs = [USEquityPricing.close]
     window_safe = True
     window_length = 252
 
     def compute(self, today, assets, out, close):
-        t_bond_30y = prices_by_sid(assets, close, 10360)
+        t_bond_30y = prices_by_sid(assets, close, 10240)
         t_bill_3m = prices_by_sid(assets, close, 10003)
 
         monthly_close = np.diff(np.log(close[0::21, :]), axis=0)

@@ -46,8 +46,8 @@ def _append_ohlc(df):
 
 def create_macro_equities_df(end_date):
     df = pd.DataFrame(columns=METADATA_HEADERS)
-    _add_macro_def(df, 10001, end_date, 'TR1M', 'US Treasury Bill 1 MO')
-    _add_macro_def(df, 10002, end_date, 'TR2M', 'US Treasury Bill 2 MO')
+    #_add_macro_def(df, 10001, end_date, 'TR1M', 'US Treasury Bill 1 MO')
+    #_add_macro_def(df, 10002, end_date, 'TR2M', 'US Treasury Bill 2 MO')
     _add_macro_def(df, 10003, end_date, 'TR3M', 'US Treasury Bill 3 MO')
     _add_macro_def(df, 10006, end_date, 'TR6M', 'US Treasury Bill 6 MO')
     _add_macro_def(df, 10012, end_date, 'TR1Y', 'US Treasury Bond 1 YR')
@@ -57,7 +57,7 @@ def create_macro_equities_df(end_date):
     _add_macro_def(df, 10084, end_date, 'TR7Y', 'US Treasury Bond 7 YR')
     _add_macro_def(df, 10120, end_date, 'TR10Y', 'US Treasury Bond 10 YR')
     _add_macro_def(df, 10240, end_date, 'TR20Y', 'US Treasury Bond 20 YR')
-    _add_macro_def(df, 10360, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
+    #_add_macro_def(df, 10360, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
     _add_macro_def(df, 10400, end_date, 'CBOND', 'US Corporate Bond Yield')
     _add_macro_def(df, 10410, end_date, 'INDPRO', 'Industrial Production Index')
     _add_macro_def(df, 10420, end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
@@ -67,15 +67,25 @@ def create_macro_equities_df(end_date):
     return df
 
 
-def create_macro_prices_df(start, end):
+def create_macro_prices_df(start, end, calendar=None):
     # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
     tres_df = quandl.get("USTREASURY/YIELD", start_date=start, end_date=end)
     # sids
     tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
+    # TR1M, TR2M and TR30Y excluded because of too many missing data
+    tres_df.drop(columns=[10001, 10002, 10360], inplace=True)
+
+    if calendar is not None:
+        sessions = calendar.sessions_in_range(start, end)
+        tres_df = tres_df.reindex(sessions.tz_localize(None))
+        tres_df = tres_df.fillna(method='ffill')
+        tres_df = tres_df.dropna()
 
     prices = tres_df.unstack().to_frame()
     prices = prices.swaplevel()
     prices = _append_ohlc(prices)
+
+
 
     # https://www.quandl.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
     corp_bond_df = _to_prices_df(quandl.get("ML/USEY", start_date=start, end_date=end), 10400)
@@ -110,3 +120,32 @@ def create_macro_prices_df(start, end):
 
     prices.sort_index(inplace=True)
     return prices
+
+
+if __name__ == "__main__":
+    #TODO ask the dates
+    prices_start = pd.to_datetime('1998-01-01')
+    prices_end = pd.to_datetime('2020-07-07')
+
+    from sharadar.pipeline.engine import load_sharadar_bundle
+    from zipline.assets import ASSET_DB_VERSION
+    from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
+    from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter
+    from trading_calendars import get_calendar
+
+    bundle = load_sharadar_bundle()
+    calendar = get_calendar('NYSE')
+
+    macro_equities_df = create_macro_equities_df(prices_end)
+
+    macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)
+
+    output_dir = get_output_dir()
+    asset_dbpath = os.path.join(output_dir, ("assets-%d.sqlite" % ASSET_DB_VERSION))
+    asset_db_writer = SQLiteAssetDBWriter(asset_dbpath)
+    asset_db_writer.write(equities=macro_equities_df)
+
+    prices_dbpath = os.path.join(output_dir, "prices.sqlite")
+    sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
+    sql_daily_bar_writer.write(macro_prices_df)
+

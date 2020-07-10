@@ -8,9 +8,8 @@ from sharadar.util.quandl_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import lookup_sid, METADATA_HEADERS
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
 from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
-from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader
+from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
-from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
@@ -238,11 +237,10 @@ def from_quandl():
         # Write dividends and splits_df
         sql_daily_bar_reader = SQLiteDailyBarReader(prices_dbpath)
         adjustment_dbpath = os.path.join(output_dir, "adjustments.sqlite")
-        adjustment_writer = SQLiteAdjustmentWriter(adjustment_dbpath, sql_daily_bar_reader, sessions)
+        adjustment_writer = SQLiteDailyAdjustmentWriter(adjustment_dbpath, sql_daily_bar_reader, sessions)
 
         log.info("Start writing %d splits and %d dividends data..." % (len(splits_df), len(dividends_df)))
         adjustment_writer.write(splits=splits_df, dividends=dividends_df)
-        adjustment_writer.close()
 
         # Write equity metadata
         log.info("Start writing equities and supplementary_mappings data...")
@@ -273,7 +271,7 @@ def from_quandl():
         asset_db_writer.write(equities=macro_equities_df)
 
         log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
-        macro_prices_df = create_macro_prices_df(prices_start, prices_end)
+        macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)
         sql_daily_bar_writer.write(macro_prices_df)
 
         # Predefined Named Universes
