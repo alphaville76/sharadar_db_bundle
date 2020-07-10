@@ -28,7 +28,7 @@ def _to_img(figure):
     return '<img width="60%" height="60%" src="data:image/png;base64, ' + pic_hash.decode("utf-8") + '" />'
 
 
-def analyze(perf, filename, doc=None, duration=None, param=None, show_image=True):
+def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True):
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -41,7 +41,7 @@ def analyze(perf, filename, doc=None, duration=None, param=None, show_image=True
 
     serialise(perf, filename, now)
 
-    create_report(perf, filename, now, doc, duration, param, show_image)
+    create_report(perf, filename, now, doc, duration, param, info, show_image)
 
 
 def serialise(perf, filename, now):
@@ -52,7 +52,7 @@ def serialise(perf, filename, now):
     perf.to_pickle(perf_dump_file)
 
 
-def create_report(perf, filename, now, doc=None, duration=None, param=None, show_image=True):
+def create_report(perf, filename, now, doc=None, duration=None, param=None, info=None, show_image=True):
     rets, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
     if len(rets.index) > 0:
@@ -146,6 +146,9 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, show
         if param is not None and len(param) > 0:
             print('<h3>Parameters</h3>', file=f)
             print('<pre>%s</pre><br/>' % str(param), file=f)
+        if info is not None and len(info) > 0:
+            print('<h3>Info</h3>', file=f)
+            print('<pre>%s</pre><br/>' % str(info), file=f)
         print(to_html_table(
             perf_stats_df,
             float_format='{0:.2f}'.format,
