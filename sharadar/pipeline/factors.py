@@ -6,6 +6,24 @@ from zipline.lib.labelarray import LabelArray
 import numpy as np
 from zipline.utils.numpy_utils import object_dtype
 import pandas as pd
+import warnings
+
+
+def nanmean(a, axis=0):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return np.nanmean(a, axis)
+
+def nanvar(a, axis=0):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return np.nanvar(a, axis)
+
+def nanstd(a, axis=0):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return np.nanstd(a, axis)
+
 
 class Fundamentals(CustomFactor, BundleLoader):
     inputs = []
@@ -85,7 +103,7 @@ class AvgMarketCap(CustomFactor, BundleLoader):
         sharefactor = self.asset_finder().get_fundamentals_df_window_length(assets, 'sharefactor_arq', today,
                                                                             self.window_length)
         shares = sharefactor * sharesbas
-        out[:] = np.nanmean(close * shares, axis=0)
+        out[:] = nanmean(close * shares)
 
 
 class MarketCap(CustomFactor):
@@ -125,13 +143,13 @@ def time_trend(Y, allowed_missing=0):
     # shape: (N, M)
     X = np.where(np.isnan(Y), np.nan, X)
 
-    X_mean = np.nanmean(X, axis=0)
-    Y_mean = np.nanmean(Y, axis=0)
+    X_mean = nanmean(X, axis=0)
+    Y_mean = nanmean(Y, axis=0)
 
     # shape: (M,)
-    XY_cov = np.nanmean((X - X_mean) * (Y - Y_mean), axis=0)
+    XY_cov = nanmean((X - X_mean) * (Y - Y_mean), axis=0)
 
-    X_var = np.nanvar(X, axis=0)
+    X_var = nanvar(X, axis=0)
 
     # shape: (M,)
     beta = np.divide(XY_cov, X_var)
@@ -146,7 +164,7 @@ def time_trend(Y, allowed_missing=0):
     # then allowed number of missing entries.
     nanlocs = np.isnan(X).sum(axis=0) > allowed_missing
     beta[nanlocs] = np.nan
-    # alpha[nanlocs] = np.nan
+    # alpha[nanlocs] = nan
     std_err[nanlocs] = np.nan
 
     # return (alpha, beta)
@@ -226,8 +244,7 @@ class StdDev(CustomFactor):
     window_length = 252
 
     def compute(self, today, assets, out, factor):
-        out[:] = np.nanstd(factor, axis=0)
-
+        out[:] = nanstd(factor)
 
 def beta_residual(Y, X, allowed_missing=0, standardize=False):
     """
@@ -250,25 +267,25 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     variance of residuals : np.array[M]
     """
     if standardize:
-        Y = (Y - np.nanmean(Y, axis=0)) / np.nanstd(Y, axis=0)
-        X = (X - np.nanmean(X, axis=0)) / np.nanstd(X, axis=0)
+        Y = (Y - nanmean(Y, axis=0)) / nanstd(Y, axis=0)
+        X = (X - nanmean(X, axis=0)) / nanstd(X, axis=0)
 
     # shape: (N, M)
     X = np.where(np.isnan(Y), np.nan, X)
 
-    X_residual = X - np.nanmean(X, axis=0)
+    X_residual = X - nanmean(X, axis=0)
 
     # shape: (M,)
-    covariances = np.nanmean(X_residual * Y, axis=0)
+    covariances = nanmean(X_residual * Y, axis=0)
 
-    X_variances = np.nanmean(X_residual ** 2, axis=0)
+    X_variances = nanmean(X_residual ** 2, axis=0)
 
     # shape: (M,)
     beta = np.divide(covariances, X_variances)
 
     Y_est = np.multiply(beta, X)
     residual = Y - Y_est
-    residual_var = np.nanvar(residual, axis=0)
+    residual_var = nanvar(residual, axis=0)
 
     # Write nans back to locations where we have more
     # then allowed number of missing entries.
@@ -277,7 +294,6 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     residual_var[nanlocs] = np.nan
 
     return (beta, residual_var)
-
 
 class Beta(CustomFactor):
     outputs = ['beta', 'residual_var']
@@ -289,6 +305,7 @@ class Beta(CustomFactor):
         allowed_missing_percentage = 0.25
         allowed_missing_count = int(allowed_missing_percentage * self.window_length)
         (out.beta, out.residual_var) = beta_residual(assets_returns, market_returns, allowed_missing_count, standardize)
+
 
 
 class Previous(CustomFactor):

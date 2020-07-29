@@ -7,7 +7,7 @@ import linecache
 import os
 import tracemalloc
 
-LOG_ENTRY_FMT = '{record.time:%Y-%m-%d} {record.level_name}:{record.lineno} {record.message}'
+LOG_ENTRY_FMT = '{record.time:%Y-%m-%d} {record.level_name} {record.message}'
 
 logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline.log")
 log = Logger('sharadar_db_bundle')

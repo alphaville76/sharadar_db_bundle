@@ -21,7 +21,6 @@ def prices_by_sid(assets, close, sid):
     rate = np.reshape(close[:, rate_index], (-1, 1))
     return rate
 
-
 class TBillBeta(CustomFactor):
     inputs = [USEquityPricing.close, Closes()[symbol('TR3M')]]
     window_safe = True
@@ -62,24 +61,6 @@ class TBillBondSpreadBeta(CustomFactor):
         beta = beta_residual(r, t_r, standardize=True)[0]
         out[:] = beta
 
-
-class CorpGvrnBondsSpreadBeta(CustomFactor):
-    """
-     the difference in the returns to corporate and US Treasury Bond 7 YR
-    """
-    inputs = [USEquityPricing.close]
-    window_safe = True
-    window_length = 252
-
-    def compute(self, today, assets, out, close):
-        t_bond = prices_by_sid(assets, close, 10084)
-        c_bond = prices_by_sid(assets, close, 10400)
-
-        monthly_close = np.diff(np.log(close[0::21, :]), axis=0)
-        monthly_rate = t_bond[0::21, :][1:, :] - c_bond[0::21, :][1:, :]
-
-        beta = beta_residual(monthly_close, monthly_rate, standardize=True)[0]
-        out[:] = beta
 
 class PurchaseManagerIndexBeta(CustomFactor):
     inputs = [USEquityPricing.close]

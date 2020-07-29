@@ -15,7 +15,10 @@ The new entry point is **sharadar-zipline** (it replaces *zipline*).
 For example to ingest data use:
 > sharadar-zipline ingest
 
-or to run an algorithm
+To ingest price and fundamental data every day at 21:30 using cron
+> 30 21 * * *	cd $HOME/zipline/lib/python3.6/site-packages/sharadar_db_bundle && $HOME/zipline/bin/python sharadar/__main__.py ingest > $HOME/log/sharadar-zipline-cron.log 2>&1
+
+To run an algorithm
 > sharadar-zipline -f algo.py -s 2017-01-01 -e 2020-01-01
 
 

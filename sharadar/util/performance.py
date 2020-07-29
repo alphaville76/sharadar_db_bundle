@@ -16,6 +16,7 @@ import gc
 import psutil
 import datetime
 from sharadar.pipeline.engine import symbol, returns
+import warnings
 
 DATETIME_FMT = '%Y-%m-%d_%H%M'
 
@@ -41,7 +42,10 @@ def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show
 
     serialise(perf, filename, now)
 
-    create_report(perf, filename, now, doc, duration, param, info, show_image)
+    with warnings.catch_warnings():
+        # ignore the many pyfolio warnings
+        warnings.simplefilter("ignore")
+        create_report(perf, filename, now, doc, duration, param, info, show_image)
 
 
 def serialise(perf, filename, now):
@@ -286,6 +290,38 @@ def to_html_table(table,
         html = html.replace('<thead>', '<thead>' + rows)
 
     return html
+
+
+def describe_portfolio(positions):
+    """
+    Describe Portfolio Performance
+    """
+    if len(positions) == 0:
+        return None
+
+    pdf = pd.DataFrame(index=list(positions.keys()) + ['Summary'], columns=['cost_basis', 'amount', 'pl', 'pl_pct'])
+    total_cost_basis = 0
+    total_pl = 0
+    for stock, position in list(positions.items()):
+        cost_basis = position.cost_basis
+        if cost_basis == 0:
+            cost_basis = position.last_sale_price
+        pl = (position.last_sale_price - cost_basis) * position.amount
+        pl_pct = 100 * (position.last_sale_price - cost_basis) / cost_basis
+        total_cost_basis = total_cost_basis + (cost_basis * position.amount)
+        total_pl = total_pl + pl
+        pdf.loc[stock].cost_basis = '{:,.2f}'.format(position.amount * cost_basis)
+        pdf.loc[stock].amount = position.amount
+        pdf.loc[stock].pl = '{:,.2f}'.format(pl)
+        pdf.loc[stock].pl_pct = '{:,.2f}'.format(pl_pct)
+
+    if total_cost_basis == 0:
+        return None
+
+    pdf.loc['Summary'].cost_basis = '{:,.2f}'.format(total_cost_basis)
+    pdf.loc['Summary'].pl = '{:,.2f}'.format(total_pl)
+    pdf.loc['Summary'].pl_pct = '{:,.2f}'.format(100.00 * total_pl / total_cost_basis)
+    return pdf
 
 
 if __name__ == "__main__":

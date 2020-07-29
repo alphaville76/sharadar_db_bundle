@@ -21,7 +21,7 @@ def cached_wrappers(user_function=None, max_size=0, ttl=None,
 
 def cached(user_function=None, max_size=500000, ttl=None, algorithm=CachingAlgorithmFlag.LRU, thread_safe=True, order_independent=False):
     """
-    Entry point for the configuration of the memoization cache
+    Entry point for the configuration of the memoization cache (max_size=500000)
     """
 
     return memoization.cached(user_function, max_size, ttl, algorithm, thread_safe, order_independent)

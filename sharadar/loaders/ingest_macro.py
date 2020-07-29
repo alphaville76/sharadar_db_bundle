@@ -85,8 +85,6 @@ def create_macro_prices_df(start, end, calendar=None):
     prices = prices.swaplevel()
     prices = _append_ohlc(prices)
 
-
-
     # https://www.quandl.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
     corp_bond_df = _to_prices_df(quandl.get("ML/USEY", start_date=start, end_date=end), 10400)
     prices = prices.append(corp_bond_df)

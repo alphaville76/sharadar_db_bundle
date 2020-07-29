@@ -34,7 +34,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
         if end_date is None:
             end_date = start_date
 
-        if chunksize < 0:
+        if chunksize <= 1:
             log.info("Compute pipeline values without chunks.")
             return self._run_pipeline(pipeline, start_date, end_date)
 
@@ -45,8 +45,8 @@ class BundlePipelineEngine(SimplePipelineEngine):
             chunksize,
         )
 
-        start_ix, end_ix = self._calendar.slice_locs(start_date, end_date)
-        log.info("Compute pipeline values in chunks of %d days." % (chunksize))
+        #start_ix, end_ix = self._calendar.slice_locs(start_date, end_date)
+        #log.info("Compute pipeline values in chunks of %d days." % (chunksize))
 
         chunks = []
         for s, e in ranges:

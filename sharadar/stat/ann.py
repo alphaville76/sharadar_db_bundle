@@ -92,7 +92,7 @@ class NeuralNetwork(object):
 
     def fit(self, X, Y):
         if len(Y.shape) == 1:
-            Y = Y.reshape((Y.shape[0], 1))
+            Y = Y.values.reshape((Y.shape[0], 1))
 
         self._validate_size(X, Y)
 
