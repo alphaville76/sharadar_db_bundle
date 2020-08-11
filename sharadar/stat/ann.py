@@ -5,12 +5,9 @@ import pandas as pd
 from scipy import optimize
 from sharadar.util.logger import log
 
-class OptimizationException(Exception):
-    pass
-
 
 class NeuralNetwork(object):
-    def __init__(self, hidden_units=None, alpha=0.0001, activation='tanh', initw='uniform'):
+    def __init__(self, hidden_units=None, alpha=0.0001, activation='tanh', initw='uniform', bias_k=1.0):
         self.n_h = hidden_units
 
         if activation not in ['tanh', 'sigmoid', 'relu']:
@@ -24,6 +21,7 @@ class NeuralNetwork(object):
 
         # Regularization Parameter:
         self.alpha = alpha
+        self.bias_k = bias_k
 
     def unravel_parameters(self, params_flat):
         W1_start = 0
@@ -56,10 +54,6 @@ class NeuralNetwork(object):
         parameters = self.unravel_parameters(params_flat)
         self.parameters = parameters
 
-        # timeboxed at 40 seconds
-        if time.time() - self.t0 > 40:
-            raise OptimizationException("Timed early stopping after %d epochs" % len(self.J))
-
         A2, cache = self.forward_propagation(X, parameters)
 
         cost = self.compute_cost(A2, Y, parameters)
@@ -78,13 +72,11 @@ class NeuralNetwork(object):
 
         options = {'maxiter': 200, 'disp': False}
 
-        try:
-            opt_res = optimize.minimize(self.cost_function_wrapper, params_flat0, \
-                                        jac=True, method='L-BFGS-B', \
-                                        args=(X, Y), options=options)
-            self.parameters = self.unravel_parameters(opt_res.x)
-        except OptimizationException as e:
-            log.warn(e)
+        opt_res = optimize.minimize(self.cost_function_wrapper, params_flat0, \
+                                    jac=True, method='L-BFGS-B', \
+                                    args=(X, Y), options=options)
+        self.parameters = self.unravel_parameters(opt_res.x)
+
 
     def _validate_size(self, X, Y):
         if X.shape[0] != Y.shape[0]:
@@ -105,7 +97,6 @@ class NeuralNetwork(object):
         # Initial Random Weights (parameters)
         self.parameters = self.initialize_parameters()
 
-        self.t0 = time.time()
         self.train(X, Y)
 
         return self
@@ -116,7 +107,10 @@ class NeuralNetwork(object):
 
     def initialize_parameters(self):
         """
-        Random initialize weight matrixes and bias vectors
+        Random initialize weight matrixes and bias vectors.
+
+        W1 and W2 represent the weights of the input layer and hidden layer,
+        while b1 and b2 represent the bias added to the hidden layer and the output layer.
         """
         R1 = self.rand(self.n_h, self.n_x + 1)
         R2 = self.rand(self.n_y, self.n_h + 1)
@@ -152,14 +146,14 @@ class NeuralNetwork(object):
         W1, b1, W2, b2 = self.param_vars(parameters)
 
         # Implement Forward Propagation to calculate A2 (probabilities)
-        Z1 = np.dot(X, W1.T) + b1.T
+        Z1 = np.dot(X, W1.T) + self.bias_k*b1.T
         if self.activation == 'tanh':
             A1 = np.tanh(Z1)
         elif self.activation == 'sigmoid':
             A1 = self.sigmoid(Z1)
         elif self.activation == 'relu':
             A1 = self.relu(Z1)
-        Z2 = np.dot(A1, W2.T) + b2.T
+        Z2 = np.dot(A1, W2.T) + self.bias_k*b2.T
         A2 = self.sigmoid(Z2)
 
         cache = {"Z1": Z1, "A1": A1, "Z2": Z2, "A2": A2}
