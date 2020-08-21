@@ -6,7 +6,7 @@ from contextlib import closing
 from zipline.utils.calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
 from sharadar.util.logger import log
-from zipline.data.us_equity_pricing import SQLiteAdjustmentWriter
+from zipline.data.adjustments import SQLiteAdjustmentWriter
 from six import (
     iteritems,
     string_types,
@@ -206,7 +206,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         log.debug("Loading raw arrays for %d assets (%s)." % (len(sids), type(sids)))
 
-        if any(not isinstance(x, int) for x in sids):
+        if any(not isinstance(x, (int, np.integer)) for x in sids):
             sids = [x.sid for x in sids]
 
         raw_arrays = []

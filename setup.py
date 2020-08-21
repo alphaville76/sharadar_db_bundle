@@ -8,7 +8,7 @@ setup(
     license='',
     author='Costantino',
     author_email='',
-    description='', install_requires=['numpy', 'pandas', 'quandl', 'zipline-live', 'toolz', 'memoization', 'logbook',
+    description='', install_requires=['numpy', 'pandas', 'quandl', 'zipline-trader', 'toolz', 'memoization', 'logbook',
                                       'click', 'requests', 'six', 'matplotlib', 'lightgbm'],
     entry_points = {
                    'console_scripts': [

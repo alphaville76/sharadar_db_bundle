@@ -242,6 +242,12 @@ def from_quandl():
         log.info("Start writing %d splits and %d dividends data..." % (len(splits_df), len(dividends_df)))
         adjustment_writer.write(splits=splits_df, dividends=dividends_df)
 
+        # Additional MACRO data
+        prices_start = prices_df.index[0][0]
+        prices_end = prices_df.index[-1][0]
+        macro_equities_df = create_macro_equities_df(prices_end)
+        equities_df = equities_df.append(macro_equities_df)
+
         # Write equity metadata
         log.info("Start writing equities and supplementary_mappings data...")
         asset_dbpath = os.path.join(output_dir, ("assets-%d.sqlite" % ASSET_DB_VERSION))
@@ -262,13 +268,6 @@ def from_quandl():
             sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date)
         with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
             insert_equity_extra_data_sf1(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
-
-        # Additional MACRO data
-        prices_start = prices_df.index[0][0]
-        prices_end = prices_df.index[-1][0]
-
-        macro_equities_df = create_macro_equities_df(prices_end)
-        asset_db_writer.write(equities=macro_equities_df)
 
         log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
         macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)

@@ -1,5 +1,6 @@
-# this file replace zipline/utils/run_algo.py in the __main__ of zipline
-
+"""
+Created on the basis of ~/zipline/lib/python3.6/site-packages/zipline-trader/zipline/utils/run_algo.py
+"""
 import sys
 
 import click
@@ -20,6 +21,8 @@ except ImportError:
 import six
 from toolz import concatv
 from trading_calendars import get_calendar
+
+from zipline.data.benchmarks import get_benchmark_returns_from_file
 from zipline.data.data_portal import DataPortal
 from zipline.data.data_portal_live import DataPortalLive
 from zipline.finance import metrics
@@ -27,6 +30,7 @@ from zipline.finance.trading import SimulationParameters
 
 import zipline.utils.paths as pth
 from zipline.extensions import load
+from zipline.errors import SymbolNotFound
 from zipline.algorithm import TradingAlgorithm
 from zipline.algorithm_live import LiveTradingAlgorithm
 from zipline.finance.blotter import Blotter
@@ -77,18 +81,19 @@ def _run(handle_data,
          local_namespace,
          environ,
          blotter,
-         benchmark_returns,
+         benchmark_symbol,
          broker,
          state_filename,
          realtime_bar_target,
          performance_callback,
          stop_execution_callback,
+         teardown,
          execution_id):
-    """
-    Run a backtest for the given algorithm.
+    """Run a backtest for the given algorithm.
+
     This is shared between the cli and :func:`zipline.run_algo`.
 
-    zipline-live additions:
+    zipline-trader additions:
     broker - wrapper to connect to a real broker
     state_filename - saving the context of the algo to be able to restart
     performance_callback - a callback to send performance results everyday and not only at the end of the backtest.
@@ -96,30 +101,59 @@ def _run(handle_data,
     stop_execution_callback - A callback to check if execution should be stopped. it is used to be able to stop live
         trading (also simulation could be stopped using this) execution. if the callback returns True, then algo
         execution will be aborted.
+    teardown - algo method like handle_data() or before_trading_start() that is called when the algo execution stops
     execution_id - unique id to identify this execution (backtest or live instance)
+
     """
     log.info("Using bundle '%s'." % bundle)
 
     bundle_data = load_sharadar_bundle(bundle)
     if start is None:
-        start = bundle_data.equity_daily_bar_reader.first_trading_day
+        start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else pd.Timestamp.utcnow()
 
     if end is None:
-        end = bundle_data.equity_daily_bar_reader.last_available_dt
+        end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else (pd.Timestamp.utcnow() + pd.Timedelta(days=1, seconds=1))
+
+    if trading_calendar is None:
+        trading_calendar = get_calendar('XNYS')
+
+    # date parameter validation
+    if trading_calendar.session_distance(start, end) < 1:
+        raise _RunAlgoError(
+            'There are no trading days between %s and %s' % (
+                start.date(),
+                end.date(),
+            ),
+        )
 
     log.info("Backtest from %s to %s." % (str(start.date()), str(end.date())))
 
-    benchmark_returns = load_benchmark_data_bundle(bundle_data.equity_daily_bar_reader, 'SPY')
+    if benchmark_symbol:
+        benchmark = symbol(benchmark_symbol)
+        benchmark_sid = benchmark.sid
+        benchmark_returns = load_benchmark_data_bundle(bundle_data.equity_daily_bar_reader, benchmark)
+    else:
+        benchmark_sid = None
+        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'),data=0.0)
 
+
+    # emission_rate is a string representing the smallest frequency at which metrics should be reported.
+    # emission_rate will be either minute or daily. When emission_rate is daily, end_of_bar will not be called at all.
     emission_rate = 'daily'
+
+    # Special defaults for live trading
     if broker:
-        emission_rate = 'minute'
-        # if we run zipline as a command line tool, these will probably not be initiated
+        data_frequency = 'minute'
+
         if not start:
             start = pd.Timestamp.utcnow()
         if not end:
             # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
             end = start + pd.Timedelta('1 day')
+
+        # No benchmark
+        benchmark_sid = None
+        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'), data=0.0)
 
     if algotext is not None:
         if local_namespace:
@@ -165,18 +199,6 @@ def _run(handle_data,
             )
         else:
             click.echo(algotext)
-
-    if trading_calendar is None:
-        trading_calendar = get_calendar('NYSE')
-
-    # date parameter validation
-    if trading_calendar.session_distance(start, end) < 1:
-        raise _RunAlgoError(
-            'There are no trading days between %s and %s' % (
-                start.date(),
-                end.date(),
-            ),
-        )
 
     first_trading_day = \
         bundle_data.equity_daily_bar_reader.first_trading_day
@@ -229,6 +251,7 @@ def _run(handle_data,
         metrics_set=metrics_set,
         blotter=blotter,
         benchmark_returns=benchmark_returns,
+        benchmark_sid=benchmark_sid,
         performance_callback=performance_callback,
         stop_execution_callback=stop_execution_callback,
         **{
@@ -236,6 +259,7 @@ def _run(handle_data,
             'handle_data': handle_data,
             'before_trading_start': before_trading_start,
             'analyze': analyze,
+            'teardown': teardown,
         } if algotext is None else {
             'algo_filename': getattr(algofile, 'name', '<algorithm>'),
             'script': algotext,
@@ -258,9 +282,7 @@ def _run(handle_data,
 _loaded_extensions = set()
 
 
-def load_benchmark_data_bundle(price_reader, ticker):
-    benchmark = symbol(ticker)
-
+def load_benchmark_data_bundle(price_reader, benchmark):
     first_date = benchmark.start_date
     last_date = benchmark.end_date
 
@@ -327,26 +349,24 @@ def run_algorithm(initialize,
                   handle_data=None,
                   before_trading_start=None,
                   analyze=None,
+                  teardown=None,
                   data_frequency='daily',
                   bundle='sharadar',
                   bundle_timestamp=None,
                   trading_calendar=None,
                   metrics_set='default',
-                  benchmark_returns=None,
+                  benchmark_symbol='SPY',
                   default_extension=True,
                   extensions=(),
                   strict_extensions=True,
                   environ=os.environ,
                   blotter='default',
-                  live_trading=False,
-                  tws_uri=None,
                   broker=None,
                   performance_callback=None,
                   stop_execution_callback=None,
                   execution_id=None,
                   state_filename=None,
-                  realtime_bar_target=None,
-                  output=os.devnull
+                  realtime_bar_target=None
                   ):
     """
     Run a trading algorithm.
@@ -375,7 +395,7 @@ def run_algorithm(initialize,
         once at the end of the backtest and is passed the context and the
         performance data.
     data_frequency : {'daily', 'minute'}, optional
-        The data frequency to run the algorithm at.
+        The data frequency to run the algorithm at. For live trading the default is 'minute', otherwise 'daily'
     bundle : str, optional
         The name of the data bundle to use to load the data to run the backtest
         with. This defaults to 'quantopian-quandl'.
@@ -387,6 +407,7 @@ def run_algorithm(initialize,
     metrics_set : iterable[Metric] or str, optional
         The set of metrics to compute in the simulation. If a string is passed,
         resolve the set with :func:`zipline.finance.metrics.load`.
+    benchmark_symbol: The symbol of the benchmark. For live trading the default None, otherwise 'SPY'.
     default_extension : bool, optional
         Should the default zipline extension be loaded. This is found at
         ``$ZIPLINE_ROOT/extension.py``
@@ -406,18 +427,17 @@ def run_algorithm(initialize,
         ``zipline.extensions.register`` and call it with no parameters.
         Default is a :class:`zipline.finance.blotter.SimulationBlotter` that
         never cancels orders.
-    live_trading : boolean, indicating are we running forward (live) and not backwards (backtesting)
-    tws_uri : ip:listening_port:client id e.g "localhost:4002:1232"
     broker : instance of zipline.gens.brokers.broker.Broker
     performance_callback : a callback to send performance results everyday and not only at the end of the backtest.
                            this allows to run live, and monitor the performance of the algorithm
     stop_execution_callback : A callback to check if execution should be stopped. it is used to be able to stop live
                               trading (also simulation could be stopped using this) execution. if the callback returns
                               True, then algo execution will be aborted.
+    teardown : algo method like handle_data() or before_trading_start() that is called when the algo execution stops
+               and allows the developer to nicely kill the algo execution
     execution_id : unique id to identify this execution instance (backtest or live) will be used to mark and get logs
                    for this specific execution instance.
-    state_filename : path to pickle file storing the algorithm "context" (similar to self).
-                     Use only for live trading, otherwise a cache expired error may occur.
+    state_filename : path to pickle file storing the algorithm "context" (similar to self)
 
     Returns
     -------
@@ -435,6 +455,7 @@ def run_algorithm(initialize,
         initialize=initialize,
         before_trading_start=before_trading_start,
         analyze=analyze,
+        teardown=teardown,
         algofile=None,
         algotext=None,
         defines=(),
@@ -444,14 +465,14 @@ def run_algorithm(initialize,
         bundle_timestamp=bundle_timestamp,
         start=start,
         end=end,
-        output=output,
+        output=os.devnull,
         trading_calendar=trading_calendar,
         print_algo=False,
         metrics_set=metrics_set,
         local_namespace=False,
         environ=environ,
         blotter=blotter,
-        benchmark_returns=benchmark_returns,
+        benchmark_symbol=benchmark_symbol,
         broker=broker,
         state_filename=state_filename,
         realtime_bar_target=realtime_bar_target,

@@ -1,3 +1,6 @@
+"""
+Created on the basis of ~/zipline/lib/python3.6/site-packages/zipline-trader/zipline/__main__.py
+"""
 import errno
 import os
 
@@ -16,9 +19,11 @@ from zipline.data import bundles as bundles_module
 from trading_calendars import get_calendar
 from zipline.utils.compat import wraps
 from zipline.utils.cli import Date, Timestamp
+from zipline.utils.run_algo import BenchmarkSpec
 from sharadar.util.run_algo import _run, load_extensions
 from zipline.extensions import create_args
 from zipline.gens import brokers
+from importlib import import_module
 
 try:
     # noinspection PyUnresolvedReferences
@@ -38,10 +43,10 @@ except NameError:
     '--strict-extensions/--non-strict-extensions',
     is_flag=True,
     default=True,
-    help='If --strict-extensions is passed then zipline will not run if it'
-    ' cannot load all of the specified extensions. If this is not passed or'
-    ' --non-strict-extensions is passed then the failure will be logged but'
-    ' execution will continue.',
+    help='If --strict-extensions is passed then zipline will not '
+         'run if it cannot load all of the specified extensions. '
+         'If this is not passed or --non-strict-extensions is passed '
+         'then the failure will be logged but execution will continue.',
 )
 @click.option(
     '--default-extension/--no-default-extension',
@@ -54,10 +59,10 @@ except NameError:
     multiple=True,
     help='Any custom command line arguments to define, in key=value form.'
 )
-def main(extension, strict_extensions, default_extension, x):
-    """Top level zipline entry point for Sharadar Datasets.
+@click.pass_context
+def main(ctx, extension, strict_extensions, default_extension, x):
+    """Top level zipline entry point.
     """
-
     # install a logbook handler before performing any other operations
     logbook.StderrHandler().push_application()
     create_args(x, zipline.extension_args)
@@ -82,6 +87,7 @@ def extract_option_object(option):
     option_object : click.Option
         The option object that this decorator will create.
     """
+
     @option
     def opt():
         pass
@@ -113,7 +119,9 @@ def ipython_only(option):
         def _(*args, **kwargs):
             kwargs[argname] = None
             return f(*args, **kwargs)
+
         return _
+
     return d
 
 
@@ -135,9 +143,9 @@ def ipython_only(option):
     '--define',
     multiple=True,
     help="Define a name to be bound in the namespace before executing"
-    " the algotext. For example '-Dname=value'. The value may be any python"
-    " expression. These are evaluated in order so they may refer to previously"
-    " defined names.",
+         " the algotext. For example '-Dname=value'. The value may be any "
+         "python expression. These are evaluated in order so they may refer "
+         "to previously defined names.",
 )
 @click.option(
     '--data-frequency',
@@ -167,18 +175,47 @@ def ipython_only(option):
     default=pd.Timestamp.utcnow(),
     show_default=False,
     help='The date to lookup data on or before.\n'
-    '[default: <current-time>]'
+         '[default: <current-time>]'
+)
+@click.option(
+    '-bf',
+    '--benchmark-file',
+    default=None,
+    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str),
+    help='The csv file that contains the benchmark returns',
+)
+@click.option(
+    '--benchmark-symbol',
+    default=None,
+    type=click.STRING,
+    help="The symbol of the instrument to be used as a benchmark "
+         "(should exist in the ingested bundle)",
+)
+@click.option(
+    '--benchmark-sid',
+    default=None,
+    type=int,
+    help="The sid of the instrument to be used as a benchmark "
+         "(should exist in the ingested bundle)",
+)
+@click.option(
+    '--no-benchmark',
+    is_flag=True,
+    default=False,
+    help="If passed, use a benchmark of zero returns.",
 )
 @click.option(
     '-s',
     '--start',
     type=Date(tz='utc', as_timestamp=True),
+    default=pd.Timestamp.utcnow(),
     help='The start date of the simulation.',
 )
 @click.option(
     '-e',
     '--end',
     type=Date(tz='utc', as_timestamp=True),
+    default=pd.Timestamp.utcnow() + pd.Timedelta(days=1, seconds=1),  # Add 1-second to assure that end is > 1day
     help='The end date of the simulation.',
 )
 @click.option(
@@ -188,13 +225,13 @@ def ipython_only(option):
     metavar='FILENAME',
     show_default=True,
     help="The location to write the perf data. If this is '-' the perf will"
-    " be written to stdout.",
+         " be written to stdout.",
 )
 @click.option(
     '--trading-calendar',
     metavar='TRADING-CALENDAR',
-    default='NYSE',
-    help="The calendar you want to use e.g. LSE. NYSE is the default."
+    default='XNYS',
+    help="The calendar you want to use e.g. XLON. XNYS is the default."
 )
 @click.option(
     '--print-algo/--no-print-algo',
@@ -206,7 +243,7 @@ def ipython_only(option):
     '--metrics-set',
     default='default',
     help='The metrics set to use. New metrics sets may be registered in your'
-    ' extension.py.',
+         ' extension.py.',
 )
 @click.option(
     '--blotter',
@@ -258,6 +295,10 @@ def run(ctx,
         capital_base,
         bundle,
         bundle_timestamp,
+        benchmark_file,
+        benchmark_symbol,
+        benchmark_sid,
+        no_benchmark,
         start,
         end,
         output,
@@ -319,8 +360,7 @@ def run(ctx,
             ctx.fail("unsupported broker: can't import class %s from %s" %
                      (cl_name, mod_name))
         brokerobj = bclass(broker_uri)
-        if end is None:
-            end = pd.Timestamp.utcnow() + pd.Timedelta(days=1)
+
 
     if (algotext is not None) == (algofile is not None):
         ctx.fail(
@@ -330,11 +370,19 @@ def run(ctx,
 
     trading_calendar = get_calendar(trading_calendar)
 
+    benchmark_spec = BenchmarkSpec.from_cli_params(
+        no_benchmark=no_benchmark,
+        benchmark_sid=benchmark_sid,
+        benchmark_symbol=benchmark_symbol,
+        benchmark_file=benchmark_file,
+    )
+
     perf = _run(
         initialize=None,
         handle_data=None,
         before_trading_start=None,
         analyze=None,
+        teardown=None,
         algofile=algofile,
         algotext=algotext,
         defines=define,
@@ -351,7 +399,7 @@ def run(ctx,
         local_namespace=local_namespace,
         environ=os.environ,
         blotter=blotter,
-        benchmark_returns=None,
+        benchmark_spec=benchmark_spec,
         broker=brokerobj,
         state_filename=state_file,
         realtime_bar_target=realtime_bar_target,
@@ -385,11 +433,11 @@ def zipline_magic(line, cell=None):
                 '--algotext', cell,
                 '--output', os.devnull,  # don't write the results by default
             ] + ([
-                # these options are set when running in line magic mode
-                # set a non None algo text to use the ipython user_ns
-                '--algotext', '',
-                '--local-namespace',
-            ] if cell is None else []) + line.split(),
+                     # these options are set when running in line magic mode
+                     # set a non None algo text to use the ipython user_ns
+                     '--algotext', '',
+                     '--local-namespace',
+                 ] if cell is None else []) + line.split(),
             '%s%%zipline' % ((cell or '') and '%'),
             # don't use system exit and propogate errors to the caller
             standalone_mode=False,
@@ -447,14 +495,14 @@ def ingest(bundle, assets_version, show_progress):
     '--before',
     type=Timestamp(),
     help='Clear all data before TIMESTAMP.'
-    ' This may not be passed with -k / --keep-last',
+         ' This may not be passed with -k / --keep-last',
 )
 @click.option(
     '-a',
     '--after',
     type=Timestamp(),
     help='Clear all data after TIMESTAMP'
-    ' This may not be passed with -k / --keep-last',
+         ' This may not be passed with -k / --keep-last',
 )
 @click.option(
     '-k',
@@ -462,7 +510,7 @@ def ingest(bundle, assets_version, show_progress):
     type=int,
     metavar='N',
     help='Clear all but the last N downloads.'
-    ' This may not be passed with -e / --before or -a / --after',
+         ' This may not be passed with -e / --before or -a / --after',
 )
 def clean(bundle, before, after, keep_last):
     """Clean up data downloaded with the ingest command.

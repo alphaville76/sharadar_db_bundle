@@ -152,8 +152,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             if mapping_data is None:
                 raise TypeError('mapping data required for equities')
             # write the symbol mapping data.
-            # Overidden to avoid duplicate entries with the same sid
-            mapping_data['sid'] = mapping_data.index
+            mapping_data.index = mapping_data['sid']
             self._write_df_to_table(
                 equity_symbol_mappings,
                 mapping_data,

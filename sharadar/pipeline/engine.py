@@ -3,6 +3,7 @@ import time
 import os
 import pandas as pd
 from sharadar.util.cache import cached
+from sharadar.pipeline.fx import SimpleFXRateReader
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
 from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR
@@ -10,16 +11,14 @@ from sharadar.util.logger import log
 from six import iteritems
 from toolz import juxt, groupby
 from zipline.data.bundles.core import BundleData, asset_db_path, adjustment_db_path
-from zipline.data.us_equity_pricing import SQLiteAdjustmentReader
-from zipline.pipeline import SimplePipelineEngine, USEquityPricingLoader
+from zipline.data.adjustments import SQLiteAdjustmentReader
+from zipline.pipeline import SimplePipelineEngine
+from zipline.pipeline.loaders.equity_pricing_loader import USEquityPricingLoader
 from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.term import LoadableTerm
 from zipline.utils import paths as pth
-from zipline.utils.date_utils import compute_date_range_chunks
-from zipline.utils.pandas_utils import categorical_df_concat
-from toolz.curried.operator import getitem
-from zipline.errors import NoFurtherDataError
-from zipline.pipeline.factors import CustomFactor
+from zipline.pipeline.hooks.progress import ProgressHooks
+from zipline.pipeline.domain import US_EQUITIES
 
 def to_string(obj):
     try:
@@ -29,223 +28,22 @@ def to_string(obj):
 
 
 class BundlePipelineEngine(SimplePipelineEngine):
+    def __init__(self, get_loader, asset_finder, default_domain=US_EQUITIES, populate_initial_workspace=None,
+                 default_hooks=None):
+        super().__init__(get_loader, asset_finder, default_domain, populate_initial_workspace, default_hooks)
 
-    def run_pipeline(self, pipeline, start_date, end_date=None, chunksize=120):
+    def run_pipeline(self, pipeline, start_date, end_date=None, chunksize=120, hooks=None):
         if end_date is None:
             end_date = start_date
 
+        if hooks is None:
+            hooks = [ProgressHooks.with_static_publisher(CliProgressPublisher())]
+
         if chunksize <= 1:
             log.info("Compute pipeline values without chunks.")
-            return self._run_pipeline(pipeline, start_date, end_date)
+            return super().run_pipeline(pipeline, start_date, end_date, hooks)
 
-        ranges = compute_date_range_chunks(
-            self._calendar,
-            start_date,
-            end_date,
-            chunksize,
-        )
-
-        #start_ix, end_ix = self._calendar.slice_locs(start_date, end_date)
-        #log.info("Compute pipeline values in chunks of %d days." % (chunksize))
-
-        chunks = []
-        for s, e in ranges:
-            log.info("Compute values for pipeline from %s to %s." % (str(s.date()), str(e.date())))
-            chunks.append(self._run_pipeline(pipeline, s, e))
-
-        if len(chunks) == 1:
-            # OPTIMIZATION: Don't make an extra copy in `categorical_df_concat`
-            # if we don't have to.
-            return chunks[0]
-
-        return categorical_df_concat(chunks, inplace=True)
-
-    def _run_pipeline(self, pipeline, start_date=None, end_date=None):
-        if start_date is None:
-            start_date = self._get_loader
-
-        if end_date is None:
-            end_date = pd.to_datetime('today', utc=True)
-
-        try:
-            return super().run_pipeline(pipeline, start_date, end_date)
-        except NoFurtherDataError as e:
-            new_start_date = self._calendar[self._extra_rows + 1]
-            log.warning("Starting computing universe from %s instead of %s because of insufficient data." % (str(new_start_date.date()), str(start_date.date())))
-            return self.run_pipeline(pipeline, new_start_date, end_date)
-
-    def run_chunked_pipeline(self, pipeline, start_date, end_date, chunksize):
-        raise NotImplementedError("because run_pipeline is always chuncked.")
-
-    def compute_chunk(self, graph, dates, assets, initial_workspace):
-        """
-        Identical to the method in the super class; overidden only for the additiona logging.
-        """
-        self._validate_compute_chunk_params(dates, assets, initial_workspace)
-        get_loader = self.get_loader
-
-        # Copy the supplied initial workspace so we don't mutate it in place.
-        workspace = initial_workspace.copy()
-        refcounts = graph.initial_refcounts(workspace)
-        execution_order = graph.execution_order(refcounts)
-
-        # If loadable terms share the same loader and extra_rows, load them all
-        # together.
-        loadable_terms = graph.loadable_terms
-        loader_group_key = juxt(get_loader, getitem(graph.extra_rows))
-        loader_groups = groupby(
-            loader_group_key,
-            # Only produce loader groups for the terms we expect to load.  This
-            # ensures that we can run pipelines for graphs where we don't have
-            # a loader registered for an atomic term if all the dependencies of
-            # that term were supplied in the initial workspace.
-            (t for t in execution_order if t in loadable_terms),
-        )
-
-        l = len(refcounts)
-        i = 0
-        for term in graph.execution_order(refcounts):
-            start_time = time.time()
-            i += 1
-            log.debug("Computing term %d of %d [%s]" % (i,l, to_string(term)))
-
-
-            # `term` may have been supplied in `initial_workspace`, and in the
-            # future we may pre-compute loadable terms coming from the same
-            # dataset.  In either case, we will already have an entry for this
-            # term, which we shouldn't re-compute.
-            if term in workspace:
-                log.debug("Term already in workspace: no computation needed")
-                continue
-
-            # Asset labels are always the same, but date labels vary by how
-            # many extra rows are needed.
-            mask, mask_dates = graph.mask_and_dates_for_term(
-                term,
-                self._root_mask_term,
-                workspace,
-                dates,
-            )
-
-            if isinstance(term, LoadableTerm):
-                to_load = sorted(
-                    loader_groups[loader_group_key(term)],
-                    key=lambda t: t.dataset
-                )
-                loader = get_loader(term)
-                loaded = loader.load_adjusted_array(
-                    to_load, mask_dates, assets, mask,
-                )
-                assert set(loaded) == set(to_load), (
-                    'loader did not return an AdjustedArray for each column\n'
-                    'expected: %r\n'
-                    'got:      %r' % (sorted(to_load), sorted(loaded))
-                )
-                workspace.update(loaded)
-            else:
-                workspace[term] = term._compute(
-                    self._inputs_for_term(term, workspace, graph),
-                    mask_dates,
-                    assets,
-                    mask,
-                )
-                if term.ndim == 2:
-                    assert workspace[term].shape == mask.shape
-                else:
-                    assert workspace[term].shape == (mask.shape[0], 1)
-
-                # Decref dependencies of ``term``, and clear any terms whose
-                # refcounts hit 0.
-                for garbage_term in graph.decref_dependencies(term, refcounts):
-                    del workspace[garbage_term]
-
-            log.debug("Elapsed time: %s" % datetime.timedelta(seconds=(time.time() - start_time)))
-
-        out = {}
-        graph_extra_rows = graph.extra_rows
-        for name, term in iteritems(graph.outputs):
-            # Truncate off extra rows from outputs.
-            out[name] = workspace[term][graph_extra_rows[term]:]
-        return out
-
-    def _compute_root_mask(self, start_date, end_date, extra_rows):
-        """
-        Compute a lifetimes matrix from our AssetFinder, then drop columns that
-        didn't exist at all during the query dates.
-
-        Parameters
-        ----------
-        start_date : pd.Timestamp
-            Base start date for the matrix.
-        end_date : pd.Timestamp
-            End date for the matrix.
-        extra_rows : int
-            Number of extra rows to compute before `start_date`.
-            Extra rows are needed by terms like moving averages that require a
-            trailing window of data.
-
-        Returns
-        -------
-        lifetimes : pd.DataFrame
-            Frame of dtype `bool` containing dates from `extra_rows` days
-            before `start_date`, continuing through to `end_date`.  The
-            returned frame contains as columns all assets in our AssetFinder
-            that existed for at least one day between `start_date` and
-            `end_date`.
-        """
-        calendar = self._calendar
-        finder = self._finder
-        start_idx, end_idx = self._calendar.slice_locs(start_date, end_date)
-        if start_idx < extra_rows:
-            self._extra_rows = extra_rows
-            raise NoFurtherDataError.from_lookback_window(
-                initial_message="Insufficient data to compute Pipeline:",
-                first_date=calendar[0],
-                lookback_start=start_date,
-                lookback_length=extra_rows,
-            )
-
-        # Build lifetimes matrix reaching back to `extra_rows` days before
-        # `start_date.`
-        lifetimes = finder.lifetimes(
-            calendar[start_idx - extra_rows:end_idx],
-            include_start_date=False,
-            country_codes={'??', 'US'},
-        )
-
-        if lifetimes.index[extra_rows] != start_date:
-            raise ValueError(
-                ('The first date (%s) of the lifetimes matrix does not match the'
-                ' start date of the pipeline. Did you forget to align the'
-                ' start_date (%s) to the trading calendar?' % (str(lifetimes.index[extra_rows]), str(start_date)))
-            )
-        if lifetimes.index[-1] != end_date:
-            raise ValueError(
-                ('The last date (%s) of the lifetimes matrix does not match the'
-                ' start date of the pipeline. Did you forget to align the'
-                ' end_date (%s) to the trading calendar?' % (str(lifetimes.index[-1]), str(end_date)))
-            )
-
-        if not lifetimes.columns.unique:
-            columns = lifetimes.columns
-            duplicated = columns[columns.duplicated()].unique()
-            raise AssertionError("Duplicated sids: %d" % duplicated)
-
-        # Filter out columns that didn't exist from the farthest look back
-        # window through the end of the requested dates.
-        existed = lifetimes.any()
-        ret = lifetimes.loc[:, existed]
-        shape = ret.shape
-
-        if shape[0] * shape[1] == 0:
-            raise ValueError(
-                "Found only empty asset-days between {} and {}.\n"
-                "This probably means that either your asset db is out of date"
-                " or that you're trying to run a Pipeline during a period with"
-                " no market days.".format(start_date, end_date),
-            )
-
-        return ret
+        return super().run_chunked_pipeline(pipeline, start_date, end_date, chunksize, hooks)
 
 
 class BundleLoader:
@@ -320,7 +118,7 @@ def make_pipeline_engine(bundle=None, start=None, end=None):
     if end is None:
         end = pd.to_datetime('today', utc=True)
 
-    pipeline_loader = USEquityPricingLoader(bundle.equity_daily_bar_reader, bundle.adjustment_reader)
+    pipeline_loader = USEquityPricingLoader(bundle.equity_daily_bar_reader, bundle.adjustment_reader, SimpleFXRateReader())
 
 
     def choose_loader(column):
@@ -328,13 +126,8 @@ def make_pipeline_engine(bundle=None, start=None, end=None):
             return pipeline_loader
         raise ValueError("No PipelineLoader registered for column %s." % column)
 
-    # set up pipeline
-    cal = bundle.equity_daily_bar_reader.trading_calendar.all_sessions
-    cal2 = cal[(cal >= start) & (cal <= end)]
-
-    spe = BundlePipelineEngine(get_loader=choose_loader,
-                               calendar=cal2,
-                               asset_finder=bundle.asset_finder)
+    spe = BundlePipelineEngine(get_loader=choose_loader, asset_finder=bundle.asset_finder)
+    #spe = SimplePipelineEngine(get_loader=choose_loader, asset_finder=bundle.asset_finder)
     return spe
 
 
@@ -386,3 +179,14 @@ def returns(assets, start, end, periods=1, field='close'):
     """
     df = prices(assets, start, end, field, periods).sort_index().pct_change(1).iloc[1:]
     return df
+
+
+class CliProgressPublisher(object):
+
+    def publish(self, model):
+        try:
+            log.info("Percent completed: %3.0f%% (%s - %s): %s" % (
+            model.percent_complete, str(model.current_chunk_bounds[0].date()),
+            str(model.current_chunk_bounds[1].date()), model.current_work))
+        except:
+            log.error("Cannot publish progress state.")
