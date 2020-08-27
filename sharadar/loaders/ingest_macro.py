@@ -18,6 +18,7 @@ def _add_macro_def(df, sid, end_date, ticker, asset_name):
     # The date on which to close any positions in this asset.
     auto_close_date = end_date + pd.Timedelta(days=1)
 
+    # The canonical name of the exchange
     exchange = 'MACRO'
     df.loc[sid] = (ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange)
 

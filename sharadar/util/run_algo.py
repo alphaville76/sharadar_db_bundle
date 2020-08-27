@@ -107,15 +107,16 @@ def _run(handle_data,
     """
     log.info("Using bundle '%s'." % bundle)
 
+    if trading_calendar is None:
+        trading_calendar = get_calendar('XNYS')
+
     bundle_data = load_sharadar_bundle(bundle)
     if start is None:
         start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else pd.Timestamp.utcnow()
 
     if end is None:
         end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else (pd.Timestamp.utcnow() + pd.Timedelta(days=1, seconds=1))
-
-    if trading_calendar is None:
-        trading_calendar = get_calendar('XNYS')
+        end = trading_calendar.next_close(end)
 
     # date parameter validation
     if trading_calendar.session_distance(start, end) < 1:
@@ -140,20 +141,6 @@ def _run(handle_data,
     # emission_rate is a string representing the smallest frequency at which metrics should be reported.
     # emission_rate will be either minute or daily. When emission_rate is daily, end_of_bar will not be called at all.
     emission_rate = 'daily'
-
-    # Special defaults for live trading
-    if broker:
-        data_frequency = 'minute'
-
-        if not start:
-            start = pd.Timestamp.utcnow()
-        if not end:
-            # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
-            end = start + pd.Timedelta('1 day')
-
-        # No benchmark
-        benchmark_sid = None
-        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'), data=0.0)
 
     if algotext is not None:
         if local_namespace:
@@ -228,12 +215,48 @@ def _run(handle_data,
         except ValueError as e:
             raise _RunAlgoError(str(e))
 
+
+    # Special defaults for live trading
+    if broker:
+        data_frequency = 'minute'
+
+        if not start:
+            start = pd.Timestamp.utcnow()
+        if not end:
+            # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
+            end = start + pd.Timedelta('1 day')
+
+        # No benchmark
+        benchmark_sid = None
+        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'), data=0.0)
+
+    # TODO inizia qui per creare un prerun dell'algo prima del live trading
+    # usare store_context prima di passare da TradingAlgorithm a LiveTradingAlgorithm
     TradingAlgorithmClass = (partial(LiveTradingAlgorithm,
                                      broker=broker,
                                      state_filename=state_filename,
                                      realtime_bar_target=realtime_bar_target)
                              if broker else TradingAlgorithm)
 
+    algo = create_algo_class(TradingAlgorithmClass, algofile, algotext, analyze, before_trading_start,
+                             benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
+                             emission_rate, end, execution_id, handle_data, initialize, metrics_set, namespace,
+                             performance_callback, start, stop_execution_callback, teardown, trading_calendar)
+
+    perf = algo.run()
+
+    if output == '-':
+        click.echo(str(perf))
+    elif output != os.devnull:  # make the zipline magic not write any data
+        perf.to_pickle(output)
+
+    return perf
+
+
+def create_algo_class(TradingAlgorithmClass, algofile, algotext, analyze, before_trading_start, benchmark_returns,
+                      benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency, emission_rate, end,
+                      execution_id, handle_data, initialize, metrics_set, namespace, performance_callback, start,
+                      stop_execution_callback, teardown, trading_calendar):
     algo = TradingAlgorithmClass(
         namespace=namespace,
         data_portal=data,
@@ -265,17 +288,8 @@ def _run(handle_data,
             'script': algotext,
         }
     )
-
-    algo.engine = make_pipeline_engine(bundle_data)
-
-    perf = algo.run()
-
-    if output == '-':
-        click.echo(str(perf))
-    elif output != os.devnull:  # make the zipline magic not write any data
-        perf.to_pickle(output)
-
-    return perf
+    algo.engine = make_pipeline_engine(bundle_data, live=isinstance(algo, LiveTradingAlgorithm))
+    return algo
 
 
 # All of the loaded extensions. We don't want to load an extension twice.

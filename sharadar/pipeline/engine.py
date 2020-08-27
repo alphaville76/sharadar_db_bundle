@@ -106,7 +106,7 @@ def sids(sids):
     return _asset_finder().retrieve_all(sids)
 
 
-def make_pipeline_engine(bundle=None, start=None, end=None):
+def make_pipeline_engine(bundle=None, start=None, end=None, live=False):
     """Creates a pipeline engine for the dates in (start, end).
     Using this allows usage very similar to run_pipeline in Quantopian's env."""
     if bundle is None:
@@ -126,8 +126,8 @@ def make_pipeline_engine(bundle=None, start=None, end=None):
             return pipeline_loader
         raise ValueError("No PipelineLoader registered for column %s." % column)
 
+    bundle.asset_finder.is_live_trading = live
     spe = BundlePipelineEngine(get_loader=choose_loader, asset_finder=bundle.asset_finder)
-    #spe = SimplePipelineEngine(get_loader=choose_loader, asset_finder=bundle.asset_finder)
     return spe
 
 

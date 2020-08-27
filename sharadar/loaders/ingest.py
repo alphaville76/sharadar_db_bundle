@@ -23,16 +23,16 @@ import traceback
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 EXCHANGE_DF = pd.DataFrame([
-    ['NYSE', 'The New York Stock Exchange', 'US'],
-    ['NASDAQ', 'National Association of Securities Dealers Automated Quotation', 'US'],
-    ['OTC', 'Over The Counter', 'US'],
-    ['NYSEMKT', 'American Stock Exchange', 'US'],
-    ['NYSEARCA', 'Archipelago Exchange', 'US'],
-    ['BATS', 'Better Alternative Trading System Exchange', 'US'],
-    ['INDEX', 'Index Data', 'US'],
-    ['MACRO', 'Macroeconomic Data', 'US'],
+    ['NYSE', 'US'],
+    ['NASDAQ', 'US'],
+    ['OTC', 'US'],
+    ['NYSEMKT', 'US'],
+    ['NYSEARCA', 'US'],
+    ['BATS', 'US'],
+    ['INDEX', 'US'],
+    ['MACRO', 'US'],
 ],
-    columns=['exchange', 'canonical_name', 'country_code'])
+    columns=['exchange', 'country_code'])
 
 
 def process_data_table(df):
@@ -309,6 +309,7 @@ def from_quandl():
                 # The date on which to close any positions in this asset.
                 auto_close_date = end_date + pd.Timedelta(days=1)
 
+                # The canonical name of the exchange, for example 'NYSE' or 'NASDAQ'
                 exchange = sharadar_metadata.loc['exchange']
                 if (exchange is None) or (exchange == 'None'):
                     exchange = 'OTC'
