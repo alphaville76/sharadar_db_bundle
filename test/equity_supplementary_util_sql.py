@@ -4,9 +4,10 @@ from sharadar.util.quandl_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
 from contextlib import closing
 import sqlite3
+from os import environ as env
 
 import quandl
-API_KEY="env["QUANDL_API_KEY"]"
+API_KEY=env["QUANDL_API_KEY"]
 quandl.ApiConfig.api_key=API_KEY
 
 db_file = '/tmp/assets-7.sqlite'

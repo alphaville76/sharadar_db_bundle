@@ -57,6 +57,10 @@ def serialise(perf, filename, now):
 
 
 def create_report(perf, filename, now, doc=None, duration=None, param=None, info=None, show_image=True):
+    if not hasattr(perf, 'returns'):
+        perf['returns'] = perf['pnl'] / (perf['portfolio_value'] - perf['pnl'])
+        perf['returns'] = perf['returns'].replace([np.nan, np.inf, -np.inf], 0.0)
+
     rets, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
     if len(rets.index) > 0:
@@ -84,16 +88,41 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
     )
 
     if show_image:
-        fig0 = create_log_returns_chart(rets, benchmark_rets)
-        fig1 = pf.create_returns_tear_sheet(rets, positions, transactions, benchmark_rets=benchmark_rets, return_fig=True)
-        fig2 = pf.create_position_tear_sheet(rets, positions, return_fig=True)
-        fig3 = pf.create_txn_tear_sheet(rets, positions, transactions, return_fig=True)
-        fig4 = pf.create_interesting_times_tear_sheet(rets, return_fig=True)
+        fig0 = None
+        fig1 = None
+        fig2 = None
+        fig3 = None
+        fig4 = None
         fig5 = None
         try:
+            fig0 = create_log_returns_chart(rets, benchmark_rets)
+        except Exception as e:
+            log.warn(e)
+
+        try:
+            fig1 = pf.create_returns_tear_sheet(rets, positions, transactions, benchmark_rets=benchmark_rets, return_fig=True)
+        except Exception as e:
+            log.warn(e)
+
+        try:
+            fig2 = pf.create_position_tear_sheet(rets, positions, return_fig=True)
+        except Exception as e:
+            log.warn(e)
+
+        try:
+            fig3 = pf.create_txn_tear_sheet(rets, positions, transactions, return_fig=True)
+        except Exception as e:
+            log.warn(e)
+
+        try:
+            fig4 = pf.create_interesting_times_tear_sheet(rets, return_fig=True)
+        except Exception as e:
+            log.warn(e)
+
+        try:
             fig5 = pf.create_round_trip_tear_sheet(rets, positions, transactions, return_fig=True)
-        except:
-            pass
+        except Exception as e:
+            log.warn(e)
 
     report_suffix = "_%s_%.2f_report.htm" % (now.strftime(DATETIME_FMT), 100. * perf_stats_series['Annual return'])
     reportfile = change_extension(filename, report_suffix)
@@ -160,9 +189,10 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         ), file=f)
         print("<br/>", file=f)
         if show_image:
-            print("<h3>Log Returns</h3>", file=f)
-            print(_to_img(fig0), file=f)
-            print("<br/>", file=f)
+            if fig0 is not None:
+                print("<h3>Log Returns</h3>", file=f)
+                print(_to_img(fig0), file=f)
+                print("<br/>", file=f)
         print(to_html_table(
             drawdown_df.sort_values('Net drawdown in %', ascending=False),
             name='Worst drawdown periods',
@@ -189,17 +219,21 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
             print(to_html_table(stats['symbols'] * 100, float_format='{:.2f}%'.format, name='Symbol stats'), file=f)
 
         if show_image:
-            print("<h3>Returns</h3>", file=f)
-            print(_to_img(fig1), file=f)
+            if fig1 is not None:
+                print("<h3>Returns</h3>", file=f)
+                print(_to_img(fig1), file=f)
 
-            print("<h3>Positions</h3>", file=f)
-            print(_to_img(fig2), file=f)
+            if fig2 is not None:
+                print("<h3>Positions</h3>", file=f)
+                print(_to_img(fig2), file=f)
 
-            print("<h3>Transactions</h3>", file=f)
-            print(_to_img(fig3), file=f)
+            if fig3 is not None:
+                print("<h3>Transactions</h3>", file=f)
+                print(_to_img(fig3), file=f)
 
-            print("<h3>Interesting Times</h3>", file=f)
-            print(_to_img(fig4), file=f)
+            if fig4 is not None:
+                print("<h3>Interesting Times</h3>", file=f)
+                print(_to_img(fig4), file=f)
 
             if fig5 is not None:
                 print("<h3>Trades</h3>", file=f)
@@ -325,8 +359,10 @@ def describe_portfolio(positions):
 
 
 if __name__ == "__main__":
-    algo_file = '../../algo/haugen20/haugen20.py'
-    perf_dump_file = '../../algo/haugen20/haugen20_202006300552_perf.dump'
+    import warnings
+    warnings.filterwarnings('ignore')
+    algo_file = '../../algo/haugen/haugen.py'
+    perf_dump_file = '../../algo/haugen/haugen_2020-08-28_1500_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
     now = datetime.datetime.now()
     create_report(perf, algo_file, now)
