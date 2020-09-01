@@ -149,9 +149,9 @@ class SQLiteAssetFinder(AssetFinder):
             # but also allowing to use pipeline live as well. 5 is a good number for weekends/holidays
             dict_['end_date'] = dict_['end_date'] + timedelta(days=5)
             dict_['auto_close_date'] = dict_['auto_close_date'] + timedelta(days=5)
+
+            dict_['symbol'] = dict_['symbol'].replace('.', ' ').partition('-')[0]
         return dict_
-
-
 
 
 @singleton
@@ -251,3 +251,43 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             if idx:
                 values = np.insert(values, 0, str(index), axis=0)
             engine.execute(cmd, tuple(values))
+
+    def check_sanity(self):
+        """
+        Check if there were changes in some metadata
+        """
+
+        sane = True
+
+        field = 'category'
+        expected = ['ADR', 'ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
+               'ADR Preferred Stock', 'ADR Primary', 'ADR Stock Warrant', 'CEF', 'Canadian', 'Canadian Common Stock',
+               'Canadian Common Stock Primary Class', 'Canadian Preferred Stock', 'Canadian Stock Warrant', 'Domestic',
+               'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class',
+               'Domestic Preferred Stock', 'Domestic Primary', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
+        if not self._check_field(field, expected):
+            sane = False
+
+        field = 'sector'
+        expected = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
+        if not self._check_field(field, expected):
+            sane = False
+
+        field = 'exchange'
+        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'None', 'OTC']
+        if not self._check_field(field, expected):
+            sane = False
+
+        return sane
+
+    def _check_field(self, field, expected):
+        sql = "SELECT DISTINCT(value) as r FROM equity_supplementary_mappings WHERE field = '%s' ORDER BY r;" % field
+        ret = [x[0] for x in self.engine.execute(sql).fetchall()]
+        ok = np.array_equal(ret, expected)
+        if not ok:
+            sane = False
+            from sharadar.util.logger import log
+            log.error("Field '%s' changed!\nActual:\n  %s\nExpected:\n  %s" % (field, ret, expected))
+            return False
+        else:
+            return True

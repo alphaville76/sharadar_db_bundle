@@ -277,6 +277,10 @@ def from_quandl():
         from sharadar.pipeline.universes import create_tradable_stocks_universe
         create_tradable_stocks_universe(output_dir, prices_start, prices_end)
 
+        sane = asset_db_writer.check_sanity()
+        if sane:
+            log.info("Sanity check successful!")
+
         okay_path = os.path.join(output_dir, "ok")
         Path(okay_path).touch()
         log.info("Ingest finished!")
