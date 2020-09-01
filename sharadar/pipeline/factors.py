@@ -89,7 +89,7 @@ class IsDomestic(CustomClassifier, BundleLoader):
 
     def compute(self, today, assets, out, *arrays):
         category = self.asset_finder().get_info(assets, 'category', today)
-        out[:] = np.isin(category, ['Domestic', 'Domestic Primary'])
+        out[:] = np.isin(category, ['Domestic', 'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class', 'Domestic Preferred Stock', 'Domestic Primary'])
 
 #FIXME
 class AvgMarketCap(CustomFactor, BundleLoader):
