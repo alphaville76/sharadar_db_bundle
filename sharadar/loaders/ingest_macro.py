@@ -122,9 +122,8 @@ def create_macro_prices_df(start, end, calendar=None):
 
 
 if __name__ == "__main__":
-    #TODO ask the dates
-    prices_start = pd.to_datetime('1998-01-01')
-    prices_end = pd.to_datetime('2020-07-07')
+    prices_start = pd.to_datetime('2019-08-31')
+    prices_end = pd.to_datetime('2020-08-31')
 
     from sharadar.pipeline.engine import load_sharadar_bundle
     from zipline.assets import ASSET_DB_VERSION
@@ -133,7 +132,7 @@ if __name__ == "__main__":
     from trading_calendars import get_calendar
 
     bundle = load_sharadar_bundle()
-    calendar = get_calendar('NYSE')
+    calendar = get_calendar('XNYS')
 
     macro_equities_df = create_macro_equities_df(prices_end)
 
@@ -147,4 +146,4 @@ if __name__ == "__main__":
     prices_dbpath = os.path.join(output_dir, "prices.sqlite")
     sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
     sql_daily_bar_writer.write(macro_prices_df)
-
+    print("inserted/updated %d entries" % macro_prices_df.shape[0])

@@ -34,7 +34,7 @@ from zipline.errors import SymbolNotFound
 from zipline.algorithm import TradingAlgorithm
 from zipline.algorithm_live import LiveTradingAlgorithm
 from zipline.finance.blotter import Blotter
-
+from zipline.utils.serialization_utils import store_context
 
 class _RunAlgoError(click.ClickException, ValueError):
     """Signal an error that should have a different message if invoked from
@@ -190,18 +190,7 @@ def _run(handle_data,
     first_trading_day = \
         bundle_data.equity_daily_bar_reader.first_trading_day
 
-    DataPortalClass = (partial(DataPortalLive, broker)
-                       if broker
-                       else DataPortal)
 
-    data = DataPortalClass(
-        bundle_data.asset_finder,
-        trading_calendar=trading_calendar,
-        first_trading_day=first_trading_day,
-        equity_minute_reader=bundle_data.equity_minute_bar_reader,
-        equity_daily_reader=bundle_data.equity_daily_bar_reader,
-        adjustment_reader=bundle_data.adjustment_reader,
-    )
 
     if isinstance(metrics_set, six.string_types):
         try:
@@ -216,15 +205,40 @@ def _run(handle_data,
             raise _RunAlgoError(str(e))
 
 
+
     # Special defaults for live trading
     if broker:
         data_frequency = 'minute'
+        now = pd.Timestamp.utcnow()
 
-        if not start:
-            start = pd.Timestamp.utcnow()
-        if not end:
-            # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
-            end = start + pd.Timedelta('1 day')
+        if start < now:
+            backtest_end = now - pd.Timedelta('1 day')
+            backtest_data = DataPortal(
+                bundle_data.asset_finder,
+                trading_calendar=trading_calendar,
+                first_trading_day=first_trading_day,
+                equity_minute_reader=bundle_data.equity_minute_bar_reader,
+                equity_daily_reader=bundle_data.equity_daily_bar_reader,
+                adjustment_reader=bundle_data.adjustment_reader,
+            )
+            backtest = create_algo_class(TradingAlgorithm, start, backtest_end, algofile, algotext, analyze, before_trading_start,
+                      benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, backtest_data, 'daily',
+                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
+                      performance_callback,  stop_execution_callback, teardown, trading_calendar)
+
+            ctx_blacklist = ['trading_client']
+            ctx_whitelist = ['perf_tracker']
+            ctx_excludes = ctx_blacklist + [e for e in backtest.__dict__.keys() if e not in ctx_whitelist]
+            backtest.run()
+            #TODO better logic for the checksumq
+            checksum = getattr(algofile, 'name', '<algorithm>')
+            store_context(state_filename, context=backtest, checksum=checksum, exclude_list=ctx_excludes)
+
+        #In live mode the start is always now
+        start = now
+
+        # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
+        end = now + pd.Timedelta('1 day')
 
         # No benchmark
         benchmark_sid = None
@@ -238,10 +252,19 @@ def _run(handle_data,
                                      realtime_bar_target=realtime_bar_target)
                              if broker else TradingAlgorithm)
 
-    algo = create_algo_class(TradingAlgorithmClass, algofile, algotext, analyze, before_trading_start,
-                             benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
-                             emission_rate, end, execution_id, handle_data, initialize, metrics_set, namespace,
-                             performance_callback, start, stop_execution_callback, teardown, trading_calendar)
+    DataPortalClass = (partial(DataPortalLive, broker) if broker else DataPortal)
+    data = DataPortalClass(
+        bundle_data.asset_finder,
+        trading_calendar=trading_calendar,
+        first_trading_day=first_trading_day,
+        equity_minute_reader=bundle_data.equity_minute_bar_reader,
+        equity_daily_reader=bundle_data.equity_daily_bar_reader,
+        adjustment_reader=bundle_data.adjustment_reader,
+    )
+    algo = create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, analyze, before_trading_start,
+                      benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
+                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
+                      performance_callback,  stop_execution_callback, teardown, trading_calendar)
 
     perf = algo.run()
 
@@ -253,10 +276,10 @@ def _run(handle_data,
     return perf
 
 
-def create_algo_class(TradingAlgorithmClass, algofile, algotext, analyze, before_trading_start, benchmark_returns,
-                      benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency, emission_rate, end,
-                      execution_id, handle_data, initialize, metrics_set, namespace, performance_callback, start,
-                      stop_execution_callback, teardown, trading_calendar):
+def create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, analyze, before_trading_start,
+                      benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
+                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
+                      performance_callback,  stop_execution_callback, teardown, trading_calendar):
     algo = TradingAlgorithmClass(
         namespace=namespace,
         data_portal=data,
