@@ -91,6 +91,36 @@ class IsDomestic(CustomClassifier, BundleLoader):
         category = self.asset_finder().get_info(assets, 'category', today)
         out[:] = np.isin(category, ['Domestic', 'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class', 'Domestic Preferred Stock', 'Domestic Primary'])
 
+class IsBankruptcy(CustomClassifier, BundleLoader):
+    """
+    The 5th letter "Q" stand for bankruptcy.
+    The NASDAQ phased out the usage of Q as of 2016, but other markets may still use "Q" for this purpose.
+    """
+    inputs = []
+    window_length = 1
+    dtype = np.int64
+    missing_value = -1
+
+    def compute(self, today, assets, out, *arrays):
+        equities = self.asset_finder().retrieve_all(assets)
+        out[:] = [((len(e.symbol) == 5) & e.symbol.endswith('Q')) for e in equities]
+
+
+class IsDelinquent(CustomClassifier, BundleLoader):
+    """
+    The 5th letter "E" stand for delinquent in regard to SEC filings.
+    The NASDAQ phased out the usage of E as of 2016, but other markets may still use "E" for this purpose.
+    """
+    inputs = []
+    window_length = 1
+    dtype = np.int64
+    missing_value = -1
+
+    def compute(self, today, assets, out, *arrays):
+        equities = self.asset_finder().retrieve_all(assets)
+        out[:] = [((len(e.symbol) == 5) & e.symbol.endswith('E')) for e in equities]
+
+
 #FIXME
 class AvgMarketCap(CustomFactor, BundleLoader):
     inputs = [USEquityPricing.close]
