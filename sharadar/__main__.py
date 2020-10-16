@@ -22,7 +22,7 @@ from zipline.utils.cli import Date, Timestamp
 from zipline.utils.run_algo import BenchmarkSpec
 from sharadar.util.run_algo import _run, load_extensions
 from zipline.extensions import create_args
-from zipline.gens import brokers
+from sharadar.live import brokers
 from importlib import import_module
 
 try:

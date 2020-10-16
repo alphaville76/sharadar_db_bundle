@@ -10,6 +10,20 @@ Step 2. Clone or download the code and install it using:
 
 >python setup.py install 
 
+For zipline in order to build the cython files run:
+>python setup.py build_ext --inplace
+
+Add this code to your ~/.zipline/extension.py:
+```python
+from zipline.data import bundles
+from zipline.finance import metrics
+from sharadar.loaders.ingest import from_quandl
+from sharadar.util.metric_daily import default_daily
+
+bundles.register("sharadar", from_quandl(), create_writers=False)
+metrics.register('default_daily', default_daily)
+```
+
 The new entry point is **sharadar-zipline** (it replaces *zipline*).
 
 For example to ingest data use:
@@ -28,8 +42,9 @@ To start a notebook
 
 
 Sharadar Fundamentals could be use as follows:
->from zipline.pipeline import Pipeline
-from zipline.pipeline.data import USEquityPricing
+```python
+from zipline.pipeline import Pipeline
+import pandas as pd
 from sharadar.pipeline.factors import (
     MarketCap,
     EV,
@@ -37,8 +52,8 @@ from sharadar.pipeline.factors import (
 )
 from sharadar.pipeline.engine import symbol, symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
->
-> pipe = Pipeline(columns={
+
+pipe = Pipeline(columns={
     'mkt_cap': MarketCap(),
     'ev': EV(),
     'debt': Fundamentals(field='debtusd_arq'),
@@ -46,6 +61,10 @@ from zipline.pipeline.filters import StaticAssets
 },
 screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
+spe = make_pipeline_engine()
 
->stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+pipe_date = pd.to_datetime('2020-02-03', utc=True)
+
+stocks = spe.run_pipeline(pipe, pipe_date)
 stocks
+```

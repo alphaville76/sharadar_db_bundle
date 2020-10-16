@@ -340,6 +340,8 @@ def describe_portfolio(positions):
         cost_basis = position.cost_basis
         if cost_basis == 0:
             cost_basis = position.last_sale_price
+        if cost_basis == 0:
+            continue
         pl = (position.last_sale_price - cost_basis) * position.amount
         pl_pct = 100 * (position.last_sale_price - cost_basis) / cost_basis
         total_cost_basis = total_cost_basis + (cost_basis * position.amount)

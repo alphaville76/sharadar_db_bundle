@@ -10,7 +10,7 @@ import warnings
 from functools import partial
 from sharadar.pipeline.engine import *
 from sharadar.util.logger import log
-
+from datetime import timedelta
 try:
     from pygments import highlight
     from pygments.lexers import PythonLexer
@@ -24,7 +24,7 @@ from trading_calendars import get_calendar
 
 from zipline.data.benchmarks import get_benchmark_returns_from_file
 from zipline.data.data_portal import DataPortal
-from zipline.data.data_portal_live import DataPortalLive
+from sharadar.live.data_portal_live import DataPortalLive
 from zipline.finance import metrics
 from zipline.finance.trading import SimulationParameters
 
@@ -32,9 +32,10 @@ import zipline.utils.paths as pth
 from zipline.extensions import load
 from zipline.errors import SymbolNotFound
 from zipline.algorithm import TradingAlgorithm
-from zipline.algorithm_live import LiveTradingAlgorithm
+from sharadar.live.algorithm_live import LiveTradingAlgorithm
 from zipline.finance.blotter import Blotter
-from zipline.utils.serialization_utils import store_context
+from sharadar.live.serialization_utils import store_context
+from trading_calendars import register_calendar_alias
 
 class _RunAlgoError(click.ClickException, ValueError):
     """Signal an error that should have a different message if invoked from
@@ -84,26 +85,14 @@ def _run(handle_data,
          benchmark_symbol,
          broker,
          state_filename,
-         realtime_bar_target,
-         performance_callback,
-         stop_execution_callback,
-         teardown,
-         execution_id):
+         realtime_bar_target):
     """Run a backtest for the given algorithm.
 
     This is shared between the cli and :func:`zipline.run_algo`.
 
-    zipline-trader additions:
+    additions useful for live trading:
     broker - wrapper to connect to a real broker
     state_filename - saving the context of the algo to be able to restart
-    performance_callback - a callback to send performance results everyday and not only at the end of the backtest.
-        this allows to run live, and monitor the performance of the algorithm
-    stop_execution_callback - A callback to check if execution should be stopped. it is used to be able to stop live
-        trading (also simulation could be stopped using this) execution. if the callback returns True, then algo
-        execution will be aborted.
-    teardown - algo method like handle_data() or before_trading_start() that is called when the algo execution stops
-    execution_id - unique id to identify this execution (backtest or live instance)
-
     """
     log.info("Using bundle '%s'." % bundle)
 
@@ -111,12 +100,17 @@ def _run(handle_data,
         trading_calendar = get_calendar('XNYS')
 
     bundle_data = load_sharadar_bundle(bundle)
+    now = pd.Timestamp.utcnow()
     if start is None:
-        start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else pd.Timestamp.utcnow()
+        start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else now
 
     if end is None:
-        end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else (pd.Timestamp.utcnow() + pd.Timedelta(days=1, seconds=1))
+        end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else (now + pd.Timedelta(days=1, seconds=1))
         end = trading_calendar.next_close(end)
+
+    if trading_calendar.session_distance(now, end) == 0:
+        end = end - pd.Timedelta(days=1)
+
 
     # date parameter validation
     if trading_calendar.session_distance(start, end) < 1:
@@ -209,7 +203,7 @@ def _run(handle_data,
     # Special defaults for live trading
     if broker:
         data_frequency = 'minute'
-        now = pd.Timestamp.utcnow()
+        now = now
 
         if start < now:
             backtest_end = now - pd.Timedelta('1 day')
@@ -223,8 +217,7 @@ def _run(handle_data,
             )
             backtest = create_algo_class(TradingAlgorithm, start, backtest_end, algofile, algotext, analyze, before_trading_start,
                       benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, backtest_data, 'daily',
-                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
-                      performance_callback,  stop_execution_callback, teardown, trading_calendar)
+                      emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar)
 
             ctx_blacklist = ['trading_client']
             ctx_whitelist = ['perf_tracker']
@@ -263,8 +256,7 @@ def _run(handle_data,
     )
     algo = create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, analyze, before_trading_start,
                       benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
-                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
-                      performance_callback,  stop_execution_callback, teardown, trading_calendar)
+                      emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar)
 
     perf = algo.run()
 
@@ -278,8 +270,7 @@ def _run(handle_data,
 
 def create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, analyze, before_trading_start,
                       benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
-                      emission_rate, execution_id, handle_data, initialize, metrics_set, namespace,
-                      performance_callback,  stop_execution_callback, teardown, trading_calendar):
+                      emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar):
     algo = TradingAlgorithmClass(
         namespace=namespace,
         data_portal=data,
@@ -291,21 +282,17 @@ def create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, ana
             trading_calendar=trading_calendar,
             capital_base=capital_base,
             emission_rate=emission_rate,
-            data_frequency=data_frequency,
-            execution_id=execution_id
+            data_frequency=data_frequency
         ),
         metrics_set=metrics_set,
         blotter=blotter,
         benchmark_returns=benchmark_returns,
         benchmark_sid=benchmark_sid,
-        performance_callback=performance_callback,
-        stop_execution_callback=stop_execution_callback,
         **{
             'initialize': initialize,
             'handle_data': handle_data,
             'before_trading_start': before_trading_start,
             'analyze': analyze,
-            'teardown': teardown,
         } if algotext is None else {
             'algo_filename': getattr(algofile, 'name', '<algorithm>'),
             'script': algotext,
@@ -386,12 +373,11 @@ def run_algorithm(initialize,
                   handle_data=None,
                   before_trading_start=None,
                   analyze=None,
-                  teardown=None,
                   data_frequency='daily',
                   bundle='sharadar',
                   bundle_timestamp=None,
                   trading_calendar=None,
-                  metrics_set='default',
+                  metrics_set='default_daily',
                   benchmark_symbol='SPY',
                   default_extension=True,
                   extensions=(),
@@ -399,9 +385,6 @@ def run_algorithm(initialize,
                   environ=os.environ,
                   blotter='default',
                   broker=None,
-                  performance_callback=None,
-                  stop_execution_callback=None,
-                  execution_id=None,
                   state_filename=None,
                   realtime_bar_target=None
                   ):
@@ -465,15 +448,6 @@ def run_algorithm(initialize,
         Default is a :class:`zipline.finance.blotter.SimulationBlotter` that
         never cancels orders.
     broker : instance of zipline.gens.brokers.broker.Broker
-    performance_callback : a callback to send performance results everyday and not only at the end of the backtest.
-                           this allows to run live, and monitor the performance of the algorithm
-    stop_execution_callback : A callback to check if execution should be stopped. it is used to be able to stop live
-                              trading (also simulation could be stopped using this) execution. if the callback returns
-                              True, then algo execution will be aborted.
-    teardown : algo method like handle_data() or before_trading_start() that is called when the algo execution stops
-               and allows the developer to nicely kill the algo execution
-    execution_id : unique id to identify this execution instance (backtest or live) will be used to mark and get logs
-                   for this specific execution instance.
     state_filename : path to pickle file storing the algorithm "context" (similar to self)
 
     Returns
@@ -487,12 +461,14 @@ def run_algorithm(initialize,
     """
     load_extensions(default_extension, extensions, strict_extensions, environ)
 
+    register_calendar_alias('NYSEMKT', 'XNYS')
+    register_calendar_alias('OTC', 'XNYS')
+
     return _run(
         handle_data=handle_data,
         initialize=initialize,
         before_trading_start=before_trading_start,
         analyze=analyze,
-        teardown=teardown,
         algofile=None,
         algotext=None,
         defines=(),
@@ -512,8 +488,5 @@ def run_algorithm(initialize,
         benchmark_symbol=benchmark_symbol,
         broker=broker,
         state_filename=state_filename,
-        realtime_bar_target=realtime_bar_target,
-        performance_callback=performance_callback,
-        stop_execution_callback=stop_execution_callback,
-        execution_id=execution_id
+        realtime_bar_target=realtime_bar_target
     )

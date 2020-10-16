@@ -1,17 +1,16 @@
 import pandas as pd
 from zipline.pipeline import Pipeline
 from zipline.pipeline.data import USEquityPricing
-from sharadar.pipeline.factors import (
-    MarketCap,
-    EV,
-    Fundamentals
-)
+
 from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
 
 bundle = load_sharadar_bundle()
+
+bundle.asset_finder.retrieve_equities([199059, 199623])
+print(symbols(['SPY']))
 
 spe = make_pipeline_engine()
 
@@ -28,6 +27,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
 print("stocks.shape [close]", stocks)
 
+from sharadar.pipeline.factors import MarketCap, EV, Fundamentals
 pipe_mkt_cap = Pipeline(columns={
     'mkt_cap': MarketCap()
 },

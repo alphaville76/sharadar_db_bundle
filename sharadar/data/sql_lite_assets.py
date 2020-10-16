@@ -17,7 +17,6 @@ from zipline.utils.calendars import get_calendar
 from zipline.utils.memoize import lazyval
 from pandas.tseries.offsets import DateOffset
 from datetime import timedelta
-from zipline.algorithm_live import LiveTradingAlgorithm
 
 
 @singleton
@@ -26,6 +25,19 @@ class SQLiteAssetFinder(AssetFinder):
     def __init__(self, engine, future_chain_predicates=CHAIN_PREDICATES):
         super().__init__(engine, future_chain_predicates)
         self.is_live_trading = False
+
+    def _retrieve_asset_dicts(self, sids, asset_tbl, querying_equities):
+        rows = list(super()._retrieve_asset_dicts(sids, asset_tbl, querying_equities))
+        if self.is_live_trading:
+            for row in rows:
+                # when we use pipeline live the end date is always yesterday so we add 5 days to still keep this condition
+                # but also allowing to use pipeline live as well. 5 is a good number for weekends/holidays
+                row['end_date'] = row['end_date'] + timedelta(days=5)
+                row['auto_close_date'] = row['auto_close_date'] + timedelta(days=5)
+
+                row['symbol'] = row['symbol'].replace('.', ' ').partition('-')[0]
+
+        return rows
 
     @lazyval
     def equity_supplementary_map(self):
@@ -142,16 +154,6 @@ class SQLiteAssetFinder(AssetFinder):
             return []
         return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
 
-    def _convert_asset_timestamp_fields(self, dict_):
-        dict_ = super()._convert_asset_timestamp_fields(dict_)
-        if self.is_live_trading:
-            # when we use pipeline live the end date is always yesterday so we add 5 days to still keep this condition
-            # but also allowing to use pipeline live as well. 5 is a good number for weekends/holidays
-            dict_['end_date'] = dict_['end_date'] + timedelta(days=5)
-            dict_['auto_close_date'] = dict_['auto_close_date'] + timedelta(days=5)
-
-            dict_['symbol'] = dict_['symbol'].replace('.', ' ').partition('-')[0]
-        return dict_
 
 
 @singleton
