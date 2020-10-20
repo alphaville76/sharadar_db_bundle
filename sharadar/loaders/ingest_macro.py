@@ -123,15 +123,13 @@ def create_macro_prices_df(start, end, calendar=None):
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         print("Usage: ingest_macro [start_date] [end_date]")
         sys.exit(os.EX_USAGE)
 
 
-    prices_start = pd.to_datetime(sys.argv[0])
-    prices_end = pd.to_datetime(sys.argv[1])
-    prices_start = sys.argv[0]
-    prices_end = sys.argv[1]
+    prices_start = pd.to_datetime(sys.argv[1])
+    prices_end = pd.to_datetime(sys.argv[2])
     print("Adding macro data from %s to %s ..." % (prices_start, prices_end))
 
     from sharadar.pipeline.engine import load_sharadar_bundle
