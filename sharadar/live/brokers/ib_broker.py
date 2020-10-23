@@ -574,15 +574,10 @@ class IBBroker(Broker):
                 continue
             editable_position._underlying_position.amount = int(ib_position.position)
             editable_position._underlying_position.cost_basis = float(ib_position.average_cost)
-            # Check if symbol exists in bars df
-            if symbol in self._tws.bars:
-                editable_position._underlying_position.last_sale_price = \
-                    float(self._tws.bars[symbol].last_trade_price.iloc[-1])
-                editable_position._underlying_position.last_sale_date = \
-                    self._tws.bars[symbol].index.values[-1]
-            else:
-                # editable_position._underlying_position.last_sale_price = None  # this cannot be set to None. only numbers.
-                editable_position._underlying_position.last_sale_date = None
+            editable_position._underlying_position.last_sale_price = ib_position.market_price
+            last_close = self.metrics_tracker._trading_calendar.session_close(self.metrics_tracker._last_session)
+            editable_position._underlying_position.last_sale_date = last_close.date()
+
             self.metrics_tracker.update_position(z_position.asset,
                                                  amount=z_position.amount,
                                                  last_sale_price=z_position.last_sale_price,
@@ -602,8 +597,7 @@ class IBBroker(Broker):
 
     @property
     def portfolio(self):
-        positions = self.positions
-
+        self.positions      # update positions
         return self.metrics_tracker.portfolio
 
     def get_account_from_broker(self):

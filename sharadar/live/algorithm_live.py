@@ -17,7 +17,7 @@ import pandas as pd
 import pytz
 from dateutil.relativedelta import relativedelta
 
-from zipline.utils.math_utils import tolerant_equals
+from zipline.utils.math_utils import tolerant_equals, round_if_near_integer
 from sharadar.live.blotter_live import BlotterLive
 from zipline.algorithm import TradingAlgorithm
 from zipline.errors import ZiplineError
@@ -198,7 +198,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
     def _create_live_metrics_tracker(self):
         """
         creating the metrics_tracker but setting values from the broker and
-        not from the simulatio params
+        not from the simulation params
         :return:
         """
         account = self.broker.get_account_from_broker()
@@ -362,15 +362,18 @@ class LiveTradingAlgorithm(TradingAlgorithm):
     @property
     @require_initialized(RequireInitError(function="portfolio"))
     def portfolio(self):
-        #TODO get portfolio from broker
-        #broker_portfolio = self.broker.portfolio
-        return super().portfolio
+        return self.updated_portfolio()
+
+    @property
+    @require_initialized(RequireInitError(function="account"))
+    def account(self):
+        return self.updated_account()
 
     @staticmethod
     def round_order(amount):
         if pd.isna(amount):
             return 0
-        return super().round_order(amount)
+        return int(round_if_near_integer(amount))
 
 
 

@@ -1,7 +1,8 @@
 from zipline.api import get_datetime
 from zipline.api import order_target
+from sharadar.util.performance import print_portfolio
 
-def stop_loss_portfolio(context, data, log, close_all):
+def stop_loss_portfolio(context, data, log):
     """
     Close all positions when the whole portfolio loss exceeded the loss_limit
     """
@@ -44,3 +45,16 @@ def stop_loss_equities(context, data, log):
             log.warn("%s positions closed with a loss of %.2f." % (stock, 100.0*pl_pct))
             if data.can_trade(stock):
                 order_target(stock, 0)
+
+def close_all(context, data, exclude=[], log=None):
+    """
+    Close all positions, except those in the exclude list
+    """
+
+    if log:
+        print_portfolio(log, context)
+    for stock in context.portfolio.positions:
+        if stock in exclude:
+            continue
+        if data.can_trade(stock):
+            order_target(stock, 0)

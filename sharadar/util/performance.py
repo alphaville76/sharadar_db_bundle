@@ -359,6 +359,12 @@ def describe_portfolio(positions):
     pdf.loc['Summary'].pl_pct = '{:,.2f}'.format(100.00 * total_pl / total_cost_basis)
     return pdf
 
+def print_portfolio(log, context):
+    mem = psutil.virtual_memory()
+    log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))
+
+    pdf = describe_portfolio(context.portfolio.positions)
+    log.info('Portfolio Performance:\n{stats}'.format(stats=pdf))
 
 if __name__ == "__main__":
     import warnings
