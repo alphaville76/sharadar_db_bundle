@@ -1,3 +1,4 @@
+import pytz
 from abc import ABCMeta
 import six
 import warnings
@@ -9,8 +10,35 @@ import pandas as pd
 from zipline.utils.input_validation import preprocess
 from zipline.utils.memoize import lazyval
 
-from zipline.utils.events import Always, NthTradingDayOfWeek, NDaysBeforeLastTradingDayOfWeek
+from zipline.utils.events import Always, NthTradingDayOfWeek, NDaysBeforeLastTradingDayOfWeek, AfterOpen, BeforeClose
 from zipline.utils.events import lossless_float_to_int, _out_of_range_error, MAX_MONTH_RANGE, StatelessRule
+
+import pytz
+from datetime import datetime
+
+class time_rules(object):
+    every_minute = Always
+
+    @staticmethod
+    def market_open(offset=None, hours=None, minutes=None):
+        return AfterOpen(offset=offset, hours=hours, minutes=minutes)
+
+    @staticmethod
+    def market_close(offset=None, hours=None, minutes=None):
+        return BeforeClose(offset=offset, hours=hours, minutes=minutes)
+
+    @staticmethod
+    def live_algo_start(offset=2):
+        ny_tz = pytz.timezone('America/New_York')
+        now = datetime.now(ny_tz)
+        now = "%0d:%0d" % (now.hour, now.minute)
+        td = datetime.strptime(now, "%H:%M") - datetime.strptime("09:30", "%H:%M")
+        h, r = divmod(td.seconds, 3600)
+        m, s = divmod(r, 60)
+        m = m+offset
+        return AfterOpen(offset=None, hours=h, minutes=m)
+
+
 
 
 
