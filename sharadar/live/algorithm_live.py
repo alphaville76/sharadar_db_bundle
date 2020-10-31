@@ -21,14 +21,12 @@ from zipline.utils.math_utils import tolerant_equals, round_if_near_integer
 from sharadar.live.blotter_live import BlotterLive
 from zipline.algorithm import TradingAlgorithm
 from zipline.errors import ZiplineError
-from sharadar.live.errors_live import ScheduleFunctionOutsideTradingStart
 from sharadar.live.realtimeclock import RealtimeClock
 from zipline.gens.tradesimulation import AlgorithmSimulator
 from zipline.utils.api_support import ZiplineAPI, api_method, require_initialized
-from sharadar.live.api_support_live import allowed_only_in_before_trading_start
 from zipline.utils.pandas_utils import normalize_date
-from sharadar.live.serialization_utils import load_context, store_context
-from zipline.finance.metrics import MetricsTracker, load as load_metrics_set
+from sharadar.util.serialization_utils import load_context, store_context
+from zipline.finance.metrics import MetricsTracker
 
 log = logbook.Logger("Live Trading")
 # how many minutes before Trading starts needs the function before_trading_starts
@@ -161,7 +159,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         # it creates the perf tracker
         TradingAlgorithm._create_generator(self, self.sim_params)
 
-        # capital base is the ammount of money the algo can use
+        # capital base is the amount of money the algo can use
         # it must be set with run_algorithm, and it's optional in cli mode with default value of 10 million
         # please note that in python: 10**7 or 10e6 is 10 million or 10000000
         # note2: the default value is defined in zipline/__main__.py under `--capital-base` option
@@ -220,28 +218,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
     def updated_account(self):
         return self.broker.account
-
-    @api_method
-    @allowed_only_in_before_trading_start(
-        ScheduleFunctionOutsideTradingStart())
-    def schedule_function(self,
-                          func,
-                          date_rule=None,
-                          time_rule=None,
-                          half_days=True,
-                          calendar=None):
-        # If the scheduled_function() is called from initalize()
-        # then the state persistence would need to take care of storing and
-        # restoring the scheduled functions too (as initialize() only called
-        # once in the algorithm's life). Persisting scheduled functions are
-        # difficult as they are not serializable by default.
-        # We enforce scheduled functions to be called only from
-        # before_trading_start() in live trading with a decorator.
-        super(self.__class__, self).schedule_function(func,
-                                                      date_rule,
-                                                      time_rule,
-                                                      half_days,
-                                                      calendar)
 
     @api_method
     def symbol(self, symbol_str):
