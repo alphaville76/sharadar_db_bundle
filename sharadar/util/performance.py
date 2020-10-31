@@ -61,6 +61,11 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         perf['returns'] = perf['pnl'] / (perf['portfolio_value'] - perf['pnl'])
         perf['returns'] = perf['returns'].replace([np.nan, np.inf, -np.inf], 0.0)
 
+    tot_positions = sum([len(x) for x in perf.positions])
+    if tot_positions == 0:
+        log.warn("No positions available")
+        return
+
     rets, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
     if len(rets.index) > 0:
@@ -369,8 +374,8 @@ def print_portfolio(log, context):
 if __name__ == "__main__":
     import warnings
     warnings.filterwarnings('ignore')
-    algo_file = '../../algo/haugen/haugen.py'
-    perf_dump_file = '../../algo/haugen/haugen_2020-08-28_1500_perf.dump'
+    algo_file = '../../algo/haugen/haugen_live.py'
+    perf_dump_file = '../../algo/haugen/haugen_live_2020-10-29_0253_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
     now = datetime.datetime.now()
     create_report(perf, algo_file, now)
