@@ -52,5 +52,13 @@ def store_context(state_file_path, context, checksum, exclude_list):
     state[CHECKSUM_KEY] = checksum
 
     with open(state_file_path, 'wb') as f:
-        # Forcing v2 protocol for compatibility between py2 and py3
-        pickle.dump(state, f, protocol=2)
+        pickle.dump(state, f)
+
+if __name__ == '__main__':
+    context_file_path = '../../algo/live/rsi_context.state'
+    with open(context_file_path, 'rb') as f:
+        context = pickle.load(f)
+
+    import pprint
+    pp = pprint.PrettyPrinter()
+    pp.pprint(context)
