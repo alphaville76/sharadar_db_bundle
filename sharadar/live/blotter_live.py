@@ -183,8 +183,14 @@ class BlotterLive(Blotter):
         all_transactions = [tx
                             for tx in itervalues(self.broker.transactions)
                             if tx.dt.date() == today]
-        new_transactions = _list_delta(all_transactions,
-                                       self._processed_transactions)
+        transactions_delta = _list_delta(all_transactions, self._processed_transactions)
+
+        # Consider as new transactions only those ones in self.orders
+        new_transactions = []
+        for tx in transactions_delta:
+            if tx.order_id in self.orders:
+                new_transactions.append(tx)
+
         self._processed_transactions = all_transactions
 
         new_commissions = [{'asset': tx.asset,
