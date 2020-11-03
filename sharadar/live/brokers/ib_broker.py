@@ -10,7 +10,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import datetime
 import sys
 from collections import namedtuple, defaultdict, OrderedDict
 from time import sleep
@@ -539,7 +539,9 @@ class IBBroker(Broker):
                 asset))
 
             # remove str() cast to have a fun debugging journey
-            self._tws.subscribe_to_market_data(str(asset.symbol))
+            symbol = str(asset.symbol)
+
+            self._tws.subscribe_to_market_data(symbol)
             self._subscribed_assets.append(asset)
             try:
                 polling.poll(
@@ -547,7 +549,7 @@ class IBBroker(Broker):
                     timeout=_max_wait_subscribe,
                     step=_poll_frequency)
             except polling.TimeoutException as te:
-                log.warning('!!!WARNING: I did not manage to subscribe to %s ' % str(asset.symbol))
+                log.warning('Cannot subscribe market data for %s. Use last available ingested data.' % symbol)
             else:
                 log.debug("Subscription completed")
 
@@ -1011,9 +1013,19 @@ class IBBroker(Broker):
         for asset in assets:
             symbol = str(asset.symbol)
             self.subscribe_to_market_data(asset)
+            if symbol in self._tws.bars:
+                trade_prices = self._tws.bars[symbol]['last_trade_price']
+                trade_sizes = self._tws.bars[symbol]['last_trade_size']
+            else:
+                log.warning("%s not in tws.bars, use ingested data." % symbol)
+                now = pd.to_datetime('now', utc=True)
+                dt = self.daily_bar_reader.last_available_dt
+                price = self.daily_bar_reader.get_value(asset.sid, dt, 'close')
+                volume = self.daily_bar_reader.get_value(asset.sid, dt, 'volume')
+                trade_prices = pd.Series([price], index=[now])
+                trade_sizes = pd.Series([volume], index=[now])
 
-            trade_prices = self._tws.bars[symbol]['last_trade_price']
-            trade_sizes = self._tws.bars[symbol]['last_trade_size']
+
             ohlcv = trade_prices.resample(resample_freq).ohlc()
             ohlcv['volume'] = trade_sizes.resample(resample_freq).sum()
 

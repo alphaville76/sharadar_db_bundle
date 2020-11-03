@@ -17,6 +17,8 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 class Broker(object):
     __metaclass__ = ABCMeta
 
+    daily_bar_reader = None
+
     @abstractmethod
     def subscribe_to_market_data(self, asset):
         pass
