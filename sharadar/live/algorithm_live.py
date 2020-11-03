@@ -351,6 +351,12 @@ class LiveTradingAlgorithm(TradingAlgorithm):
             return 0
         return int(round_if_near_integer(amount))
 
+    def run_pipeline(self, pipeline, start_session, chunksize):
+        # In Live mode a Pipeline can be run only for the current session (end_session = start_session)
+        return self.engine.run_pipeline(pipeline, start_session, start_session), start_session
+
+
+
 
 
 
