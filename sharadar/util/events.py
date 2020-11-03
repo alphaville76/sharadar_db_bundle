@@ -99,5 +99,3 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
             .nth(self.td_delta)
             .astype(np.int64)
         )
-
-

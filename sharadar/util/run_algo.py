@@ -4,13 +4,12 @@ Created on the basis of ~/zipline/lib/python3.6/site-packages/zipline-trader/zip
 import sys
 
 import click
-import os
 import pandas as pd
 import warnings
 from functools import partial
 from sharadar.pipeline.engine import *
 from sharadar.util.logger import log
-from datetime import timedelta
+
 try:
     from pygments import highlight
     from pygments.lexers import PythonLexer
@@ -22,7 +21,6 @@ import six
 from toolz import concatv
 from trading_calendars import get_calendar
 
-from zipline.data.benchmarks import get_benchmark_returns_from_file
 from zipline.data.data_portal import DataPortal
 from sharadar.live.data_portal_live import DataPortalLive
 from zipline.finance import metrics
@@ -30,11 +28,10 @@ from zipline.finance.trading import SimulationParameters
 
 import zipline.utils.paths as pth
 from zipline.extensions import load
-from zipline.errors import SymbolNotFound
 from zipline.algorithm import TradingAlgorithm
 from sharadar.live.algorithm_live import LiveTradingAlgorithm
 from zipline.finance.blotter import Blotter
-from sharadar.live.serialization_utils import store_context
+from sharadar.util.serialization_utils import store_context
 from trading_calendars import register_calendar_alias
 
 class _RunAlgoError(click.ClickException, ValueError):
@@ -104,16 +101,14 @@ def _run(handle_data,
     if start is None:
         start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else now
 
+    if not trading_calendar.is_session(start.date()):
+        start = trading_calendar.next_open(start)
+
     if end is None:
-        end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else (now + pd.Timedelta(days=1, seconds=1))
-        end = trading_calendar.next_close(end)
-
-    if trading_calendar.session_distance(now, end) == 0:
-        end = end - pd.Timedelta(days=1)
-
+        end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else start
 
     # date parameter validation
-    if trading_calendar.session_distance(start, end) < 1:
+    if trading_calendar.session_distance(start, end) < 0:
         raise _RunAlgoError(
             'There are no trading days between %s and %s' % (
                 start.date(),
@@ -121,7 +116,10 @@ def _run(handle_data,
             ),
         )
 
-    log.info("Backtest from %s to %s." % (str(start.date()), str(end.date())))
+    if broker:
+        log.info("Live Trading on %s." % start.date())
+    else:
+        log.info("Backtest from %s to %s." % (start.date(), end.date()))
 
     if benchmark_symbol:
         benchmark = symbol(benchmark_symbol)
@@ -184,8 +182,6 @@ def _run(handle_data,
     first_trading_day = \
         bundle_data.equity_daily_bar_reader.first_trading_day
 
-
-
     if isinstance(metrics_set, six.string_types):
         try:
             metrics_set = metrics.load(metrics_set)
@@ -198,44 +194,51 @@ def _run(handle_data,
         except ValueError as e:
             raise _RunAlgoError(str(e))
 
-
-
     # Special defaults for live trading
     if broker:
         data_frequency = 'minute'
-        now = now
-
-        if start < now:
-            backtest_end = now - pd.Timedelta('1 day')
-            backtest_data = DataPortal(
-                bundle_data.asset_finder,
-                trading_calendar=trading_calendar,
-                first_trading_day=first_trading_day,
-                equity_minute_reader=bundle_data.equity_minute_bar_reader,
-                equity_daily_reader=bundle_data.equity_daily_bar_reader,
-                adjustment_reader=bundle_data.adjustment_reader,
-            )
-            backtest = create_algo_class(TradingAlgorithm, start, backtest_end, algofile, algotext, analyze, before_trading_start,
-                      benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, backtest_data, 'daily',
-                      emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar)
-
-            ctx_blacklist = ['trading_client']
-            ctx_whitelist = ['perf_tracker']
-            ctx_excludes = ctx_blacklist + [e for e in backtest.__dict__.keys() if e not in ctx_whitelist]
-            backtest.run()
-            #TODO better logic for the checksumq
-            checksum = getattr(algofile, 'name', '<algorithm>')
-            store_context(state_filename, context=backtest, checksum=checksum, exclude_list=ctx_excludes)
-
-        #In live mode the start is always now
-        start = now
-
-        # in cli mode, sessions are 1 day only. and it will be re-ran each day by user
-        end = now + pd.Timedelta('1 day')
+        realtime_bar_target = 'realtime-bars'
 
         # No benchmark
         benchmark_sid = None
         benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'), data=0.0)
+
+        broker.daily_bar_reader = bundle_data.equity_daily_bar_reader
+
+        if start.date() < now.date():
+            backtest_start = start
+            backtest_end = bundle_data.equity_daily_bar_reader.last_available_dt
+
+            if not os.path.exists(state_filename):
+                log.info("Backtest from %s to %s." % (backtest_start.date(), backtest_end.date()))
+                backtest_data = DataPortal(
+                    bundle_data.asset_finder,
+                    trading_calendar=trading_calendar,
+                    first_trading_day=first_trading_day,
+                    equity_minute_reader=bundle_data.equity_minute_bar_reader,
+                    equity_daily_reader=bundle_data.equity_daily_bar_reader,
+                    adjustment_reader=bundle_data.adjustment_reader,
+                )
+                backtest = create_algo_class(TradingAlgorithm, backtest_start, backtest_end, algofile, algotext, analyze, before_trading_start,
+                          benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, backtest_data, 'daily',
+                          emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar)
+
+                ctx_blacklist = ['trading_client']
+                ctx_whitelist = ['perf_tracker']
+                ctx_excludes = ctx_blacklist + [e for e in backtest.__dict__.keys() if e not in ctx_whitelist]
+                backtest.run()
+                #TODO better logic for the checksumq
+                checksum = getattr(algofile, 'name', '<algorithm>')
+                store_context(state_filename, context=backtest, checksum=checksum, exclude_list=ctx_excludes)
+            else:
+                log.warn("State file already exists. Do not run the backtest.")
+
+            # Set start and end to now for live trading
+            start = pd.Timestamp.utcnow()
+            if not trading_calendar.is_session(start.date()):
+                start = trading_calendar.next_open(start)
+            end = start
+
 
     # TODO inizia qui per creare un prerun dell'algo prima del live trading
     # usare store_context prima di passare da TradingAlgorithm a LiveTradingAlgorithm
