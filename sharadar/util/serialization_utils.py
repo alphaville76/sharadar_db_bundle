@@ -55,7 +55,8 @@ def store_context(state_file_path, context, checksum, exclude_list):
         pickle.dump(state, f)
 
 if __name__ == '__main__':
-    context_file_path = '../../algo/live/rsi_context.state'
+    import sys
+    context_file_path = sys.argv[1]
     with open(context_file_path, 'rb') as f:
         context = pickle.load(f)
 
