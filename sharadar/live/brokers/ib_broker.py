@@ -586,12 +586,8 @@ class IBBroker(Broker):
         for asset in cur_pos_in_tracker:
             if asset.symbol not in self._tws.ib_positions:
                 # deleting object from the metrcs_tracker as its not in the portfolio
-                self.metrics_tracker.update_position(asset,
-                                                     amount=0)
-        # for some reason, the metrics tracker has self.positions AND self.portfolio.positions. let's make sure
-        # these objects are consistent
-        # (self.portfolio.positions is self.metrics_tracker._ledger._portfolio.positions)
-        # (self.metrics_tracker.positions is self.metrics_tracker._ledger.position_tracker.positions)
+                self.metrics_tracker.update_position(asset, amount=0)
+
         self.metrics_tracker._ledger._portfolio.positions = zp.Positions(self.metrics_tracker.positions)
 
     @property
