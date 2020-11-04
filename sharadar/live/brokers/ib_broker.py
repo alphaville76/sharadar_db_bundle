@@ -20,6 +20,7 @@ from six import iteritems, itervalues
 import polling
 import pandas as pd
 import numpy as np
+import zipline.protocol as zp
 
 from sharadar.live.brokers.broker import Broker
 from zipline.finance.order import (Order as ZPOrder,
@@ -48,7 +49,7 @@ if sys.version_info > (3,):
 
 log = Logger('IB Broker')
 
-Position = namedtuple('Position', ['contract', 'position', 'market_price',
+IBPosition = namedtuple('IBPosition', ['contract', 'position', 'market_price',
                                    'market_value', 'average_cost',
                                    'unrealized_pnl', 'realized_pnl',
                                    'account_name'])
@@ -126,8 +127,7 @@ class TWSConnection(EClientSocket, EWrapper):
         self.accounts = defaultdict(
             lambda: defaultdict(lambda: defaultdict(lambda: np.NaN)))
         self.accounts_download_complete = False
-        self.positions = {}
-        self.portfolio = {}
+        self.ib_positions = {}
         self.open_orders = {}
         self.order_statuses = {}
         self.executions = defaultdict(OrderedDict)
@@ -302,16 +302,16 @@ class TWSConnection(EClientSocket, EWrapper):
                         account_name):
         symbol = contract.m_symbol
 
-        position = Position(contract=contract,
-                            position=position,
-                            market_price=market_price,
-                            market_value=market_value,
-                            average_cost=average_cost,
-                            unrealized_pnl=unrealized_pnl,
-                            realized_pnl=realized_pnl,
-                            account_name=account_name)
+        ib_position = IBPosition(contract=contract,
+                              position=position,
+                              market_price=market_price,
+                              market_value=market_value,
+                              average_cost=average_cost,
+                              unrealized_pnl=unrealized_pnl,
+                              realized_pnl=realized_pnl,
+                              account_name=account_name)
 
-        self.positions[symbol] = position
+        self.ib_positions[symbol] = ib_position
 
     def updateAccountTime(self, time_stamp):
         pass
@@ -535,10 +535,7 @@ class IBBroker(Broker):
 
     def subscribe_to_market_data(self, asset):
         if asset not in self.subscribed_assets:
-            log.info("Subscribing to market data for {}".format(
-                asset))
-
-            # remove str() cast to have a fun debugging journey
+              # remove str() cast to have a fun debugging journey
             symbol = str(asset.symbol)
 
             self._tws.subscribe_to_market_data(symbol)
@@ -556,6 +553,7 @@ class IBBroker(Broker):
     @property
     def positions(self):
         self._get_positions_from_broker()
+        #return zp.Positions(self.metrics_tracker.positions)
         return self.metrics_tracker.positions
 
     def _get_positions_from_broker(self):
@@ -564,11 +562,11 @@ class IBBroker(Broker):
         should be used once at startup and once every time we want to refresh the positions array
         """
         cur_pos_in_tracker = self.metrics_tracker.positions
-        for symbol in self._tws.positions:
-            ib_position = self._tws.positions[symbol]
+        for symbol in self._tws.ib_positions:
+            ib_position = self._tws.ib_positions[symbol]
             try:
-                z_position = zp.Position(zp.InnerPosition(symbol_lookup(symbol)))
-                editable_position = MutableView(z_position)
+                zp_position = zp.Position(zp.InnerPosition(symbol_lookup(symbol)))
+                editable_position = MutableView(zp_position)
             except SymbolNotFound:
                 # The symbol might not have been ingested to the db therefore
                 # it needs to be skipped.
@@ -580,13 +578,13 @@ class IBBroker(Broker):
             last_close = self.metrics_tracker._trading_calendar.session_close(self.metrics_tracker._last_session)
             editable_position._underlying_position.last_sale_date = last_close.date()
 
-            self.metrics_tracker.update_position(z_position.asset,
-                                                 amount=z_position.amount,
-                                                 last_sale_price=z_position.last_sale_price,
-                                                 last_sale_date=z_position.last_sale_date,
-                                                 cost_basis=z_position.cost_basis)
+            self.metrics_tracker.update_position(zp_position.asset,
+                                                 amount=zp_position.amount,
+                                                 last_sale_price=zp_position.last_sale_price,
+                                                 last_sale_date=zp_position.last_sale_date,
+                                                 cost_basis=zp_position.cost_basis)
         for asset in cur_pos_in_tracker:
-            if asset.symbol not in self._tws.positions:
+            if asset.symbol not in self._tws.ib_positions:
                 # deleting object from the metrcs_tracker as its not in the portfolio
                 self.metrics_tracker.update_position(asset,
                                                      amount=0)
@@ -594,8 +592,7 @@ class IBBroker(Broker):
         # these objects are consistent
         # (self.portfolio.positions is self.metrics_tracker._ledger._portfolio.positions)
         # (self.metrics_tracker.positions is self.metrics_tracker._ledger.position_tracker.positions)
-        self.metrics_tracker._ledger._portfolio.positions = self.metrics_tracker.positions
-
+        self.metrics_tracker._ledger._portfolio.positions = zp.Positions(self.metrics_tracker.positions)
 
     @property
     def portfolio(self):
@@ -606,7 +603,6 @@ class IBBroker(Broker):
         ib_account = self._tws.accounts[self.account_id][self.currency]
         return ib_account
 
-    
     def set_metrics_tracker(self, metrics_tracker):
         self.metrics_tracker = metrics_tracker
 
@@ -734,8 +730,7 @@ class IBBroker(Broker):
         elif isinstance(style, StopLimitOrder):
             order.m_orderType = "STP LMT"
 
-        # TODO: Support GTC orders both here and at blotter_live
-        order.m_tif = "DAY"
+        order.m_tif = "GTC"
         order.m_orderRef = self._create_order_ref(order)
 
         ib_order_id = self._tws.next_order_id
@@ -922,8 +917,7 @@ class IBBroker(Broker):
                       if order.broker_order_id == ib_order_id]
 
             if not orders:
-                log.warning("No order found for executions: {}".format(
-                    executions))
+                log.warning("No order found for executions: {}".format(executions))
                 continue
 
             assert len(orders) == 1
