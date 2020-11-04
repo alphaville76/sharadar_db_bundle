@@ -67,9 +67,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         # blotter is always initialized to SimulationBlotter in run_algo.py.
         # we override it here to use the LiveBlotter for live algos
-        blotter_live = BlotterLive(
-            data_frequency=kwargs['sim_params'].data_frequency,
-            broker=self.broker)
+        blotter_live = BlotterLive(broker=self.broker)
         kwargs['blotter'] = blotter_live
 
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -239,8 +237,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         end_date = pd.Timestamp((datetime.utcnow() + relativedelta(years=10)).date()).replace(tzinfo=pytz.UTC)
         tradeable_asset['end_date'] = end_date
         tradeable_asset['auto_close_date'] = end_date
-        log.info('Extended lifetime of asset {} to {}'.format(symbol_str,
-                                                              tradeable_asset['end_date']))
+
         return asset.from_dict(tradeable_asset)
 
     def _check_delisted(self, asset):
