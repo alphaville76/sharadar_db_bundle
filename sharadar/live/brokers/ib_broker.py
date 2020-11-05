@@ -576,7 +576,7 @@ class IBBroker(Broker):
             editable_position._underlying_position.cost_basis = float(ib_position.average_cost)
             editable_position._underlying_position.last_sale_price = ib_position.market_price
             last_close = self.metrics_tracker._trading_calendar.session_close(self.metrics_tracker._last_session)
-            editable_position._underlying_position.last_sale_date = last_close.date()
+            editable_position._underlying_position.last_sale_date = last_close
 
             self.metrics_tracker.update_position(zp_position.asset,
                                                  amount=zp_position.amount,
