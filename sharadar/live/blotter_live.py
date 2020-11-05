@@ -41,7 +41,9 @@ class BlotterLive(Blotter):
         self.broker = broker
         self._processed_closed_orders = []
         self._processed_transactions = []
+
         self.new_orders = []
+
 
         self.slippage_models = {
             Equity: FixedBasisPointsSlippage(),
@@ -49,7 +51,6 @@ class BlotterLive(Blotter):
                 volume_limit=DEFAULT_FUTURE_VOLUME_SLIPPAGE_BAR_LIMIT,
             ),
         }
-
         self.commission_models = {
             Equity: PerShare(),
             Future: PerContract(
@@ -57,48 +58,62 @@ class BlotterLive(Blotter):
                 exchange_fee=FUTURE_EXCHANGE_FEES_BY_SYMBOL,
             ),
         }
+        log.info('Initialized blotter_live')
+    def __repr__(self):
+        return """
+    {class_name}(
+        open_orders={open_orders},
+        orders={orders},
+        new_orders={new_orders},
+    """.strip().format(class_name=self.__class__.__name__,
+                       open_orders=self.open_orders,
+                       orders=self.broker.orders,
+                       new_orders=self.new_orders)
+    @property
+    def orders(self):
+        return self.broker.orders
 
     @property
     def open_orders(self):
-        assets = set([order.asset for order in itervalues(self.broker.orders) if order.open])
-        return {
-            asset: [order for order in itervalues(self.broker.orders) if order.asset == asset and order.open]
-            for asset in assets
-        }
+        return {order.asset: order for order in itervalues(self.broker.orders) if order.open}
 
     @expect_types(asset=Asset)
     def order(self, asset, amount, style, order_id=None):
         assert order_id is None
+        if amount == 0:
+            return None
         order = self.broker.order(asset, amount, style)
         self.new_orders.append(order)
+
         return order.id
 
     def cancel(self, order_id, relay_status=True):
         return self.broker.cancel_order(order_id)
 
     def cancel_all_orders_for_asset(self, asset, warn=False, relay_status=True):
+        """
+        Cancel all open orders for a given asset.
+        """
         orders = self.open_orders[asset]
-
         for order in orders[:]:
             self.cancel(order.id, relay_status)
 
     def reject(self, order_id, reason=''):
-        log.warning("Unexpected reject request for {}: '{}'".format(order_id, reason))
+        log.warning("Unexpected reject request for {}: '{}'".format(
+            order_id, reason))
 
     def hold(self, order_id, reason=''):
-        log.warning("Unexpected hold request for {}: '{}'".format(order_id, reason))
+        log.warning("Unexpected hold request for {}: '{}'".format(
+            order_id, reason))
 
     def get_transactions(self, bar_data):
-        # All returned values from this function are delta between the previous and actual call.
+        # All returned values from this function are delta between
+        # the previous and actual call.
         def _list_delta(lst_a, lst_b):
             return [elem for elem in lst_a if elem not in set(lst_b)]
 
-        today = pd.to_datetime('now', utc=True).date()
-        all_transactions = [tx
-                            for tx in itervalues(self.broker.transactions)
-                            if tx.dt.date() == today]
-
-        new_transactions = _list_delta(self.broker.transactions, self._processed_transactions)
+        all_transactions = [tx for tx in itervalues(self.broker.transactions) if tx.order_id]
+        new_transactions = _list_delta(all_transactions, self._processed_transactions)
         self._processed_transactions = all_transactions
 
         new_commissions = [{'asset': tx.asset,
