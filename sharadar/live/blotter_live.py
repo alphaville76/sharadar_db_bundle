@@ -41,6 +41,22 @@ class BlotterLive(Blotter):
         self.broker = broker
         self._processed_closed_orders = []
         self._processed_transactions = []
+        self.new_orders = []
+
+        self.slippage_models = {
+            Equity: FixedBasisPointsSlippage(),
+            Future: VolatilityVolumeShare(
+                volume_limit=DEFAULT_FUTURE_VOLUME_SLIPPAGE_BAR_LIMIT,
+            ),
+        }
+
+        self.commission_models = {
+            Equity: PerShare(),
+            Future: PerContract(
+                cost=DEFAULT_PER_CONTRACT_COST,
+                exchange_fee=FUTURE_EXCHANGE_FEES_BY_SYMBOL,
+            ),
+        }
 
     @property
     def open_orders(self):
@@ -54,6 +70,7 @@ class BlotterLive(Blotter):
     def order(self, asset, amount, style, order_id=None):
         assert order_id is None
         order = self.broker.order(asset, amount, style)
+        self.new_orders.append(order)
         return order.id
 
     def cancel(self, order_id, relay_status=True):
