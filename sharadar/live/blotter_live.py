@@ -10,7 +10,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from logbook import Logger
+
 from collections import defaultdict
 from copy import copy
 
@@ -33,8 +33,7 @@ from zipline.finance.commission import (
 )
 from zipline.utils.input_validation import expect_types
 import pandas as pd
-log = Logger('Blotter Live')
-warning_logger = Logger('AlgoWarning')
+from sharadar.util.logger import log
 
 class BlotterLive(Blotter):
     def __init__(self, broker):
@@ -99,12 +98,10 @@ class BlotterLive(Blotter):
             self.cancel(order.id, relay_status)
 
     def reject(self, order_id, reason=''):
-        log.warning("Unexpected reject request for {}: '{}'".format(
-            order_id, reason))
+        log.warning("Unexpected reject request for {}: '{}'".format(order_id, reason))
 
     def hold(self, order_id, reason=''):
-        log.warning("Unexpected hold request for {}: '{}'".format(
-            order_id, reason))
+        log.warning("Unexpected hold request for {}: '{}'".format(order_id, reason))
 
     def get_transactions(self, bar_data):
         # All returned values from this function are delta between

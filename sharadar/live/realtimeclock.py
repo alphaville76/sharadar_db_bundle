@@ -11,8 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from time import sleep
-
-from logbook import Logger
 import pandas as pd
 
 from zipline.gens.sim_engine import (
@@ -22,9 +20,6 @@ from zipline.gens.sim_engine import (
     MINUTE_END,
     BEFORE_TRADING_START_BAR
 )
-
-log = Logger('Realtime Clock')
-
 
 class RealtimeClock(object):
     """

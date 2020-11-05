@@ -42,12 +42,11 @@ from ib.ext.Order import Order
 from ib.ext.ExecutionFilter import ExecutionFilter
 from ib.ext.EClientErrors import EClientErrors
 
-from logbook import Logger
+from sharadar.util.logger import log
 
 if sys.version_info > (3,):
     long = int
 
-log = Logger('IB Broker')
 
 IBPosition = namedtuple('IBPosition', ['contract', 'position', 'market_price',
                                    'market_value', 'average_cost',
