@@ -416,11 +416,6 @@ class TWSConnection(EClientSocket, EWrapper):
 
     def error(self, id_=None, error_code=None, error_msg=None):
         if isinstance(id_, Exception):
-            # XXX: for an unknown reason 'log' is None in this branch,
-            # therefore it needs to be instantiated before use
-            global log
-            if not log:
-                log = Logger('IB Broker')
             log.exception(id_)
 
         if isinstance(error_code, EClientErrors.CodeMsgPair):
@@ -534,7 +529,7 @@ class IBBroker(Broker):
 
     def subscribe_to_market_data(self, asset):
         if asset not in self.subscribed_assets:
-              # remove str() cast to have a fun debugging journey
+            # remove str() cast to have a fun debugging journey
             symbol = str(asset.symbol)
 
             self._tws.subscribe_to_market_data(symbol)
@@ -563,6 +558,8 @@ class IBBroker(Broker):
         cur_pos_in_tracker = self.metrics_tracker.positions
         for symbol in self._tws.ib_positions:
             ib_position = self._tws.ib_positions[symbol]
+            if ib_position.position == 0:
+                continue
             try:
                 zp_position = zp.Position(zp.InnerPosition(symbol_lookup(symbol)))
                 editable_position = MutableView(zp_position)
@@ -869,13 +866,14 @@ class IBBroker(Broker):
                 zp_order.filled = order_status['filled']
 
                 zp_status = self._ib_to_zp_status(order_status['status'])
-                if zp_status:
-                    zp_order.status = zp_status
-                else:
+                if zp_status is None:
                     log.warning("Order-{order_id}: "
-                                "unknown order status: {order_status}."
-                                .format(order_id=ib_order_id,
-                                        order_status=order_status['status']))
+                                "unknown order status: {order_status}.".format(
+                                    order_id=ib_order_id,
+                                    order_status= order_status['status']))
+                else:
+                    zp_order.status = zp_status
+
 
         def _update_from_execution(zp_order, ib_order_id):
             if ib_order_id in self._tws.executions and \
