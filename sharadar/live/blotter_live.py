@@ -74,7 +74,13 @@ class BlotterLive(Blotter):
 
     @property
     def open_orders(self):
-        return {order.asset: order for order in itervalues(self.broker.orders) if order.open}
+        assets = set([order.asset for order in itervalues(self.orders)
+                      if order.open])
+        return {
+            asset: [order for order in itervalues(self.orders)
+                    if order.asset == asset and order.open]
+            for asset in assets
+        }
 
     @expect_types(asset=Asset)
     def order(self, asset, amount, style, order_id=None):

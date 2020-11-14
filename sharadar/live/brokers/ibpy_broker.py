@@ -14,7 +14,7 @@
 This implementation uses IbPy, a third-party implementation of the API.
 IbPy is not a product of Interactive Brokers, nor is this project affiliated with IB.
 """
-import threading
+import datetime
 import sys
 from collections import namedtuple, defaultdict, OrderedDict
 from time import sleep
@@ -39,11 +39,12 @@ from zipline.protocol import MutableView
 from zipline.api import symbol as symbol_lookup
 from zipline.errors import SymbolNotFound
 
-from ibapi.client import EClient
-from ibapi.wrapper import EWrapper, TickTypeEnum
-from ibapi.contract import Contract
-from ibapi.order import Order
-from ibapi.execution import ExecutionFilter
+from ib.ext.EClientSocket import EClientSocket
+from ib.ext.EWrapper import EWrapper
+from ib.ext.Contract import Contract
+from ib.ext.Order import Order
+from ib.ext.ExecutionFilter import ExecutionFilter
+from ib.ext.EClientErrors import EClientErrors
 
 from sharadar.util.logger import log
 
@@ -100,7 +101,7 @@ def _method_params_to_dict(args):
             if k != 'self'}
 
 
-class TWSConnection(EWrapper, EClient):
+class TWSConnection(EClientSocket, EWrapper):
     def __init__(self, tws_uri):
         """
         :param tws_uri: host:listening_port:client_id
@@ -109,7 +110,7 @@ class TWSConnection(EWrapper, EClient):
                         - your client id, could be any number as long as it's not already used
         """
         EWrapper.__init__(self)
-        EClient.__init__(self, self)
+        EClientSocket.__init__(self, anyWrapper=self)
 
         self.tws_uri = tws_uri
         host, port, client_id = self.tws_uri.split(':')
@@ -138,18 +139,12 @@ class TWSConnection(EWrapper, EClient):
         self.time_skew = None
         self.unrecoverable_error = False
 
-        self.start()
+        self.connect()
 
-    def start(self):
+    def connect(self):
         log.info("Connecting: {}:{}:{}".format(self._host, self._port,
                                                self.client_id))
-        self.connect(self._host, self._port, self.client_id)
-
-        # Initialise the threads for various components
-        thread = threading.Thread(target=self.run, daemon=True)
-        thread.start()
-        setattr(self, "_thread", thread)
-
+        self.eConnect(self._host, self._port, self.client_id)
         timeout = _connection_timeout
         while timeout and not self.isConnected():
             log.info("Cannot connect to TWS. Retrying...")
@@ -238,7 +233,7 @@ class TWSConnection(EWrapper, EClient):
             log.error("Tick {} for id={} is not registered".format(tick_type,
                                                                    ticker_id))
             return
-        if tick_type == TickTypeEnum.RT_VOLUME:
+        if tick_type == 48:
             # RT Volume Bar. Format:
             # Last trade price; Last trade size;Last trade time;Total volume;\
             # VWAP;Single trade flag
@@ -427,6 +422,10 @@ class TWSConnection(EWrapper, EClient):
     def error(self, id_=None, error_code=None, error_msg=None):
         if isinstance(id_, Exception):
             log.exception(id_)
+
+        if isinstance(error_code, EClientErrors.CodeMsgPair):
+            error_msg = error_code.msg()
+            error_code = error_code.code()
 
         if isinstance(error_code, int):
             if error_code in (502, 503, 326):

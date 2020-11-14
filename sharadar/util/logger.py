@@ -10,7 +10,6 @@ import tracemalloc
 # log in local time instead of UTC
 set_datetime_format("local")
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
-BACKTEST_LOG_ENTRY_FMT = '{record.time:%Y-%m-%d} {record.level_name} {record.message}'
 
 logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline.log")
 log = Logger('sharadar_db_bundle')
@@ -56,11 +55,11 @@ class BacktestLogger(Logger):
         now = datetime.datetime.now()
         log_filename = path + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log"
         file_handler = FileHandler(log_filename, level=DEBUG, bubble=True)
-        file_handler.format_string = BACKTEST_LOG_ENTRY_FMT
+        file_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(file_handler)
 
         stream_handler = StreamHandler(sys.stdout, level=INFO)
-        stream_handler.format_string = BACKTEST_LOG_ENTRY_FMT
+        stream_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(stream_handler)
 
     def process_record(self, record):
