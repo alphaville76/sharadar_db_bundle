@@ -20,6 +20,10 @@ class Broker(object):
     daily_bar_reader = None
 
     @abstractmethod
+    def disconnect(self):
+        pass
+
+    @abstractmethod
     def subscribe_to_market_data(self, asset):
         pass
 

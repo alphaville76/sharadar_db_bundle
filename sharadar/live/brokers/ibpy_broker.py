@@ -57,7 +57,7 @@ IBPosition = namedtuple('IBPosition', ['contract', 'position', 'market_price',
                                    'unrealized_pnl', 'realized_pnl',
                                    'account_name'])
 
-_max_wait_subscribe = 100  # how many cycles to wait
+_max_wait_subscribe = 10  # how many cycles to wait
 _connection_timeout = 15  # Seconds
 _poll_frequency = 0.1
 

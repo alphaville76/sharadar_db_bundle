@@ -81,8 +81,7 @@ def _run(handle_data,
          blotter,
          benchmark_symbol,
          broker,
-         state_filename,
-         realtime_bar_target):
+         state_filename):
     """Run a backtest for the given algorithm.
 
     This is shared between the cli and :func:`zipline.run_algo`.
@@ -197,7 +196,6 @@ def _run(handle_data,
     # Special defaults for live trading
     if broker:
         data_frequency = 'minute'
-        realtime_bar_target = 'realtime-bars'
 
         # No benchmark
         benchmark_sid = None
@@ -244,8 +242,7 @@ def _run(handle_data,
     # usare store_context prima di passare da TradingAlgorithm a LiveTradingAlgorithm
     TradingAlgorithmClass = (partial(LiveTradingAlgorithm,
                                      broker=broker,
-                                     state_filename=state_filename,
-                                     realtime_bar_target=realtime_bar_target)
+                                     state_filename=state_filename)
                              if broker else TradingAlgorithm)
 
     DataPortalClass = (partial(DataPortalLive, broker) if broker else DataPortal)
@@ -388,8 +385,7 @@ def run_algorithm(initialize,
                   environ=os.environ,
                   blotter='default',
                   broker=None,
-                  state_filename=None,
-                  realtime_bar_target=None
+                  state_filename=None
                   ):
     """
     Run a trading algorithm.
@@ -490,6 +486,5 @@ def run_algorithm(initialize,
         blotter=blotter,
         benchmark_symbol=benchmark_symbol,
         broker=broker,
-        state_filename=state_filename,
-        realtime_bar_target=realtime_bar_target
+        state_filename=state_filename
     )

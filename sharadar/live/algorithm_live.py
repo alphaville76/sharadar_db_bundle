@@ -53,7 +53,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         self.algo_filename = kwargs.get('algo_filename', "<algorithm>")
         self.state_filename = kwargs.pop('state_filename', None)
-        self.realtime_bar_target = kwargs.pop('realtime_bar_target', None)
         # Persistence blacklist/whitelist and excludes gives a way to include/
         # exclude (so do not persist on disk if initiated or excluded from the serialization
         # function that reinstate or save the context variable to its last state).
@@ -268,27 +267,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
     def on_exit(self):
         self.teardown()
-        if not self.realtime_bar_target:
-            return
-
-        log.info("Storing realtime bars to: {}".format(
-            self.realtime_bar_target))
-
-        today = str(pd.to_datetime('today').date())
-        subscribed_assets = self.broker.subscribed_assets
-        realtime_history = self.broker.get_realtime_bars(subscribed_assets,
-                                                         '1m')
-
-        if not os.path.exists(self.realtime_bar_target):
-            os.mkdir(self.realtime_bar_target)
-
-        for asset in subscribed_assets:
-            filename = "ZL-%s-%s.csv" % (asset.symbol, today)
-            path = os.path.join(self.realtime_bar_target, filename)
-            realtime_history[asset].to_csv(path, mode='a',
-                                           index_label='datetime',
-                                           header=not os.path.exists(path))
-
+        self.broker.disconnect()
+        log.info("Today's trading ended. The algo needs to be restarted daily.")
 
     def _pipeline_output(self, pipeline, chunks, name):
         # This method is taken from TradingAlgorithm.
