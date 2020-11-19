@@ -35,8 +35,6 @@ class SQLiteAssetFinder(AssetFinder):
                 row['end_date'] = row['end_date'] + timedelta(days=5)
                 row['auto_close_date'] = row['auto_close_date'] + timedelta(days=5)
 
-                row['symbol'] = row['symbol'].replace('.', ' ').partition('-')[0]
-
         return rows
 
     @lazyval

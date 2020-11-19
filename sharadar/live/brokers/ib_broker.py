@@ -202,20 +202,20 @@ class TWSConnection(EWrapper, EClient):
         self._next_order_id += 1
         return order_id
 
-    def subscribe_to_market_data(self, symbol, currency='USD'):
-        if symbol in self.symbol_to_ticker_id:
+    def subscribe_to_market_data(self, ib_symbol, currency='USD'):
+        if ib_symbol in self.symbol_to_ticker_id:
             # Already subscribed to market data
             return
 
         contract = Contract()
-        contract.symbol = symbol
-        contract.secType = symbol_to_sec_type[symbol]
-        contract.exchange = symbol_to_exchange[symbol]
+        contract.symbol = ib_symbol
+        contract.secType = symbol_to_sec_type[ib_symbol]
+        contract.exchange = symbol_to_exchange[ib_symbol]
         contract.currency = currency
         ticker_id = self.next_ticker_id
 
-        self.symbol_to_ticker_id[symbol] = ticker_id
-        self.ticker_id_to_symbol[ticker_id] = symbol
+        self.symbol_to_ticker_id[ib_symbol] = ticker_id
+        self.ticker_id_to_symbol[ticker_id] = ib_symbol
 
         # INDEX tickers cannot be requested with market data. The data can,
         # however, be requested with realtimeBars. This change will make
@@ -236,9 +236,12 @@ class TWSConnection(EWrapper, EClient):
         self.tick_dict["SYMBOL_" + str(ticker_id)] = symbol
         self.tick_dict[TickTypeEnum.to_str(tick_type) + "_" + str(ticker_id)] = value
 
-
     def tickSnapshotEnd(self, ticker_id):
-        symbol = self.tick_dict["SYMBOL_" + str(ticker_id)]
+        key = "SYMBOL_" + str(ticker_id)
+        if key not in self.tick_dict:
+            return
+
+        symbol = self.tick_dict[key]
         last_trade_price = self.tick_dict["LAST_" + str(ticker_id)]
         last_trade_time = self.tick_dict["LAST_TIMESTAMP_" + str(ticker_id)]
         last_trade_size = self.tick_dict["LAST_SIZE_" + str(ticker_id)]
@@ -404,7 +407,7 @@ class TWSConnection(EWrapper, EClient):
 
     def connectionClosed(self):
         self.unrecoverable_error = True
-        log.error("IB Connection closed")
+        log.info("IB Connection closed")
 
     def error(self, id_=None, error_code=None, error_msg=None):
         if isinstance(id_, Exception):
@@ -516,18 +519,17 @@ class IBBroker(Broker):
 
     def subscribe_to_market_data(self, asset):
         if asset not in self.subscribed_assets:
-            # remove str() cast to have a fun debugging journey
-            symbol = str(asset.symbol)
+            ib_symbol = self._asset_symbol(asset)
 
-            self._tws.subscribe_to_market_data(symbol)
+            self._tws.subscribe_to_market_data(ib_symbol)
             self._subscribed_assets.append(asset)
             try:
                 polling.poll(
-                    lambda: asset.symbol in self._tws.bars,
+                    lambda: ib_symbol in self._tws.bars,
                     timeout=_max_wait_subscribe,
                     step=_poll_frequency)
             except polling.TimeoutException as te:
-                log.warning('Cannot subscribe market data for %s.' % symbol)
+                log.warning('Cannot subscribe market data for %s.' % ib_symbol)
             else:
                 log.debug("Subscription completed")
 
@@ -543,18 +545,19 @@ class IBBroker(Broker):
         should be used once at startup and once every time we want to refresh the positions array
         """
         cur_pos_in_tracker = self.metrics_tracker.positions
-        for symbol in self._tws.ib_positions:
-            ib_position = self._tws.ib_positions[symbol]
+        for ib_symbol in self._tws.ib_positions:
+            ib_position = self._tws.ib_positions[ib_symbol]
             if ib_position.position == 0:
                 continue
-            try:
-                zp_position = zp.Position(zp.InnerPosition(symbol_lookup(symbol)))
-                editable_position = MutableView(zp_position)
-            except SymbolNotFound:
-                # The symbol might not have been ingested to the db therefore
-                # it needs to be skipped.
-                log.warning('Wanted to subscribe to %s, but this asset is probably not ingested' % symbol)
+
+            equity = self._safe_symbol_lookup(ib_symbol)
+            if not equity:
+                log.warning('Wanted to subscribe to %s, but this asset is probably not ingested' % ib_symbol)
                 continue
+
+            zp_position = zp.Position(zp.InnerPosition(equity))
+            editable_position = MutableView(zp_position)
+
             editable_position._underlying_position.amount = int(ib_position.position)
             editable_position._underlying_position.cost_basis = float(ib_position.average_cost)
             editable_position._underlying_position.last_sale_price = ib_position.market_price
@@ -567,7 +570,8 @@ class IBBroker(Broker):
                                                  last_sale_date=zp_position.last_sale_date,
                                                  cost_basis=zp_position.cost_basis)
         for asset in cur_pos_in_tracker:
-            if asset.symbol not in self._tws.ib_positions:
+            ib_symbol = self._asset_symbol(asset)
+            if ib_symbol not in self._tws.ib_positions:
                 # deleting object from the metrcs_tracker as its not in the portfolio
                 self.metrics_tracker.update_position(asset, amount=0)
 
@@ -629,11 +633,18 @@ class IBBroker(Broker):
     def is_alive(self):
         return not self._tws.unrecoverable_error
 
+    def _to_ib_symbol(self, symbol):
+        # some example: NAV-PD -> NAV, LGF.B -> LGF B
+        return symbol.replace('.', ' ').partition('-')[0]
+
+    def _asset_symbol(self, asset):
+        return self._to_ib_symbol(str(asset.symbol))
+
     @staticmethod
-    def _safe_symbol_lookup(symbol):
+    def _safe_symbol_lookup(ib_symbol):
         try:
-            sym = symbol.replace(' ', '.')
-            return symbol_lookup(sym)
+            symbol = ib_symbol.replace(' ', '.')
+            return symbol_lookup(symbol)
         except SymbolNotFound:
             return None
 
@@ -686,11 +697,13 @@ class IBBroker(Broker):
             return None
 
     def order(self, asset, amount, style):
+        ib_symbol = self._asset_symbol(asset)
+
         contract = Contract()
-        contract.symbol = str(asset.symbol)
+        contract.symbol = ib_symbol
         contract.currency = self.currency
-        contract.exchange = symbol_to_exchange[str(asset.symbol)]
-        contract.secType = symbol_to_sec_type[str(asset.symbol)]
+        contract.exchange = symbol_to_exchange[ib_symbol]
+        contract.secType = symbol_to_sec_type[ib_symbol]
 
         order = Order()
         order.totalQuantity = int(fabs(amount))
@@ -771,15 +784,15 @@ class IBBroker(Broker):
 
         # Try to reconstruct the order from the given information:
         # open order state and execution state
-        symbol, order_details = None, None
+        ib_symbol, order_details = None, None
 
         if ib_order and ib_contract:
-            symbol = ib_contract.symbol
+            ib_symbol = ib_contract.symbol
             order_details = self._parse_order_ref(ib_order.orderRef)
 
         if not order_details and ib_order_id in self._tws.open_orders:
             open_order = self._tws.open_orders[ib_order_id]
-            symbol = open_order['contract'].symbol
+            ib_symbol = open_order['contract'].symbol
             order_details = self._parse_order_ref(
                 open_order['order'].orderRef)
 
@@ -787,15 +800,15 @@ class IBBroker(Broker):
             executions = self._tws.executions[ib_order_id]
             last_exec_detail = list(executions.values())[-1]['exec_detail']
             last_exec_contract = list(executions.values())[-1]['contract']
-            symbol = last_exec_contract.symbol
+            ib_symbol = last_exec_contract.symbol
             order_details = self._parse_order_ref(last_exec_detail.orderRef)
 
-        asset = self._safe_symbol_lookup(symbol)
+        asset = self._safe_symbol_lookup(ib_symbol)
         if not asset:
             log.warning(
                 "Ignoring symbol {symbol} which has associated "
                 "order but it is not registered in bundle".format(
-                    symbol=symbol))
+                    symbol=ib_symbol))
             return None
 
         if order_details:
@@ -944,17 +957,15 @@ class IBBroker(Broker):
         ib_order_id = self.orders[zp_order_id].broker_order_id
         self._tws.cancelOrder(ib_order_id)
 
-    def get_spot_value(self, assets, field, dt, data_frequency):
-        symbol = str(assets.symbol)
+    def get_spot_value(self, asset, field, dt, data_frequency):
+        self.subscribe_to_market_data(asset)
 
-        self.subscribe_to_market_data(assets)
-
-        bars = self._tws.bars[symbol]
+        ib_symbol = self._asset_symbol(asset)
+        bars = self._tws.bars[ib_symbol]
 
         last_event_time = bars.index[-1]
 
-        minute_start = (last_event_time - pd.Timedelta('1 min')) \
-            .time()
+        minute_start = (last_event_time - pd.Timedelta('1 min')).time()
         minute_end = last_event_time.time()
 
         if bars.empty:
@@ -983,8 +994,8 @@ class IBBroker(Broker):
 
     def get_last_traded_dt(self, asset):
         self.subscribe_to_market_data(asset)
-
-        return self._tws.bars[asset.symbol].index[-1]
+        ib_symbol = self._asset_symbol(asset)
+        return self._tws.bars[ib_symbol].index[-1]
 
     def get_realtime_bars(self, assets, frequency):
         if frequency == '1m':
@@ -996,17 +1007,16 @@ class IBBroker(Broker):
 
         df = pd.DataFrame()
         for asset in assets:
-            symbol = str(asset.symbol)
             self.subscribe_to_market_data(asset)
 
-            trade_prices = self._tws.bars[symbol]['last_trade_price']
-            trade_sizes = self._tws.bars[symbol]['last_trade_size']
+            ib_symbol = self._asset_symbol(asset)
+            trade_prices = self._tws.bars[ib_symbol]['last_trade_price']
+            trade_sizes = self._tws.bars[ib_symbol]['last_trade_size']
             ohlcv = trade_prices.resample(resample_freq).ohlc()
             ohlcv['volume'] = trade_sizes.resample(resample_freq).sum()
 
             # Add asset as level 0 column; ohlcv will be used as level 1 cols
-            ohlcv.columns = pd.MultiIndex.from_product([[asset, ],
-                                                        ohlcv.columns])
+            ohlcv.columns = pd.MultiIndex.from_product([[asset, ], ohlcv.columns])
 
             df = pd.concat([df, ohlcv], axis=1)
 
