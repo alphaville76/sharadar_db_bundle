@@ -57,4 +57,6 @@ def close_all(context, data, exclude=[], log=None):
         if stock in exclude:
             continue
         if data.can_trade(stock):
+            if log:
+                log.info("Close all position for %s" % (str(stock)))
             order_target(stock, 0)

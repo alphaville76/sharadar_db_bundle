@@ -59,27 +59,6 @@ _max_wait_subscribe = 10  # how many cycles to wait
 _connection_timeout = 15  # Seconds
 _poll_frequency = 0.1
 
-symbol_to_exchange = defaultdict(lambda: 'SMART')
-symbol_to_exchange['VIX'] = 'CBOE'
-symbol_to_exchange['SPX'] = 'CBOE'
-symbol_to_exchange['VIX3M'] = 'CBOE'
-symbol_to_exchange['VXST'] = 'CBOE'
-symbol_to_exchange['VXMT'] = 'CBOE'
-symbol_to_exchange['GVZ'] = 'CBOE'
-symbol_to_exchange['GLD'] = 'ARCA'
-symbol_to_exchange['GDX'] = 'ARCA'
-symbol_to_exchange['GPRO'] = 'SMART/NASDAQ'
-symbol_to_exchange['MSFT'] = 'SMART/NASDAQ'
-symbol_to_exchange['CSCO'] = 'SMART/NASDAQ'
-
-symbol_to_sec_type = defaultdict(lambda: 'STK')
-symbol_to_sec_type['VIX'] = 'IND'
-symbol_to_sec_type['VIX3M'] = 'IND'
-symbol_to_sec_type['VXST'] = 'IND'
-symbol_to_sec_type['VXMT'] = 'IND'
-symbol_to_sec_type['GVZ'] = 'IND'
-symbol_to_sec_type['SPX'] = 'IND'
-
 
 def log_message(message, mapping):
     try:
@@ -202,15 +181,16 @@ class TWSConnection(EWrapper, EClient):
         self._next_order_id += 1
         return order_id
 
-    def subscribe_to_market_data(self, ib_symbol, currency='USD'):
+    def subscribe_to_market_data(self, ib_symbol, exchange='SMART', primaryExchange='ISLAND', secType='STK', currency='USD'):
         if ib_symbol in self.symbol_to_ticker_id:
             # Already subscribed to market data
             return
 
         contract = Contract()
         contract.symbol = ib_symbol
-        contract.secType = symbol_to_sec_type[ib_symbol]
-        contract.exchange = symbol_to_exchange[ib_symbol]
+        contract.exchange = exchange
+        contract.primaryExchange = primaryExchange
+        contract.secType = secType
         contract.currency = currency
         ticker_id = self.next_ticker_id
 
@@ -241,13 +221,17 @@ class TWSConnection(EWrapper, EClient):
         if key not in self.tick_dict:
             return
 
-        symbol = self.tick_dict[key]
-        last_trade_price = self.tick_dict["LAST_" + str(ticker_id)]
-        last_trade_time = self.tick_dict["LAST_TIMESTAMP_" + str(ticker_id)]
-        last_trade_size = self.tick_dict["LAST_SIZE_" + str(ticker_id)]
+        ib_symbol = self.tick_dict[key]
+        try:
+            last_trade_price = float(self.tick_dict["LAST_" + str(ticker_id)])
+            last_trade_size = int(self.tick_dict["LAST_SIZE_" + str(ticker_id)])
+            last_trade_time = float(self.tick_dict["LAST_TIMESTAMP_" + str(ticker_id)])
+            last_trade_dt = pd.to_datetime(last_trade_time, unit='s', utc=True)
+        except KeyError:
+            log.warning('Cannot subscribe market data for %s.' % ib_symbol)
+            return
 
-        last_trade_dt = pd.to_datetime(float(last_trade_time), unit='ms', utc=True)
-        self._add_bar(symbol, float(last_trade_price), int(last_trade_size), last_trade_dt)
+        self._add_bar(ib_symbol, last_trade_price, last_trade_size, last_trade_dt)
 
     def _add_bar(self, symbol, last_trade_price, last_trade_size, last_trade_time):
         bar = pd.DataFrame(index=pd.DatetimeIndex([last_trade_time]),
@@ -385,7 +369,6 @@ class TWSConnection(EWrapper, EClient):
 
     def commissionReport(self, commission_report):
         exec_id = commission_report.execId
-        # FIXME How could occur a KeyError here?
         order_id = self._execution_to_order_id[commission_report.execId]
         self.commissions[order_id][exec_id] = commission_report
 
@@ -464,7 +447,7 @@ class TWSConnection(EWrapper, EClient):
         log_message('fundamentalData', vars())
 
     def marketDataType(self, req_id, market_data_type):
-        log_message('marketDataType', vars())
+        pass
 
     def realtimeBar(self, req_id, time, open_, high, low, close, volume, wap,
                     count):
@@ -520,8 +503,12 @@ class IBBroker(Broker):
     def subscribe_to_market_data(self, asset):
         if asset not in self.subscribed_assets:
             ib_symbol = self._asset_symbol(asset)
+            exchange = 'SMART'
+            primaryExchange = asset.exchange
+            secType = 'STK'
+            currency = 'USD'
 
-            self._tws.subscribe_to_market_data(ib_symbol)
+            self._tws.subscribe_to_market_data(ib_symbol, exchange, primaryExchange, secType, currency)
             self._subscribed_assets.append(asset)
             try:
                 polling.poll(
@@ -536,8 +523,8 @@ class IBBroker(Broker):
     @property
     def positions(self):
         self._get_positions_from_broker()
-        # return zp.Positions(self.metrics_tracker.positions)
-        return self.metrics_tracker.positions
+        # Filter out positions with amount == 0
+        return {v : k for k, v in self.metrics_tracker.positions.items() if v.amount != 0}
 
     def _get_positions_from_broker(self):
         """
@@ -547,9 +534,7 @@ class IBBroker(Broker):
         cur_pos_in_tracker = self.metrics_tracker.positions
         for ib_symbol in self._tws.ib_positions:
             ib_position = self._tws.ib_positions[ib_symbol]
-            if ib_position.position == 0:
-                continue
-
+ 
             equity = self._safe_symbol_lookup(ib_symbol)
             if not equity:
                 log.warning('Wanted to subscribe to %s, but this asset is probably not ingested' % ib_symbol)
@@ -701,9 +686,10 @@ class IBBroker(Broker):
 
         contract = Contract()
         contract.symbol = ib_symbol
+        contract.exchange = 'SMART'
+        contract.primaryExchange = asset.exchange
+        contract.secType = 'STK'
         contract.currency = self.currency
-        contract.exchange = symbol_to_exchange[ib_symbol]
-        contract.secType = symbol_to_sec_type[ib_symbol]
 
         order = Order()
         order.totalQuantity = int(fabs(amount))
@@ -1010,8 +996,13 @@ class IBBroker(Broker):
             self.subscribe_to_market_data(asset)
 
             ib_symbol = self._asset_symbol(asset)
-            trade_prices = self._tws.bars[ib_symbol]['last_trade_price']
-            trade_sizes = self._tws.bars[ib_symbol]['last_trade_size']
+            if ib_symbol in self._tws.bars:
+                trade_prices = self._tws.bars[ib_symbol]['last_trade_price']
+                trade_sizes = self._tws.bars[ib_symbol]['last_trade_size']
+            else:
+                log.warning("No tws bar for '%s'." % ib_symbol)
+                trade_prices = pd.Series([1.0], index=[pd.to_datetime('now')])
+                trade_sizes = pd.Series([1], index=[pd.to_datetime('now')])
             ohlcv = trade_prices.resample(resample_freq).ohlc()
             ohlcv['volume'] = trade_sizes.resample(resample_freq).sum()
 

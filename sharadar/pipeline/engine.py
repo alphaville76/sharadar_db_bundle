@@ -185,8 +185,13 @@ class CliProgressPublisher(object):
 
     def publish(self, model):
         try:
-            log.info("Percent completed: %3.0f%% (%s - %s): %s" % (
-            model.percent_complete, str(model.current_chunk_bounds[0].date()),
-            str(model.current_chunk_bounds[1].date()), model.current_work))
+            start = str(model.current_chunk_bounds[0].date())
+            end = str(model.current_chunk_bounds[1].date())
+            completed = model.percent_complete
+            work = model.current_work
+            if start == end:
+                log.info("Percent completed: %3.0f%% (%s): %s" % (completed, start, work))
+            else:
+                log.info("Percent completed: %3.0f%% (%s - %s): %s" % (completed, start, end, work))
         except:
             log.error("Cannot publish progress state.")

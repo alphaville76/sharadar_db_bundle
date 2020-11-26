@@ -11,7 +11,8 @@ import tracemalloc
 set_datetime_format("local")
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
 
-logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline.log")
+now = datetime.datetime.now()
+logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
 log = Logger('sharadar_db_bundle')
 log_file_handler = FileHandler(logfilename, level=DEBUG, bubble=True)
 log_file_handler.format_string = LOG_ENTRY_FMT
