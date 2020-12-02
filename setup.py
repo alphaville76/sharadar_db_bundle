@@ -9,8 +9,7 @@ setup(
     license='',
     author='Costantino',
     author_email='',
-    description='', install_requires=['numpy', 'pandas', 'quandl', 'zipline', 'toolz', 'memoization', 'logbook',
-                                      'click', 'requests', 'six', 'matplotlib', 'lightgbm', 'polling'],
+    description='',
     entry_points = {
                    'console_scripts': [
                        'sharadar-zipline = sharadar.__main__:main',
