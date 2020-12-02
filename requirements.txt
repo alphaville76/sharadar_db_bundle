@@ -21,7 +21,7 @@ Click==7.0
 contextlib2==0.6.0.post1
 cookies==2.2.1
 coverage==4.0.3
-cryptography==2.8
+cryptography==3.2
 cycler==0.10.0
 cyordereddict==1.0.0
 Cython==0.29.14
