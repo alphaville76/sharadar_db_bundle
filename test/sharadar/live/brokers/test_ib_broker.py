@@ -42,6 +42,8 @@ class TestIBBroker(WithSimParams,
         with patch('sharadar.live.brokers.ib_broker.TWSConnection.start'):
             tws = TWSConnection("localhost:9999:1111")
 
+        tws.start()
+
         tws._add_bar('SPY', 12.4, 10,
                      pd.to_datetime('2017-09-27 10:30:00', utc=True),
                      10, 12.401, False)
