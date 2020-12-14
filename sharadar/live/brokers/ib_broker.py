@@ -117,12 +117,8 @@ class TWSConnection(EWrapper, EClient):
         self.unrecoverable_error = False
         self.tick_dict = {}
 
-        self.start()
-
     def start(self):
-        log.info("Connecting: {}:{}:{}".format(self._host, self._port,
-                                               self.client_id))
-        self.connect(self._host, self._port, self.client_id)
+        self.bind()
 
         # Initialise the threads for various components
         thread = threading.Thread(target=self.run, daemon=True)
@@ -148,6 +144,10 @@ class TWSConnection(EWrapper, EClient):
             sleep(_poll_frequency)
 
         log.info("Local-Broker Time Skew: {}".format(self.time_skew))
+
+    def bind(self):
+        log.info("Connecting: {}:{}:{}".format(self._host, self._port, self.client_id))
+        self.connect(self._host, self._port, self.client_id)
 
     def _download_account_details(self):
         exec_filter = ExecutionFilter()
@@ -484,6 +484,8 @@ class IBBroker(Broker):
         self._transactions = {}
 
         self._tws = TWSConnection(tws_uri)
+        self._tws.start()
+
         self.account_id = (self._tws.managed_accounts[0] if account_id is None
                            else account_id)
         self.currency = 'USD'
