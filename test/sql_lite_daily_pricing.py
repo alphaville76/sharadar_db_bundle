@@ -3,7 +3,7 @@ from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDai
 import quandl
 from os import environ as env
 import pandas as pd
-from sharadar.loaders.ingest import process_data_table
+from sharadar.loaders.ingest_sharadar import process_data_table
 from zipline.utils.calendars import get_calendar
 from sharadar.util.equity_supplementary_util import lookup_sid
 from zipline.data.bar_reader import (

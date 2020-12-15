@@ -17,7 +17,7 @@ Add this code to your ~/.zipline/extension.py:
 ```python
 from zipline.data import bundles
 from zipline.finance import metrics
-from sharadar.loaders.ingest import from_quandl
+from sharadar.loaders.ingest_sharadar import from_quandl
 from sharadar.util.metric_daily import default_daily
 
 bundles.register("sharadar", from_quandl(), create_writers=False)
