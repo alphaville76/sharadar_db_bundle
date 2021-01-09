@@ -506,7 +506,7 @@ class IBBroker(Broker):
         if asset not in self.subscribed_assets:
             ib_symbol = self._asset_symbol(asset)
             exchange = 'SMART'
-            primaryExchange = asset.exchange
+            primaryExchange = 'ISLAND'
             secType = 'STK'
             currency = 'USD'
 
@@ -689,7 +689,7 @@ class IBBroker(Broker):
         contract = Contract()
         contract.symbol = ib_symbol
         contract.exchange = 'SMART'
-        contract.primaryExchange = asset.exchange
+        primaryExchange = 'ISLAND'
         contract.secType = 'STK'
         contract.currency = self.currency
 

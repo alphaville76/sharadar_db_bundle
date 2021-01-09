@@ -90,11 +90,18 @@ def _bar_reader(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=
 def symbol(ticker, as_of_date=None):
     return _asset_finder().lookup_symbol(ticker, as_of_date)
 
+@cached
+def symbols(tickers, as_of_date=None):
+    return _asset_finder().lookup_symbols(tickers, as_of_date)
 
 @cached
-def symbols(ticker, as_of_date=None):
-    return _asset_finder().lookup_symbols(ticker, as_of_date)
+def sector(ticker, as_of_date=None):
+    return _asset_finder().get_info(symbol(ticker).sid, 'sector')
 
+@cached
+def sectors(tickers, as_of_date=None):
+    sids = [x.sid for x in symbols(tickers)]
+    return _asset_finder().get_info(sids, 'sector')
 
 @cached
 def sid(sid):

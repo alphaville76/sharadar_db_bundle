@@ -33,6 +33,7 @@ from sharadar.live.algorithm_live import LiveTradingAlgorithm
 from zipline.finance.blotter import Blotter
 from sharadar.util.serialization_utils import store_context
 from trading_calendars import register_calendar_alias
+from trading_calendars.errors import CalendarNameCollision
 
 class _RunAlgoError(click.ClickException, ValueError):
     """Signal an error that should have a different message if invoked from
@@ -460,8 +461,11 @@ def run_algorithm(initialize,
     """
     load_extensions(default_extension, extensions, strict_extensions, environ)
 
-    register_calendar_alias('NYSEMKT', 'XNYS')
-    register_calendar_alias('OTC', 'XNYS')
+    try:
+        register_calendar_alias('NYSEMKT', 'XNYS')
+        register_calendar_alias('OTC', 'XNYS')
+    except CalendarNameCollision as e:
+        log.info(e)
 
     return _run(
         handle_data=handle_data,

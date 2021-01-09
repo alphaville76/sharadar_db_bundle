@@ -9,6 +9,8 @@ import datetime
 
 bundle = load_sharadar_bundle()
 
+print(bundle.asset_finder.get_info([199059, 199623], 'sector'))
+
 bundle.asset_finder.retrieve_equities([199059, 199623])
 print(symbols(['SPY']))
 

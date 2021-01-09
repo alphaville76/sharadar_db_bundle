@@ -45,6 +45,19 @@ class FundamentalsTTM(Fundamentals):
     def compute(self, today, assets, out, field):
         out[:] = self.asset_finder().get_fundamentals_ttm(assets, field, today, k=self.window_length)
 
+class DaysSinceFiling(CustomFactor, BundleLoader):
+    inputs = []
+    window_length = 1
+    window_safe = True
+
+    def compute(self, today, assets, out):
+        datekeys = self.asset_finder().get_datekey(assets, today, n=self.window_length)
+        # timestamp value is in nanoseconds
+        out[:] = (today.value - datekeys) / (24 * 60 * 60 * 1e9)
+
+    def __str__(self):
+        return "DaysSinceFiling"
+
 
 class AbstractClassifier(CustomClassifier, BundleLoader):
     inputs = []

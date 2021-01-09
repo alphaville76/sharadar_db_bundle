@@ -71,9 +71,11 @@ class SQLiteAssetFinder(AssetFinder):
         MAX_DELAY = 1.296e+16 # 5 months
         sql = "SELECT sid, value FROM ("+self._get_inner_select()+ ") t WHERE rown = %d;"
 
+        if as_of_date is None:
+            as_of_date = pd.Timestamp.today()
+
         date_check = as_of_date.value if enforce_date else 0
         cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, date_check, n*MAX_DELAY, n)
-        #print(cmd)
         return self.engine.execute(cmd).fetchall()      
     
     def _get_result_ttm(self, sids, field_name, as_of_date, k):
@@ -88,7 +90,26 @@ class SQLiteAssetFinder(AssetFinder):
         cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, as_of_date.value, m*MAX_DELAY*4, n, m)
         #print(cmd)
         return self.engine.execute(cmd).fetchall()  
-    
+
+    def get_datekey(self, sids, as_of_date, n):
+        """
+        Get the last SEC filing date.
+        """
+        sql = ("SELECT sid, start_date FROM ("
+               "SELECT sid, start_date, "
+               "ROW_NUMBER() OVER (PARTITION BY sid "
+               "ORDER BY start_date DESC) AS rown "
+               "FROM equity_supplementary_mappings "
+               "WHERE sid IN (%s) "
+               "AND field = 'revenue_arq' "
+               "AND start_date <= %d "
+               ") t WHERE rown = %d;"
+              )
+
+        cmd = sql % (', '.join(map(str, sids)), as_of_date.value, n)
+        result =  self.engine.execute(cmd).fetchall()
+        return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
+
     @cached
     def get_fundamentals(self, sids, field_name, as_of_date=None, n=1):
         """

@@ -7,6 +7,12 @@ METADATA_HEADERS = ['symbol', 'asset_name', 'start_date', 'end_date', 'first_tra
 
 ONE_DAY = pd.Timedelta(days=1)
 
+def value_changed(cursor, sid, field, value):
+    sql = "SELECT value from equity_supplementary_mappings WHERE sid = ? AND field = ? ORDER BY start_date DESC LIMIT 1"
+    cursor.execute(sql, (sid, field))
+    record = cursor.fetchone()
+    return record[0] != value if record is not None else True
+
 def insert_equity_extra_data_basic(sharadar_metadata_df, cursor):
     """
     Basic extra data like company name, category (ARD, Domestic), industry sector, etc...
@@ -22,10 +28,12 @@ def insert_equity_extra_data_basic(sharadar_metadata_df, cursor):
                 if value is None:
                     continue
                 date = row['firstpricedate']
-                
+
+                start_date = date.value if not value_changed(cursor, sid, field, value) else pd.Timestamp("now").value
                 # end_date not used (set -1)
+
                 sql = "INSERT OR REPLACE INTO equity_supplementary_mappings (sid, field, start_date, end_date, value) VALUES(?, ?, ?, -1, ?)"
-                cursor.execute(sql, (sid, field, date.value, str(value)))
+                cursor.execute(sql, (sid, field, start_date, str(value)))
 
 def lookup_related_tickers(sharadar_metadata_df, related, ticker):
     related_index = related[related.str.contains(' ' + ticker + ' ')].index

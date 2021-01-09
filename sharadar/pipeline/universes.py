@@ -132,7 +132,7 @@ class NamedUniverse(CustomFilter):
 if __name__ == "__main__":
     # TODO ask the dates
     universe_start = pd.to_datetime('1998-10-16', utc=True)
-    universe_end = pd.to_datetime('2020-07-07', utc=True)
+    universe_end = pd.to_datetime('2020-12-30', utc=True)
 
     from sharadar.util.output_dir import get_output_dir
     universes_dbpath = os.path.join(get_output_dir(), "universes.sqlite")
