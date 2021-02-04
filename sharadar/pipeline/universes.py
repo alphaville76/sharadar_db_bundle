@@ -97,12 +97,11 @@ def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
     UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
 
 
-def TradableStocksUS():
+def StocksUS():
     return (
         (USEquityPricing.close.latest > 3) &
         Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
         (Sector().notnull()) &
-        (~Sector().element_of(['Financial Services', 'Real Estate'])) &
         (IsDomestic().eq(1)) &
         (AverageDollarVolume(window_length=200) > 2.5e6) &
         (MarketCap() > 350e6) &
@@ -110,6 +109,13 @@ def TradableStocksUS():
         (Fundamentals(field='assets_arq') > 0) &
         (Fundamentals(field='equity_arq') > 0) &
         (EV() > 0)
+    )
+
+def TradableStocksUS(min_percentile = 30):
+    return (
+        (StocksUS()) &
+        (AverageDollarVolume(window_length=200).percentile_between(min_percentile, 100.0, mask=StocksUS())) &
+        (MarketCap().percentile_between(min_percentile, 100.0, mask=StocksUS()))
     )
 
 

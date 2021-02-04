@@ -53,10 +53,20 @@ class DataPortalLive(DataPortal):
         # get_spot_value() will be used to fill the missing data - which is
         # always representing the current spot price presented by Broker.
 
-        historical_bars = super(DataPortalLive, self).get_history_window(
-            assets, end_dt, bar_count, frequency, field, data_frequency,
-            ffill=False)
+        # we have only daily price data
+        data_frequency = "daily"
 
+        # the ingested data are up to the previous trading day
+        end_dt = self.trading_calendar.sessions_window(end_dt.normalize(), -1)[0]
+        try:
+            historical_bars = super(DataPortalLive, self).get_history_window(assets, end_dt, bar_count, frequency,
+                                                                             field, data_frequency, ffill=False)
+        except:
+            end_dt = self._last_available_session
+            historical_bars = super(DataPortalLive, self).get_history_window(assets, end_dt, bar_count, frequency,
+                                                                             field, data_frequency, ffill=False)
+
+        # the ingested data are merged with the data from the broker
         realtime_bars = self.broker.get_realtime_bars(
             assets, frequency)
 
