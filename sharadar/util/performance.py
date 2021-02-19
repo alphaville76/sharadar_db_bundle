@@ -29,7 +29,7 @@ def _to_img(figure):
     return '<img width="60%" height="60%" src="data:image/png;base64, ' + pic_hash.decode("utf-8") + '" />'
 
 
-def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True):
+def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True, context=None):
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -39,6 +39,10 @@ def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show
     log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))
 
     now = datetime.datetime.now()
+
+    if context is not None:
+        if context.recorded_vars is not None:
+            perf._metadata={'recorded_vars': list(context.recorded_vars.keys())}
 
     serialise(perf, filename, now)
 
@@ -100,7 +104,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         fig4 = None
         fig5 = None
         try:
-            fig0 = create_log_returns_chart(rets, benchmark_rets)
+            fig0 = create_log_returns_chart(rets, benchmark_rets, perf)
         except Exception as e:
             log.warn(e)
 
@@ -259,8 +263,14 @@ def format_perf_stats(perf_stats_df):
             if stat in STAT_FUNCS_PCT:
                 perf_stats_df.loc[stat, column] = str(np.round(value * 100, 2)) + '%'
 
+def create_log_returns_chart(rets, benchmark_rets, perf):
+    try:
+        return create_log_returns_chart_with_vars(rets, benchmark_rets, perf)
+    except:
+        return create_log_returns_chart_no_vars(rets, benchmark_rets)
 
-def create_log_returns_chart(rets, benchmark_rets):
+
+def create_log_returns_chart_no_vars(rets, benchmark_rets):
     cum_log_returns = np.log1p(rets).cumsum()
     cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
 
@@ -273,6 +283,54 @@ def create_log_returns_chart(rets, benchmark_rets):
     plt.title("Log returns")
     return fig
 
+
+def create_log_returns_chart_with_vars(rets, benchmark_rets, perf):
+    cum_log_returns = np.log1p(rets).cumsum()
+    cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
+
+    recorded_vars = perf._metadata['recorded_vars']
+    n = len(recorded_vars) + 1
+    ratios = [1 for i in range(n)]
+    ratios[0] = 3
+    fig, ax = plt.subplots(n, gridspec_kw={'height_ratios': ratios})
+    cum_log_returns.plot(ax=ax[0], figsize=(20, 20))
+    cum_log_benchmark_rets.plot(ax=ax[0])
+    ax[0].grid(True)
+    ax[0].axhline(y=0, linestyle='--', color='black')
+    ax[0].legend(['Backtest', 'Benchmark'])
+    plt.suptitle("Log returns")
+
+    i = 1
+    for v in recorded_vars:
+        perf[v].plot(ax=ax[i])
+        ax[i].grid(True)
+        ax[i].axhline(y=0, linestyle='--', color='black')
+        ax[i].legend([v])
+        i += 1
+
+    return fig
+
+
+
+def create_log_returns_chart_with_vars_old(rets, benchmark_rets, perf):
+    cum_log_returns = np.log1p(rets).cumsum()
+    cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
+
+    fig, ax = plt.subplots(2, gridspec_kw={'height_ratios': [2, 1]})
+    cum_log_returns.plot(ax=ax[0], figsize=(20, 10))
+    cum_log_benchmark_rets.plot(ax=ax[0])
+    ax[0].grid(True)
+    ax[0].axhline(y=0, linestyle='--', color='black')
+    ax[0].legend(['Backtest', 'Benchmark'])
+    plt.suptitle("Log returns")
+
+    recorded_vars = perf._metadata['recorded_vars']
+    perf[recorded_vars].plot(ax=ax[1])
+    ax[1].grid(True)
+    ax[1].axhline(y=0, linestyle='--', color='black')
+    ax[1].legend(recorded_vars)
+
+    return fig
 
 def change_extension(filename, new_ext):
     path, ext = os.path.splitext(filename)
