@@ -33,6 +33,7 @@ jobs:
         cd zipline-trader
         pip install wheel
         pip install -r etc/requirements_build.in
+        export DISABLE_BCOLZ_AVX2=true
         pip install --no-binary=bcolz -e .[all] -r etc/requirements_blaze.in
     - name: Lint with flake8
       run: |
