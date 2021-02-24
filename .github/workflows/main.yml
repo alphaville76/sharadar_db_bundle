@@ -22,7 +22,9 @@ jobs:
         pip install flake8 pytest
         git clone https://github.com/shlomikushchi/zipline-trader.git
         cd zipline-trader
-        pip install -e .
+        pip install wheel
+        pip install -r etc/requirements_build.in
+        pip install --no-binary=bcolz -e .[all] -r etc/requirements_blaze.in
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
