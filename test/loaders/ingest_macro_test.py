@@ -6,11 +6,11 @@ end = pd.to_datetime("2020-04-14")
 
 macro_prices_df = create_macro_prices_df(start, end)
 print(macro_prices_df)
-assert macro_prices_df.shape == (187, 6)
+assert macro_prices_df.shape == (160, 6)
 
-macro_equities_df = create_macro_equities_df(start, end)
+macro_equities_df = create_macro_equities_df(end)
 print(macro_equities_df)
-assert macro_equities_df.shape == (18, 7)
+assert macro_equities_df.shape == (15, 7)
 
 #Adding macro data from 2010-01-04 00:00:00 to 2020-04-22 00:00:00 ...
 
