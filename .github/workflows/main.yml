@@ -16,6 +16,15 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Install TA lib
+      run: |
+        wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+        tar xvfz ta-lib-0.4.0-src.tar.gz
+        cd ta-lib
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
