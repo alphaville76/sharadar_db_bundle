@@ -25,6 +25,12 @@ jobs:
         make
         sudo make install
         sudo ldconfig
+    - name: Install TWS api
+      run: |
+        wget https://interactivebrokers.github.io/downloads/twsapi_macunix.976.01.zip
+        unzip twsapi_macunix.976.01.zip -d twsapi
+        cd twsapi/IBJts/source/pythonclient
+        python setup.py install
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -38,6 +44,7 @@ jobs:
         cd ..
         rm -rf zipline-trader
         python setup.py install
+
     #- name: Lint with flake8
     #  run: |
     #    # stop the build if there are Python syntax errors or undefined names
