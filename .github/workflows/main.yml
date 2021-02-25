@@ -36,6 +36,7 @@ jobs:
         export DISABLE_BCOLZ_AVX2=true
         pip install --no-binary=bcolz -e .[all] -r etc/requirements_blaze.in
         cd ..
+        rm -rf zipline-trader
         python setup.py install
     #- name: Lint with flake8
     #  run: |
