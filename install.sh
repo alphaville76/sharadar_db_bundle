@@ -32,7 +32,8 @@ cd twsapi/IBJts/source/pythonclient
 python setup.py install
 cd -
 
-pip install memoization singleton_decorator quandl
+pip install memoization singleton_decorator quandl pyfolio
+pip install pandas==0.22.0
 git clone https://github.com/alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle
 python setup.py install

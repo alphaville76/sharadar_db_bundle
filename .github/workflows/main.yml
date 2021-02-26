@@ -44,6 +44,8 @@ jobs:
         cd ..
         rm -rf zipline-trader
         python setup.py install
+        pip install memoization singleton_decorator quandl pyfolio
+        pip install pandas==0.22.0
 
     #- name: Lint with flake8
     #  run: |
