@@ -9,16 +9,22 @@ import datetime
 
 bundle = load_sharadar_bundle()
 
-print(bundle.asset_finder.get_info([199059, 199623], 'sector'))
+sectors = bundle.asset_finder.get_info([199059, 199623], 'sector')
+print("sectors", sectors)
 
-bundle.asset_finder.retrieve_equities([199059, 199623])
-print(symbols(['SPY']))
+equities = bundle.asset_finder.retrieve_equities([199059, 199623])
+print("equities", equities)
+
+syms = symbols(['SPY'])
+print("symbols", syms)
+assert len(syms) == 1
+assert syms[0].exchange == 'NYSEARCA'
+assert syms[0].sid == 118691
 
 spe = make_pipeline_engine()
 
 pipe_start = pd.to_datetime('2020-02-03', utc=True)
 pipe_end = pd.to_datetime('2020-02-07', utc=True)
-
 
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
@@ -27,7 +33,8 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
-print("stocks.shape [close]", stocks)
+print("stocks.shape [close]", stocks.shape)
+assert stocks.shape == (15, 1)
 
 from sharadar.pipeline.factors import MarketCap, EV, Fundamentals
 pipe_mkt_cap = Pipeline(columns={
@@ -38,7 +45,7 @@ pipe_mkt_cap = Pipeline(columns={
 start_time = time.time()
 stocks = spe.run_pipeline(pipe_mkt_cap, pipe_start, pipe_end)
 print("stocks.shape [mkt cap]", stocks.shape)
-print("--- %s ---" % datetime.timedelta(seconds=(time.time() - start_time)))
+assert stocks.shape == (49857, 1)
 
 pipe_mkt_cap_ev = Pipeline(columns={
     'mkt_cap': MarketCap(),
@@ -50,6 +57,11 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end)
-print(stocks)
+print(stocks.shape)
+assert stocks.shape == (15, 4)
 
-
+print(stocks.iloc[0])
+assert stocks.iloc[0]['cash'] == 39771000000.0
+assert stocks.iloc[0]['debt'] == 108292000000.0
+assert stocks.iloc[0]['ev'] == 1422775814800.0
+assert stocks.iloc[0]['mkt_cap'] == 1354254814800.0
