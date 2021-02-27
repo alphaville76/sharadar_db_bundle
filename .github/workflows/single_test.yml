@@ -34,6 +34,8 @@ jobs:
         cd ta-lib
         ./configure
         make
+        sudo make install
+        sudo ldconfig
         
         # Install zipline-trades and deps
         cd $PYTHON_LIBS
