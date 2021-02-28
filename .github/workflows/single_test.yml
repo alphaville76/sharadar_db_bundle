@@ -16,11 +16,15 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Test secret
+      env:
+        QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
+      run: |
+        echo sec $QUANDL_API_KEY
     - name: Install all
       env:
         QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
       run: |
-        echo $QUANDL_API_KEY
         python -m pip install --upgrade pip
         export INSTALL_DIR="~/dev/sharadar_db_bundle"
         mkdir -p $INSTALL_DIR
