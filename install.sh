@@ -1,5 +1,6 @@
-mkdir -p ~/dev/sharadar_db_bundle/
-cd ~/dev/sharadar_db_bundle/
+export INSTALL_DIR="~/dev/sharadar_db_bundle"
+mkdir -p $INSTALL_DIR
+cd $INSTALL_DIR
 virtualenv -p /usr/bin/python3.6 venv
 source venv/bin/activate
 python -m pip install --upgrade pip

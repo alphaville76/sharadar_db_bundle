@@ -60,6 +60,8 @@ jobs:
         git clone https://github.com/alphaville76/sharadar_db_bundle.git
         cd sharadar_db_bundle
         python setup.py install
+        cp -r .zipline ~
+        python sharadar/loaders/ingest_sharadar.py 2020-02-01 2020-04-01
         python test/basic_pipeline_sep_db.py
 
 
