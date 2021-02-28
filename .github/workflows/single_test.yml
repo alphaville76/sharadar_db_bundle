@@ -20,6 +20,7 @@ jobs:
       env:
         QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
       run: |
+        echo $QUANDL_API_KEY
         python -m pip install --upgrade pip
         export INSTALL_DIR="~/dev/sharadar_db_bundle"
         mkdir -p $INSTALL_DIR
