@@ -84,3 +84,16 @@ stocks = spe.run_pipeline(pipe, pipe_end)
 print(stocks)
 print("stocks.shape", stocks.shape)
 assert stocks.shape == (10, 3)
+
+
+pipe_start = pd.to_datetime('2020-02-03', utc=True)
+pipe_end = pd.to_datetime('2021-02-26', utc=True)
+macro = symbols(['TR3M', 'TR6M', 'TR1Y', 'TR2Y', 'TR3Y', 'TR5Y', 'TR7Y', 'TR10Y','TR20Y','CBOND', 'INDPRO', 'INDPROPCT', 'PMICMP', 'UNRATE', 'RATEINF'])
+pipe = Pipeline(columns={
+    'Close': USEquityPricing.close.latest,
+},
+screen = StaticAssets(macro)
+)
+stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+print("stocks.shape [close]", stocks)
+assert stocks.shape == (4050, 1)

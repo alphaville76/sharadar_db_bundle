@@ -17,6 +17,8 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install all
+      env:
+        QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
       run: |
         python -m pip install --upgrade pip
         export INSTALL_DIR="~/dev/sharadar_db_bundle"
