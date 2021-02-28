@@ -102,9 +102,8 @@ def StocksUS():
         (USEquityPricing.close.latest > 3) &
         Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
         (Sector().notnull()) &
+        (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
         (IsDomestic().eq(1)) &
-        (AverageDollarVolume(window_length=200) > 2.5e6) &
-        (MarketCap() > 350e6) &
         (Fundamentals(field='revenue_arq') > 0) &
         (Fundamentals(field='assets_arq') > 0) &
         (Fundamentals(field='equity_arq') > 0) &

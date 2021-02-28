@@ -58,7 +58,7 @@ def process_data_table(df):
     return df
 
 def is_fetch_date_too_old(date):
-    return pd.to_datetime(date, utc=True) < OLDEST_DATE_SEP;
+    return pd.to_datetime(date, utc=True) <= OLDEST_DATE_SEP;
 
 def fetch_data(start, end):
     """
@@ -161,7 +161,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         df.append(df_ticker_synch)
 
 
-def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), sanity_check=True):
+def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), sanity_check=True, tradable_stocks=True):
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -176,7 +176,7 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
 
     # use string format expected by quandl
     start_fetch_date = sessions[0].strftime('%Y-%m-%d')
-    end_fetch_date = sessions[-1].strftime('%Y-%m-%d')
+    end_fetch_date = None if sessions[-1] == calendar.last_session else sessions[-1].strftime('%Y-%m-%d')
     if os.path.exists(prices_dbpath):
         start_fetch_date = SQLiteDailyBarReader(prices_dbpath).last_available_dt.strftime('%Y-%m-%d')
         log.info("Last available date: %s" % start_fetch_date)
@@ -252,9 +252,10 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
     macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)
     sql_daily_bar_writer.write(macro_prices_df)
 
-    # Predefined Named Universes
-    from sharadar.pipeline.universes import create_tradable_stocks_universe
-    create_tradable_stocks_universe(output_dir, prices_start, prices_end)
+    if tradable_stocks:
+        # Predefined Named Universes
+        from sharadar.pipeline.universes import create_tradable_stocks_universe
+        create_tradable_stocks_universe(output_dir, prices_start, prices_end)
 
     if sanity_check:
         if asset_db_writer.check_sanity():
@@ -340,6 +341,11 @@ def from_quandl():
 
 if __name__ == '__main__':
     import sys
-    start_session = pd.to_datetime(sys.argv[1], utc=True)
-    end_session = pd.to_datetime(sys.argv[2], utc=True)
-    _ingest(start_session, end_session, sanity_check=False)
+
+    start_session = OLDEST_DATE_SEP
+    calendar = get_calendar('XNYS')
+    end_session = calendar.last_session
+    if sys.argv == 3:
+        start_session = pd.to_datetime(sys.argv[1], utc=True)
+        end_session = pd.to_datetime(sys.argv[2], utc=True)
+    _ingest(start_session, end_session, calendar, sanity_check=False, tradable_stocks=False)

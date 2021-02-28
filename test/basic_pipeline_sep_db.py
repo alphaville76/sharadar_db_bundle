@@ -6,6 +6,9 @@ from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipelin
 from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
+from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
+from zipline.pipeline.factors import AverageDollarVolume
+from sharadar.pipeline.universes import TradableStocksUS
 
 bundle = load_sharadar_bundle()
 
@@ -45,7 +48,7 @@ pipe_mkt_cap = Pipeline(columns={
 start_time = time.time()
 stocks = spe.run_pipeline(pipe_mkt_cap, pipe_start, pipe_end)
 print("stocks.shape [mkt cap]", stocks.shape)
-assert stocks.shape == (49857, 1)
+assert stocks.shape == (49867, 1)
 
 pipe_mkt_cap_ev = Pipeline(columns={
     'mkt_cap': MarketCap(),
@@ -65,3 +68,19 @@ assert stocks.iloc[0]['cash'] == 39771000000.0
 assert stocks.iloc[0]['debt'] == 108292000000.0
 assert stocks.iloc[0]['ev'] == 1422775814800.0
 assert stocks.iloc[0]['mkt_cap'] == 1354254814800.0
+
+
+pipe = Pipeline(columns={
+    'Close': USEquityPricing.close.latest,
+    'Exchange': Exchange(),
+    'Sector': Sector()
+},
+screen = (
+    (TradableStocksUS()) &
+    (AverageDollarVolume(window_length = 200, mask=TradableStocksUS()).top(10))
+)
+)
+stocks = spe.run_pipeline(pipe, pipe_end)
+print(stocks)
+print("stocks.shape", stocks.shape)
+assert stocks.shape == (10, 3)
