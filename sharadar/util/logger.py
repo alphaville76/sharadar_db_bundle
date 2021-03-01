@@ -6,6 +6,7 @@ import datetime
 import linecache
 import os
 import tracemalloc
+from sharadar.util.mail import send_mail
 
 # log in local time instead of UTC
 set_datetime_format("local")
@@ -49,7 +50,7 @@ def log_top_mem_usage(logger, snapshot, key_type='lineno', limit=10):
 class BacktestLogger(Logger):
 
 
-    def __init__(self, filename, logname='Backtest', level=NOTSET):
+    def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET):
         super().__init__(logname, level)
 
         path, ext = os.path.splitext(filename)
@@ -63,13 +64,18 @@ class BacktestLogger(Logger):
         stream_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(stream_handler)
 
+        self.arena = arena
+
     def process_record(self, record):
         """
         use the date of the trading day for log purposes
         """
         super().process_record(record)
+        if self.arena == 'live':
+            send_mail(record.channel + " " + record.level_name, record.message)
         record.time = get_datetime()
 
 if __name__ == '__main__':
     log.info("Hello World!")
+    BacktestLogger(__file__, arena='live', logname="Myname").warn("Hello World!")
 
