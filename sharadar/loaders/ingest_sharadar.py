@@ -333,7 +333,7 @@ def from_quandl():
             log.error("%s : %s" % (output_dir, e.strerror))
 
         try:
-            _ingest(start_date, end_date, calendar)
+            _ingest(start_date, calendar.last_session, calendar)
         except Exception as e:
             log.error(traceback.format_exc())
 
