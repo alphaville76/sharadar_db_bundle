@@ -63,5 +63,5 @@ jobs:
         cd sharadar_db_bundle
         python setup.py install
         cp -r .zipline ~
-        python sharadar/loaders/ingest_sharadar.py 2020-01-01 2020-01-31
+        python sharadar/loaders/ingest_sharadar.py 2020-01-01 2020-01-10
         python test/basic_pipeline_test.py
