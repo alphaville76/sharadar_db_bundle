@@ -53,6 +53,8 @@ jobs:
         cd twsapi/IBJts/source/pythonclient
         python setup.py install
     - name: Install main package
+      env:
+        QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
       run: |
         pip install memoization singleton_decorator quandl pyfolio mailjet_rest
         pip install pandas==0.22.0
