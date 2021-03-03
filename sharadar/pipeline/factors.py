@@ -234,11 +234,24 @@ class FundamentalsTrend(CustomFactor, BundleLoader):
 
         (out.trend, out.std_err) = time_trend(y)
 
+# to avoid divide by zero
+def _robust(x, fn):
+    if np.isscalar(x):
+        return fn(x) if x != 0.0 else 0.0
 
-def logscale(x):
+    x1 = np.copy(x)
+    idx = np.nonzero(x1)
+    x1[idx] = fn(x[idx])
+    return x1
+
+def _logscale(x):
     # Given: y=log(1+x), y≈x when x is small (less than 1).
-    return np.sign(x) * np.nan_to_num(np.log(np.abs(x + np.sign(x))))
+    return np.sign(x) * np.log(np.abs(x + np.sign(x)))
 
+
+# to avoid divide by zero
+def logscale(x):
+    return _robust(x, _logscale)
 
 class LogFundamentalsTrend(FundamentalsTrend):
     def compute(self, today, assets, out, field):
@@ -443,7 +456,7 @@ class InvestmentToAssetsTrend(CustomFactor, BundleLoader):
 
     def compute(self, today, assets, out):
         ta = self.asset_finder().get_fundamentals_df_window_length(assets, 'assets_art', today, self.window_length + 4)
-        ta_log = np.log(ta)
+        ta_log = logscale(ta)
         ta_log_py = shift(ta_log, -4)
         # flip to get chronological order
         ia = np.flip(ta_log - ta_log_py, axis=0)[4:]
