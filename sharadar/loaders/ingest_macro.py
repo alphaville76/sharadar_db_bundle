@@ -3,17 +3,17 @@ import os
 from os import environ as env
 from pandas.tseries.offsets import DateOffset
 import pandas as pd
-from sharadar.util.equity_supplementary_util import METADATA_HEADERS
 from sharadar.util.output_dir import get_output_dir
+from sharadar.loaders.constant import OLDEST_DATE_SEP, METADATA_HEADERS
 
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 
 def _add_macro_def(df, sid, end_date, ticker, asset_name):
-    start_date = pd.to_datetime("1998-01-01")
+    start_date = OLDEST_DATE_SEP.tz_convert(None)
 
     # The first date we have trade data for this asset.
-    first_traded = start_date
+    first_traded = OLDEST_DATE_SEP.tz_convert(None)
 
     # The date on which to close any positions in this asset.
     auto_close_date = end_date + pd.Timedelta(days=1)
@@ -121,12 +121,16 @@ def create_macro_prices_df(start, end, calendar=None):
     return prices
 
 
-def ingest(start, end):
+def ingest(start_date, end_date):
     from sharadar.pipeline.engine import load_sharadar_bundle
     from zipline.assets import ASSET_DB_VERSION
     from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
     from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter
     from trading_calendars import get_calendar
+    from sharadar.loaders.constant import EXCHANGE_DF
+
+    start = start_date.tz_convert(None)
+    end = end_date.tz_convert(None)
 
     bundle = load_sharadar_bundle()
     calendar = get_calendar('XNYS')
@@ -135,7 +139,7 @@ def ingest(start, end):
     output_dir = get_output_dir()
     asset_dbpath = os.path.join(output_dir, ("assets-%d.sqlite" % ASSET_DB_VERSION))
     asset_db_writer = SQLiteAssetDBWriter(asset_dbpath)
-    asset_db_writer.write(equities=macro_equities_df)
+    asset_db_writer.write(equities=macro_equities_df, exchanges=EXCHANGE_DF)
     prices_dbpath = os.path.join(output_dir, "prices.sqlite")
     sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
     sql_daily_bar_writer.write(macro_prices_df)

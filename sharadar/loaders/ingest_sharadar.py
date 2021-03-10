@@ -6,7 +6,7 @@ import quandl
 from trading_calendars import get_calendar
 from sharadar.util.output_dir import get_output_dir
 from sharadar.util.quandl_util import fetch_entire_table
-from sharadar.util.equity_supplementary_util import lookup_sid, METADATA_HEADERS
+from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
 from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
@@ -17,26 +17,12 @@ from pathlib import Path
 from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
+from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
 
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
-
-OLDEST_DATE_SEP = pd.to_datetime('1998-10-16', utc=True)
-
-EXCHANGE_DF = pd.DataFrame([
-    ['NYSE', 'US'],
-    ['NASDAQ', 'US'],
-    ['OTC', 'US'],
-    ['NYSEMKT', 'US'],
-    ['NYSEARCA', 'US'],
-    ['BATS', 'US'],
-    ['INDEX', 'US'],
-    ['MACRO', 'US'],
-],
-    columns=['exchange', 'country_code'])
-
 
 def process_data_table(df):
     log.info("Adjusting for stock splits...")

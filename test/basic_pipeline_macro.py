@@ -1,7 +1,6 @@
 import pandas as pd
 from zipline.pipeline import Pipeline
 from zipline.pipeline.data import USEquityPricing
-
 from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
 import time
@@ -9,8 +8,19 @@ import datetime
 from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
 from zipline.pipeline.factors import AverageDollarVolume
 from sharadar.pipeline.universes import TradableStocksUS
+from sharadar.loaders.ingest_macro import ingest
 
 bundle = load_sharadar_bundle()
+
+
+def ingest_macro():
+    start = bundle.equity_daily_bar_reader.first_trading_day
+    end = bundle.equity_daily_bar_reader.last_available_dt
+    print("Adding macro data from %s to %s ..." % (start, end))
+    print(ingest(start, end))
+
+#ingest_macro()
+
 spe = make_pipeline_engine()
 
 pipe_start = pd.to_datetime('2021-01-04', utc=True)
@@ -23,4 +33,3 @@ screen = StaticAssets(macro)
 )
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
 print(stocks.tail(30))
-
