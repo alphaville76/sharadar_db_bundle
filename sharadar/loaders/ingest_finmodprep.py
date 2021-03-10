@@ -4,8 +4,8 @@ import urllib.parse
 import json
 
 
-#print(env["FINMODPREP_API_KEY"])
-APIKEY = "d0bf4c0f504a5d5f1af136f779b8608f"
+
+APIKEY = env["FINMODPREP_API_KEY"]
 
 def head(entries, n=10):
     count = 0

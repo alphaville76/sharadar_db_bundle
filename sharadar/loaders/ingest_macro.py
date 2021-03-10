@@ -121,17 +121,7 @@ def create_macro_prices_df(start, end, calendar=None):
     return prices
 
 
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 3:
-        print("Usage: ingest_macro [start_date] [end_date]")
-        sys.exit(os.EX_USAGE)
-
-
-    prices_start = pd.to_datetime(sys.argv[1])
-    prices_end = pd.to_datetime(sys.argv[2])
-    print("Adding macro data from %s to %s ..." % (prices_start, prices_end))
-
+def ingest(start, end):
     from sharadar.pipeline.engine import load_sharadar_bundle
     from zipline.assets import ASSET_DB_VERSION
     from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
@@ -140,17 +130,28 @@ if __name__ == "__main__":
 
     bundle = load_sharadar_bundle()
     calendar = get_calendar('XNYS')
-
-    macro_equities_df = create_macro_equities_df(prices_end)
-
-    macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)
-
+    macro_equities_df = create_macro_equities_df(end)
+    macro_prices_df = create_macro_prices_df(start, end, calendar)
     output_dir = get_output_dir()
     asset_dbpath = os.path.join(output_dir, ("assets-%d.sqlite" % ASSET_DB_VERSION))
     asset_db_writer = SQLiteAssetDBWriter(asset_dbpath)
     asset_db_writer.write(equities=macro_equities_df)
-
     prices_dbpath = os.path.join(output_dir, "prices.sqlite")
     sql_daily_bar_writer = SQLiteDailyBarWriter(prices_dbpath, calendar)
     sql_daily_bar_writer.write(macro_prices_df)
-    print("inserted/updated %d entries" % macro_prices_df.shape[0])
+    return macro_prices_df.shape[0]
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 3:
+        print("Usage: ingest_macro [start_date] [end_date]")
+        sys.exit(os.EX_USAGE)
+
+
+    start = pd.to_datetime(sys.argv[1])
+    end = pd.to_datetime(sys.argv[2])
+
+    print("Adding macro data from %s to %s ..." % (start, end))
+    n = ingest(start, end)
+    print("inserted/updated %d entries" % n)
