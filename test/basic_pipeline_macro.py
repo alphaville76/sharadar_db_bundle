@@ -5,7 +5,7 @@ from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipelin
 from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
-from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
+from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from zipline.pipeline.factors import AverageDollarVolume
 from sharadar.pipeline.universes import TradableStocksUS
 from sharadar.loaders.ingest_macro import ingest

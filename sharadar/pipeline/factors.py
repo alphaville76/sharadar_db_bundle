@@ -1,23 +1,26 @@
-from sharadar.pipeline.engine import BundleLoader, symbol
-from zipline.pipeline.data import USEquityPricing
-from zipline.pipeline.factors import CustomFactor, DailyReturns
-from zipline.pipeline.classifiers import CustomClassifier
-from zipline.lib.labelarray import LabelArray
-import numpy as np
-from zipline.utils.numpy_utils import object_dtype
-import pandas as pd
 import warnings
 
+import numpy as np
+import pandas as pd
+from sharadar.pipeline.engine import BundleLoader, symbol
+from zipline.lib.labelarray import LabelArray
+from zipline.pipeline.classifiers import CustomClassifier
+from zipline.pipeline.data import USEquityPricing
+from zipline.pipeline.factors import CustomFactor, DailyReturns
+from zipline.utils.numpy_utils import object_dtype
+from zipline.pipeline.factors import AverageDollarVolume
 
 def nanmean(a, axis=0):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         return np.nanmean(a, axis)
 
+
 def nanvar(a, axis=0):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         return np.nanvar(a, axis)
+
 
 def nanstd(a, axis=0):
     with warnings.catch_warnings():
@@ -44,6 +47,7 @@ class Fundamentals(CustomFactor, BundleLoader):
 class FundamentalsTTM(Fundamentals):
     def compute(self, today, assets, out, field):
         out[:] = self.asset_finder().get_fundamentals_ttm(assets, field, today, k=self.window_length)
+
 
 class DaysSinceFiling(CustomFactor, BundleLoader):
     inputs = []
@@ -84,7 +88,6 @@ class Exchange(AbstractClassifier):
         super().__init__(categories, field)
 
 
-
 class Sector(AbstractClassifier):
     def __init__(self):
         categories = ['Healthcare', 'Basic Materials', 'Financial Services', 'Consumer Cyclical', 'Technology',
@@ -94,7 +97,7 @@ class Sector(AbstractClassifier):
         super().__init__(categories, field)
 
 
-class IsDomestic(CustomClassifier, BundleLoader):
+class IsDomesticCommonStock(CustomClassifier, BundleLoader):
     inputs = []
     window_length = 1
     dtype = np.int64
@@ -102,7 +105,9 @@ class IsDomestic(CustomClassifier, BundleLoader):
 
     def compute(self, today, assets, out, *arrays):
         category = self.asset_finder().get_info(assets, 'category', today)
-        out[:] = np.isin(category, ['Domestic', 'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class', 'Domestic Preferred Stock', 'Domestic Primary'])
+        out[:] = np.isin(category, ['Domestic Common Stock', 'Domestic Common Stock Primary Class',
+                                    'Domestic Common Stock Secondary Class', 'Domestic Preferred Stock'])
+
 
 class IsBankruptcy(CustomClassifier, BundleLoader):
     """
@@ -133,41 +138,87 @@ class IsDelinquent(CustomClassifier, BundleLoader):
         equities = self.asset_finder().retrieve_all(assets)
         out[:] = [((len(e.symbol) == 5) & e.symbol.endswith('E')) for e in equities]
 
-
-#FIXME
-class AvgMarketCap(CustomFactor, BundleLoader):
-    inputs = [USEquityPricing.close]
+class MarketCap(CustomFactor, BundleLoader):
+    inputs = []
     window_length = 1
     window_safe = True
 
-    def compute(self, today, assets, out, close):
-        sharesbas = self.asset_finder().get_fundamentals_df_window_length(assets, 'sharesbas_arq', today,
-                                                                          self.window_length)
-        sharefactor = self.asset_finder().get_fundamentals_df_window_length(assets, 'sharefactor_arq', today,
-                                                                            self.window_length)
-        shares = sharefactor * sharesbas
-        out[:] = nanmean(close * shares)
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'marketcap', today, n=self.window_length) * 1e6
 
+    def __str__(self):
+        return "MarketCap(%d)" % self.window_length
 
-class MarketCap(CustomFactor):
-    inputs = [USEquityPricing.close, Fundamentals(field='sharesbas_arq'), Fundamentals(field='sharefactor_arq')]
+class EV(CustomFactor, BundleLoader):
+    inputs = []
     window_length = 1
     window_safe = True
 
-    def compute(self, today, assets, out, close, sharesbas, sharefactor):
-        out[:] = close * sharefactor * sharesbas
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'ev', today, n=self.window_length)*1e6
 
+    def __str__(self):
+        return "EV(%d)" % self.window_length
 
-class EV(CustomFactor):
-    """
-    Enterprise value is a measure of the value of a business as a whole; calculated as [MarketCap] plus [DebtUSD] minus [CashnEqUSD].
-    """
-    inputs = [MarketCap(), Fundamentals(field='debtusd_arq'), Fundamentals(field='cashnequsd_arq')]
+class EvEbit(CustomFactor, BundleLoader):
+    inputs = []
     window_length = 1
     window_safe = True
 
-    def compute(self, today, assets, out, mkt_cap, debtusd, cashnequsd):
-        out[:] = mkt_cap + debtusd - cashnequsd
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'evebit', today, n=self.window_length)
+
+    def __str__(self):
+        return "EvEbit(%d)" % self.window_length
+
+
+class EvEbitda(CustomFactor, BundleLoader):
+    inputs = []
+    window_length = 1
+    window_safe = True
+
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'evebitda', today, n=self.window_length)
+
+    def __str__(self):
+        return "EvEbitda(%d)" % self.window_length
+
+
+class PriceBook(CustomFactor, BundleLoader):
+    inputs = []
+    window_length = 1
+    window_safe = True
+
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'pb', today, n=self.window_length)
+
+    def __str__(self):
+        return "PriceBook(%d)" % self.window_length
+
+
+class PriceEarnings(CustomFactor, BundleLoader):
+    inputs = []
+    window_length = 1
+    window_safe = True
+
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'pe', today, n=self.window_length)
+
+    def __str__(self):
+        return "PriceEarnings(%d)" % self.window_length
+
+
+class PriceSales(CustomFactor, BundleLoader):
+    inputs = []
+    window_length = 1
+    window_safe = True
+
+    def compute(self, today, assets, out):
+        out[:] = self.asset_finder().get_daily_metrics(assets, 'ps', today, n=self.window_length)
+
+    def __str__(self):
+        return "PriceSales(%d)" % self.window_length
+
 
 def time_trend(Y, allowed_missing=0):
     """
@@ -234,6 +285,7 @@ class FundamentalsTrend(CustomFactor, BundleLoader):
 
         (out.trend, out.std_err) = time_trend(y)
 
+
 # to avoid divide by zero
 def _robust(x, fn):
     if np.isscalar(x):
@@ -244,6 +296,7 @@ def _robust(x, fn):
     x1[idx] = fn(x[idx])
     return x1
 
+
 def _logscale(x):
     # Given: y=log(1+x), y≈x when x is small (less than 1).
     return np.sign(x) * np.log(np.abs(x + np.sign(x)))
@@ -252,6 +305,7 @@ def _logscale(x):
 # to avoid divide by zero
 def logscale(x):
     return _robust(x, _logscale)
+
 
 class LogFundamentalsTrend(FundamentalsTrend):
     def compute(self, today, assets, out, field):
@@ -263,8 +317,8 @@ class LogFundamentalsTrend(FundamentalsTrend):
         # The arctan of a slope is the the angle θ with the origin between −π/2 and π/2
         # Then divide by π/2 to get a measure in [-1,1]
         # Then add π/2 and divide by π to get a measure in [0,1]
-        #out.trend = 2.0 * np.arctan(out.trend) / np.pi
-        out.trend = (np.arctan(out.trend) + np.pi/2) / np.pi
+        # out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        out.trend = (np.arctan(out.trend) + np.pi / 2) / np.pi
 
 
 class TimeTrend(CustomFactor):
@@ -285,8 +339,9 @@ class LogTimeTrend(TimeTrend):
         # The arctan of a slope is the the angle θ with the origin between −π/2 and π/2
         # Then divide by π/2 to get a measure in [-1,1]
         # Then add π/2 and divide by π to get a measure in [0,1]
-        #out.trend = 2.0 * np.arctan(out.trend) / np.pi
-        out.trend = (np.arctan(out.trend) + np.pi/2) / np.pi
+        # out.trend = 2.0 * np.arctan(out.trend) / np.pi
+        out.trend = (np.arctan(out.trend) + np.pi / 2) / np.pi
+
 
 class LogLatest(CustomFactor):
     window_length = 1
@@ -295,12 +350,12 @@ class LogLatest(CustomFactor):
         out[:] = logscale(data[-1])
 
 
-
 class StdDev(CustomFactor):
     window_length = 252
 
     def compute(self, today, assets, out, factor):
         out[:] = nanstd(factor)
+
 
 def beta_residual(Y, X, allowed_missing=0, standardize=False):
     """
@@ -351,6 +406,7 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
 
     return (beta, residual_var)
 
+
 class Beta(CustomFactor):
     outputs = ['beta', 'residual_var']
     inputs = [DailyReturns(), DailyReturns()[symbol('SPY')]]
@@ -361,7 +417,6 @@ class Beta(CustomFactor):
         allowed_missing_percentage = 0.25
         allowed_missing_count = int(allowed_missing_percentage * self.window_length)
         (out.beta, out.residual_var) = beta_residual(assets_returns, market_returns, allowed_missing_count, standardize)
-
 
 
 class Previous(CustomFactor):
@@ -406,7 +461,8 @@ class TradingVolume(CustomFactor):
     Trading volume is computed as the total dollar amount of trading in the
     stock over the trailing month as a percent of total market capitalization.
     """
-    inputs = [MonthlyDollarVolume(), MarketCap()]
+    #inputs = [MonthlyDollarVolume(), MarketCap()]
+    inputs = [AverageDollarVolume(window_length=20), MarketCap()]
 
     window_safe = True
     window_length = 1
@@ -431,6 +487,7 @@ class InvestmentToAssets(CustomFactor, BundleLoader):
         assets_t_minus_1 = self.asset_finder().get_fundamentals(assets, 'assets_art', today, n=(l + 4))
         out[:] = assets_t / assets_t_minus_1 - 1.0
 
+
 def shift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
     if num > 0:
@@ -443,12 +500,13 @@ def shift(arr, num, fill_value=np.nan):
         result[:] = arr
     return result
 
+
 class InvestmentToAssetsTrend(CustomFactor, BundleLoader):
     """
     Trend of InvestmentToAssets, measured as asset growth YOY (Lu Zhang - q-factors and Investment CAPM)
 
     """
-    #5 years
+    # 5 years
     window_length = 20
     inputs = []
     window_safe = True

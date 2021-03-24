@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from click import progressbar
 from sharadar.pipeline.engine import make_pipeline_engine
-from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
+from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from sharadar.util.logger import log
 from sharadar.util.output_dir import get_output_dir
 from zipline.pipeline import Pipeline, CustomFilter
@@ -99,15 +99,15 @@ def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
 
 def StocksUS():
     return (
-        (USEquityPricing.close.latest > 3) &
-        Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
-        (Sector().notnull()) &
-        (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
-        (IsDomestic().eq(1)) &
-        (Fundamentals(field='revenue_arq') > 0) &
-        (Fundamentals(field='assets_arq') > 0) &
-        (Fundamentals(field='equity_arq') > 0) &
-        (EV() > 0)
+            (USEquityPricing.close.latest > 3) &
+            Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
+            (Sector().notnull()) &
+            (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
+            (IsDomesticCommonStock().eq(1)) &
+            (Fundamentals(field='revenue_arq') > 0) &
+            (Fundamentals(field='assets_arq') > 0) &
+            (Fundamentals(field='equity_arq') > 0) &
+            (EV() > 0)
     )
 
 def TradableStocksUS(min_percentile = 30):

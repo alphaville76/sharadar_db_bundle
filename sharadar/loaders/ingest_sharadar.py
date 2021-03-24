@@ -7,7 +7,7 @@ from trading_calendars import get_calendar
 from sharadar.util.output_dir import get_output_dir
 from sharadar.util.quandl_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import lookup_sid
-from sharadar.util.equity_supplementary_util import insert_equity_extra_data_basic, insert_equity_extra_data_sf1
+from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
 from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
@@ -36,7 +36,6 @@ def process_data_table(df):
     df['low'] *= m
     df['close'] = df['closeunadj']
     df['volume'] /= m
-    df['dividends'] *= m
 
     df = df.drop(['closeunadj', 'lastupdated'], axis=1)
     df = df.replace([np.inf, -np.inf, np.nan], 0)
@@ -81,20 +80,21 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
     return df
 
 
-def create_dividends_df(df, sharadar_metadata_df):
-    dividends_df = df
-    dividends_df = dividends_df[dividends_df["dividends"] != 0.0]
-    dividends_df = dividends_df.dropna()
+def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start, end):
+    dividends_df = quandl.get_table('SHARADAR/ACTIONS', date={'gte':start,'lte':end}, action=['dividend', 'spinoffdividend'], paginate=True)
 
-    dividends_df['sid'] = dividends_df.index.get_level_values('sid')
-    dividends_df = dividends_df.rename(columns={'dividends': 'amount'})
-    dividends_df = dividends_df.drop(['open', 'high', 'low', 'close', 'volume', 'ticker'], axis=1)
-    dividends_df.index = dividends_df.index.get_level_values('date')
+    # Remove dividends_df entries, whose ticker doesn't exist
+    tickers_dividends = dividends_df['ticker'].unique()
+    tickers_intersect = set(existing_tickers).intersection(tickers_dividends)
+    dividends_df = dividends_df.loc[dividends_df['ticker'].isin(tickers_intersect)]
+
+    dividends_df = dividends_df.rename(columns={'value': 'amount'})
+    dividends_df['sid'] = dividends_df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
+    dividends_df.index = dividends_df['date']
     dividends_df['record_date'] = dividends_df['declared_date'] = dividends_df['pay_date'] = dividends_df[
         'ex_date'] = dividends_df.index
-
+    dividends_df.drop(['action', 'date', 'name', 'contraticker', 'contraname', 'ticker'], axis=1, inplace=True)
     return dividends_df
-
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start, end):
     splits_df = quandl.get_table('SHARADAR/ACTIONS', date={'gte':start,'lte':end}, action=['split'], paginate=True)
@@ -136,7 +136,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         # Forward fill missing data, volume and dividens must remain 0
         columns_ffill = ['ticker', 'open', 'high', 'low', 'close']
         df_ticker_synch[columns_ffill] = df_ticker_synch[columns_ffill].fillna(method='ffill')
-        df_ticker_synch = df_ticker_synch.fillna({'volume': 0, 'dividends': 0})
+        df_ticker_synch = df_ticker_synch.fillna({'volume': 0})
 
         # Drop remaining NaN
         df_ticker_synch.dropna(inplace=True)
@@ -147,7 +147,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         df.append(df_ticker_synch)
 
 
-def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), sanity_check=True, tradable_stocks=True):
+def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), sanity_check=True, tradable_stocks=False):
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -190,8 +190,7 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
 
     # DIVIDENDS
     log.info("Creating dividends data...")
-    # see also https://github.com/shlomikushchi/zipline-live2/blob/master/zipline/data/bundles/csvdir.py
-    dividends_df = create_dividends_df(prices_df, sharadar_metadata_df)
+    dividends_df = create_dividends_df(sharadar_metadata_df, related_tickers, tickers, start_fetch_date, end_fetch_date)
 
     # SPLITS
     log.info("Creating splits data...")
@@ -224,15 +223,30 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
     # They could be retrieved by AssetFinder.get_supplementary_field(sid, field_name, as_of_date)
     log.info("Start creating company info dataframe...")
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
-        insert_equity_extra_data_basic(sharadar_metadata_df, cursor)
+        insert_asset_info(sharadar_metadata_df, cursor)
 
+    #TODO Fundamentals
+    #for start_fetch_date use
+    #             SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = 'revenue_arq';
+    # CREATE INDEX idx_start_date_field  ON equity_supplementary_mappings (start_date, field); ?
     log.info("Start creating Fundamentals dataframe...")
     if is_fetch_date_too_old(start_fetch_date):
         sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
     else:
         sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date, end_fetch_date)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
-        insert_equity_extra_data_sf1(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
+        insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
+
+    #TODO daily metrics
+    #for start_fetch_date use
+    #             SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = 'marketcap';
+    log.info("Start creating daily metrics dataframe...")
+    if is_fetch_date_too_old(start_fetch_date):
+        daily_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
+    else:
+        daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_fetch_date, end_fetch_date)
+    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+        insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
 
     log.info("Adding macro data from %s to %s ..." % (prices_start, prices_end))
     macro_prices_df = create_macro_prices_df(prices_start, prices_end, calendar)
@@ -317,6 +331,7 @@ def from_quandl():
             os.rmdir(output_dir)
         except OSError as e:
             log.error("%s : %s" % (output_dir, e.strerror))
+
 
         try:
             _ingest(start_date, calendar.last_session, calendar)

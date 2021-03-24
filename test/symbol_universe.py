@@ -11,7 +11,7 @@ from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
 from sharadar.pipeline.factors import IsBankruptcy, IsDelinquent
-from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
+from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 
 def universe():
     return( (USEquityPricing.close.latest > 3) &

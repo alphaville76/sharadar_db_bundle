@@ -7,12 +7,13 @@ from zipline.pipeline.filters import StaticAssets
 import time
 import datetime
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.pipeline.factors import Exchange, Sector, IsDomestic, MarketCap, Fundamentals, EV
+from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 
 bundle = load_sharadar_bundle()
 
 sectors = bundle.asset_finder.get_info([199059, 199623], 'sector')
 print("sectors", sectors)
+assert (sectors == [['Technology', 'Technology']]).all()
 
 equities = bundle.asset_finder.retrieve_equities([199059, 199623])
 print("equities", equities)

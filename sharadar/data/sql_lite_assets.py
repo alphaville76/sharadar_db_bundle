@@ -173,6 +173,21 @@ class SQLiteAssetFinder(AssetFinder):
             return []
         return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
 
+    @cached
+    def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar = get_calendar('XNYS')):
+        sessions = calendar.sessions_window(as_of_date, n-1)
+        query = "SELECT start_date, sid, value FROM equity_supplementary_mappings " \
+                "WHERE field ='%s' AND sid in (%s) AND start_date >= %s AND start_date <= %s" \
+                % (field_name, ",".join(map(str, sids)), sessions[0].value, sessions[-1].value)
+
+        df = pd.read_sql_query(query, self.engine)
+        df = df.pivot(index='start_date', columns='sid', values='value')
+        df = df.reindex(index=list(map(self._fmt_date, sessions)), columns=sids)
+        return df.values.astype('float64')
+
+    def _fmt_date(self, dt):
+        return dt.value
+
 
 
 @singleton
@@ -281,11 +296,11 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         sane = True
 
         field = 'category'
-        expected = ['ADR', 'ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
-               'ADR Preferred Stock', 'ADR Primary', 'ADR Stock Warrant', 'CEF', 'Canadian', 'Canadian Common Stock',
-               'Canadian Common Stock Primary Class', 'Canadian Preferred Stock', 'Canadian Stock Warrant', 'Domestic',
-               'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class',
-               'Domestic Preferred Stock', 'Domestic Primary', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
+        expected = ['ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
+                    'ADR Preferred Stock', 'ADR Stock Warrant', 'CEF', 'Canadian Common Stock',
+                    'Canadian Common Stock Primary Class', 'Canadian Preferred Stock', 'Canadian Stock Warrant',
+                    'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class',
+                    'Domestic Preferred Stock', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
         if not self._check_field(field, expected):
             sane = False
 
@@ -295,7 +310,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             sane = False
 
         field = 'exchange'
-        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'None', 'OTC']
+        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
         if not self._check_field(field, expected):
             sane = False
 
