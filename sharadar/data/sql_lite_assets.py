@@ -193,6 +193,11 @@ class SQLiteAssetFinder(AssetFinder):
 @singleton
 class SQLiteAssetDBWriter(AssetDBWriter):
 
+    def init_db(self, txn=None):
+        super().init_db(txn)
+        txn.execute("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);")
+
+
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         if asset_type == 'future':
             tbl = futures_contracts_table
@@ -327,3 +332,18 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             return False
         else:
             return True
+
+    @property
+    def last_available_fundamentals_dt(self):
+        return self.last_available_dt('revenue_arq')
+
+    @property
+    def last_available_daily_metrics_dt(self):
+        return self.last_available_dt('marketcap')
+
+    def last_available_dt(self, field):
+        sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
+        res = self.engine.execute(sql).fetchall()
+        if len(res) == 0:
+            return pd.NaT
+        return pd.Timestamp(res[0][0], tz='UTC')

@@ -42,14 +42,16 @@ def process_data_table(df):
     df = df.fillna({'volume': 0})
     return df
 
-def is_fetch_date_too_old(date):
+def must_fetch_entire_table(date):
+    if date == pd.NaT:
+        return True
     return pd.to_datetime(date, utc=True) <= OLDEST_DATE_SEP;
 
 def fetch_data(start, end):
     """
     Fetch the Sharadar Equity Prices (SEP) and Sharadar Fund Prices (SFP). Entire dataset or by date.
     """
-    if is_fetch_date_too_old(start):
+    if must_fetch_entire_table(start):
         df_sep = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
         df_sfp = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SFP", parse_dates=['date'])
     else:
@@ -225,26 +227,21 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_asset_info(sharadar_metadata_df, cursor)
 
-    #TODO Fundamentals
-    #for start_fetch_date use
-    #             SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = 'revenue_arq';
-    # CREATE INDEX idx_start_date_field  ON equity_supplementary_mappings (start_date, field); ?
-    log.info("Start creating Fundamentals dataframe...")
-    if is_fetch_date_too_old(start_fetch_date):
+    start_date_fundamentals = asset_db_writer.last_available_fundamentals_dt
+    log.info("Start creating Fundamentals dataframe from %s..." % start_date_fundamentals)
+    if must_fetch_entire_table(start_date_fundamentals):
         sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
     else:
-        sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_fetch_date, end_fetch_date)
+        sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_date_fundamentals, end_fetch_date)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
 
-    #TODO daily metrics
-    #for start_fetch_date use
-    #             SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = 'marketcap';
-    log.info("Start creating daily metrics dataframe...")
-    if is_fetch_date_too_old(start_fetch_date):
+    start_date_metrics = asset_db_writer.last_available_daily_metrics_dt
+    log.info("Start creating daily metrics dataframe from %s..." % start_date_metrics)
+    if must_fetch_entire_table(start_date_metrics):
         daily_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
     else:
-        daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_fetch_date, end_fetch_date)
+        daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_date_metrics, end_fetch_date)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
 
