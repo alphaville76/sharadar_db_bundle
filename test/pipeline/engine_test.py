@@ -1,25 +1,51 @@
-from sharadar.pipeline.engine import load_sharadar_bundle, symbol, symbols, prices, returns, trading_date
+from sharadar.pipeline.engine import (
+    load_sharadar_bundle,
+    symbol,
+    symbols,
+    prices,
+    prices_old,
+    returns,
+    trading_date)
 import pandas as pd
 
-df_rets = returns(
-    assets=symbol('AAPL'),
-    start='2013-01-01',
-    end='2014-01-01'
-)
-print(df_rets)
-
-assets = symbols(['IBM', 'F', 'AAPL'])
 
 start = pd.to_datetime('2021-03-08', utc=True)
 end = pd.to_datetime('2021-03-12', utc=True)
 
-print(prices(assets, start, end))
+assets = symbols(['IBM', 'F', 'AAPL'])
+p = prices(assets, start, end)
+print(p)
+assert p.shape == (5, 3)
+assert type(p)  == pd.DataFrame
 
-print(prices(assets, '2020-02-03', '2020-02-05'))
+assets = symbols(['SPY'])
+p = prices(assets, start, end)
+assert p.shape == (5,)
+assert type(p)  == pd.Series
 
-print(returns(assets, start, end))
+assets = [symbol('SPY')]
+p = prices(assets, start, end)
+print(p)
+assert p.shape == (5,)
+assert type(p)  == pd.Series
 
-print(prices(symbols(['AAPL']), '2020-08-26', '2020-09-02'))
+assets = symbols(['IBM', 'F', 'AAPL'])
+p = returns(assets, start, end)
+print(p)
+assert p.shape == (5, 3)
+assert type(p)  == pd.DataFrame
+
+assets = symbols(['SPY'])
+p = returns(assets, start, end)
+print(p)
+assert p.shape == (5,)
+assert type(p)  == pd.Series
+
+assets = [symbol('SPY')]
+p = returns(assets, start, end)
+assert p.shape == (5,)
+assert type(p)  == pd.Series
+
 
 
 

@@ -135,7 +135,6 @@ class NamedUniverse(CustomFilter):
 
 
 if __name__ == "__main__":
-    # TODO ask the dates
     universe_start = pd.to_datetime('1998-10-16', utc=True)
     universe_end = pd.to_datetime('2020-12-30', utc=True)
 

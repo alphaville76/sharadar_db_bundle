@@ -34,6 +34,7 @@ from zipline.finance.blotter import Blotter
 from sharadar.util.serialization_utils import store_context
 from trading_calendars import register_calendar_alias
 from trading_calendars.errors import CalendarNameCollision
+from sharadar.pipeline.engine import returns
 
 class _RunAlgoError(click.ClickException, ValueError):
     """Signal an error that should have a different message if invoked from
@@ -122,9 +123,7 @@ def _run(handle_data,
         log.info("Backtest from %s to %s." % (start.date(), end.date()))
 
     if benchmark_symbol:
-        benchmark = symbol(benchmark_symbol)
-        benchmark_sid = benchmark.sid
-        benchmark_returns = load_benchmark_data_bundle(bundle_data.equity_daily_bar_reader, benchmark)
+        benchmark_returns = returns([symbol(benchmark_symbol)], start, end)
     else:
         benchmark_sid = None
         benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'),data=0.0)
@@ -226,7 +225,6 @@ def _run(handle_data,
                 ctx_whitelist = ['perf_tracker']
                 ctx_excludes = ctx_blacklist + [e for e in backtest.__dict__.keys() if e not in ctx_whitelist]
                 backtest.run()
-                #TODO better logic for the checksumq
                 checksum = getattr(algofile, 'name', '<algorithm>')
                 store_context(state_filename, context=backtest, checksum=checksum, exclude_list=ctx_excludes)
             else:
@@ -239,7 +237,6 @@ def _run(handle_data,
             end = start
 
 
-    # TODO inizia qui per creare un prerun dell'algo prima del live trading
     # usare store_context prima di passare da TradingAlgorithm a LiveTradingAlgorithm
     TradingAlgorithmClass = (partial(LiveTradingAlgorithm,
                                      broker=broker,
@@ -305,16 +302,6 @@ def create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, ana
 
 # All of the loaded extensions. We don't want to load an extension twice.
 _loaded_extensions = set()
-
-
-def load_benchmark_data_bundle(price_reader, benchmark):
-    first_date = benchmark.start_date
-    last_date = benchmark.end_date
-
-    benchmark_prices = price_reader.load_series('close', first_date, last_date, benchmark.sid).dropna()
-    benchmark_returns = benchmark_prices.sort_index().pct_change(1).iloc[1:]
-    return benchmark_returns
-
 
 def load_extensions(default, extensions, strict, environ, reload=False):
     """Load all of the given extensions. This should be called by run_algo

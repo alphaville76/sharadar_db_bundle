@@ -79,7 +79,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
 
     perf_stats_series = pf.timeseries.perf_stats(rets, positions=positions, transactions=transactions)
 
-    benchmark_rets = returns(symbols(['SPY']), rets.index[0], rets.index[-1]).values
+    benchmark_rets = returns([symbol('SPY')], rets.index[0], rets.index[-1])
     benchmark_perf_stats = pf.timeseries.perf_stats(benchmark_rets)
 
     perf_stats_df = pd.DataFrame(perf_stats_series, columns=['Backtest'])
@@ -432,8 +432,8 @@ def print_portfolio(log, context):
 if __name__ == "__main__":
     import warnings
     warnings.filterwarnings('ignore')
-    algo_file = '../../algo/haugen/haugen_blacklist.py'
-    perf_dump_file = '../../algo/haugen/haugen_blacklist_2021-03-24_0552_perf.dump'
+    algo_file = '../../algo/haugen/haugen20_10.py'
+    perf_dump_file = '../../algo/haugen/haugen20_10_2021-03-25_0924_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
     now = datetime.datetime.now()
     create_report(perf, algo_file, now)

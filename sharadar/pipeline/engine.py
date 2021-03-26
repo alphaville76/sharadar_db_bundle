@@ -159,6 +159,17 @@ def to_sids(assets):
         return [x.sid for x in assets]
     return [assets.sid]
 
+def prices_old(assets, start, end, field='close', offset=0):
+    """
+    Get price data for assets between start and end.
+    """
+    start = trading_date(start)
+    end = trading_date(end)
+
+    if offset > 0:
+        start = _bar_reader().trading_calendar.sessions_window(start, -offset)[0]
+
+    return _bar_reader().load_dataframe(field, start, end, to_sids(assets))
 
 def prices(assets, start, end, field='close', offset=0):
     """
@@ -181,10 +192,12 @@ def prices(assets, start, end, field='close', offset=0):
                              equity_daily_reader=bundle.equity_daily_bar_reader,
                              adjustment_reader=bundle.adjustment_reader)
 
-    return data_portal.get_history_window(assets=assets, end_dt=end, bar_count=bar_count,
+    df = data_portal.get_history_window(assets=assets, end_dt=end, bar_count=bar_count,
                                              frequency='1d',
                                              field=field,
                                              data_frequency='daily')
+
+    return df if len(assets) > 1 else df.squeeze()
 
 
 def returns(assets, start, end, periods=1, field='close'):
