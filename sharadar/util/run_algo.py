@@ -123,7 +123,9 @@ def _run(handle_data,
         log.info("Backtest from %s to %s." % (start.date(), end.date()))
 
     if benchmark_symbol:
-        benchmark_returns = returns([symbol(benchmark_symbol)], start, end)
+        benchmark = symbol(benchmark_symbol)
+        benchmark_sid = benchmark.sid
+        benchmark_returns = returns([benchmark], start, end)
     else:
         benchmark_sid = None
         benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'),data=0.0)
