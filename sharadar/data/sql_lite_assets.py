@@ -175,7 +175,8 @@ class SQLiteAssetFinder(AssetFinder):
 
     @cached
     def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar = get_calendar('XNYS')):
-        sessions = calendar.sessions_window(as_of_date, n-1)
+        assert n > 0
+        sessions = calendar.sessions_window(as_of_date, -n+1)
         query = "SELECT start_date, sid, value FROM equity_supplementary_mappings " \
                 "WHERE field ='%s' AND sid in (%s) AND start_date >= %s AND start_date <= %s" \
                 % (field_name, ",".join(map(str, sids)), sessions[0].value, sessions[-1].value)
@@ -187,6 +188,21 @@ class SQLiteAssetFinder(AssetFinder):
 
     def _fmt_date(self, dt):
         return dt.value
+
+    @property
+    def last_available_fundamentals_dt(self):
+        return self.last_available_dt('revenue_arq')
+
+    @property
+    def last_available_daily_metrics_dt(self):
+        return self.last_available_dt('marketcap')
+
+    def last_available_dt(self, field):
+        sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
+        res = self.engine.execute(sql).fetchall()
+        if len(res) == 0:
+            return pd.NaT
+        return pd.Timestamp(res[0][0], tz='UTC')
 
 
 
@@ -332,18 +348,3 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             return False
         else:
             return True
-
-    @property
-    def last_available_fundamentals_dt(self):
-        return self.last_available_dt('revenue_arq')
-
-    @property
-    def last_available_daily_metrics_dt(self):
-        return self.last_available_dt('marketcap')
-
-    def last_available_dt(self, field):
-        sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
-        res = self.engine.execute(sql).fetchall()
-        if len(res) == 0:
-            return pd.NaT
-        return pd.Timestamp(res[0][0], tz='UTC')

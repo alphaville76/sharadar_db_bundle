@@ -9,6 +9,9 @@ from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.factors import CustomFactor, DailyReturns
 from zipline.utils.numpy_utils import object_dtype
 from zipline.pipeline.factors import AverageDollarVolume
+from sharadar.pipeline.engine import history, returns
+from sharadar.util.logger import log
+
 
 def nanmean(a, axis=0):
     with warnings.catch_warnings():
@@ -138,13 +141,22 @@ class IsDelinquent(CustomClassifier, BundleLoader):
         equities = self.asset_finder().retrieve_all(assets)
         out[:] = [((len(e.symbol) == 5) & e.symbol.endswith('E')) for e in equities]
 
+
+def get_daily_metrics(asset_finder, assets, field, today, n, mult=1):
+    metric = mult * asset_finder.get_daily_metrics(assets, field, today, n)
+    if np.isnan(metric).all():
+        # If all NaN (not ingested because delay in computation in SEP) then use the data of the previous day
+        log.warn("No data for %s on %s. Use data from previous day." % (field, today.date()))
+        metric = mult * asset_finder.get_daily_metrics(assets, field, today, n + 1)[0, :]
+    return metric
+
 class MarketCap(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'marketcap', today, n=self.window_length) * 1e6
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'marketcap', today, self.window_length, 1e6)
 
     def __str__(self):
         return "MarketCap(%d)" % self.window_length
@@ -152,10 +164,10 @@ class MarketCap(CustomFactor, BundleLoader):
 class EV(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'ev', today, n=self.window_length)*1e6
+        out[:] = out[:] = get_daily_metrics(self.asset_finder(), assets, 'ev', today, self.window_length, 1e6)
 
     def __str__(self):
         return "EV(%d)" % self.window_length
@@ -163,10 +175,10 @@ class EV(CustomFactor, BundleLoader):
 class EvEbit(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'evebit', today, n=self.window_length)
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'evebit', today, self.window_length)
 
     def __str__(self):
         return "EvEbit(%d)" % self.window_length
@@ -175,10 +187,10 @@ class EvEbit(CustomFactor, BundleLoader):
 class EvEbitda(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'evebitda', today, n=self.window_length)
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'evebitda', today, self.window_length)
 
     def __str__(self):
         return "EvEbitda(%d)" % self.window_length
@@ -187,10 +199,10 @@ class EvEbitda(CustomFactor, BundleLoader):
 class PriceBook(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'pb', today, n=self.window_length)
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'pb', today, self.window_length)
 
     def __str__(self):
         return "PriceBook(%d)" % self.window_length
@@ -199,10 +211,10 @@ class PriceBook(CustomFactor, BundleLoader):
 class PriceEarnings(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'pe', today, n=self.window_length)
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'pe', today, self.window_length)
 
     def __str__(self):
         return "PriceEarnings(%d)" % self.window_length
@@ -211,10 +223,10 @@ class PriceEarnings(CustomFactor, BundleLoader):
 class PriceSales(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = True
+    window_safe = False
 
     def compute(self, today, assets, out):
-        out[:] = self.asset_finder().get_daily_metrics(assets, 'ps', today, n=self.window_length)
+        out[:] = get_daily_metrics(self.asset_finder(), assets, 'ps', today, self.window_length)
 
     def __str__(self):
         return "PriceSales(%d)" % self.window_length
@@ -534,5 +546,4 @@ class ForwardsReturns(CustomFactor, BundleLoader):
     def compute(self, today, assets, out):
         end_dt = self.bar_reader().trading_calendar.sessions_window(today, self.window_length)[-1]
 
-        close = self.bar_reader().load_raw_arrays(['close'], today, end_dt, assets)
-        out[:] = (close[0][-1] - close[0][0]) / close[0][0]
+        out[:] = returns(assets, today, end_dt)

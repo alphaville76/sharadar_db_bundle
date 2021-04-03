@@ -10,7 +10,7 @@ from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
 from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
-from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
+from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
@@ -227,7 +227,8 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_asset_info(sharadar_metadata_df, cursor)
 
-    start_date_fundamentals = asset_db_writer.last_available_fundamentals_dt
+    asset_db_reader = SQLiteAssetFinder(asset_dbpath)
+    start_date_fundamentals = asset_db_reader.last_available_fundamentals_dt
     log.info("Start creating Fundamentals dataframe from %s..." % start_date_fundamentals)
     if must_fetch_entire_table(start_date_fundamentals):
         sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
@@ -236,7 +237,7 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
 
-    start_date_metrics = asset_db_writer.last_available_daily_metrics_dt
+    start_date_metrics = asset_db_reader.last_available_daily_metrics_dt
     log.info("Start creating daily metrics dataframe from %s..." % start_date_metrics)
     if must_fetch_entire_table(start_date_metrics):
         daily_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])

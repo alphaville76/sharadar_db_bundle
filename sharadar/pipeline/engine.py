@@ -159,18 +159,6 @@ def to_sids(assets):
         return [x.sid for x in assets]
     return [assets.sid]
 
-def prices_old(assets, start, end, field='close', offset=0):
-    """
-    Get price data for assets between start and end.
-    """
-    start = trading_date(start)
-    end = trading_date(end)
-
-    if offset > 0:
-        start = _bar_reader().trading_calendar.sessions_window(start, -offset)[0]
-
-    return _bar_reader().load_dataframe(field, start, end, to_sids(assets))
-
 def prices(assets, start, end, field='close', offset=0):
     """
     Get price data for assets between start and end.
@@ -199,6 +187,11 @@ def prices(assets, start, end, field='close', offset=0):
 
     return df if len(assets) > 1 else df.squeeze()
 
+def history(assets, as_of_date, n, field='close'):
+    as_of_date = trading_date(as_of_date)
+    trading_calendar = load_sharadar_bundle().equity_daily_bar_reader.trading_calendar
+    sessions = trading_calendar.sessions_window(as_of_date, -n + 1)
+    return prices(assets, sessions[0], sessions[-1], field)
 
 def returns(assets, start, end, periods=1, field='close'):
     """
