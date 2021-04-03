@@ -38,7 +38,7 @@ import zipline.protocol as zp
 from zipline.protocol import MutableView
 from zipline.api import symbol as symbol_lookup
 from zipline.errors import SymbolNotFound
-
+from ibapi.tag_value import TagValue
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper, TickTypeEnum
 from ibapi.contract import Contract
@@ -703,6 +703,9 @@ class IBBroker(Broker):
 
         if isinstance(style, MarketOrder):
             order.orderType = "MKT"
+            order.algoStrategy = "Adaptive"
+            order.algoParams = []
+            order.algoParams.append(TagValue("adaptivePriority", "Normal"))
         elif isinstance(style, LimitOrder):
             order.orderType = "LMT"
         elif isinstance(style, StopOrder):
@@ -1014,3 +1017,8 @@ class IBBroker(Broker):
             df = pd.concat([df, ohlcv], axis=1)
 
         return df
+
+
+
+
+
