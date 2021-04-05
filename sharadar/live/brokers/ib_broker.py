@@ -703,17 +703,21 @@ class IBBroker(Broker):
 
         if isinstance(style, MarketOrder):
             order.orderType = "MKT"
+            order.tif = "DAY"
             order.algoStrategy = "Adaptive"
             order.algoParams = []
-            order.algoParams.append(TagValue("adaptivePriority", "Normal"))
+            order.algoParams.append(TagValue("adaptivePriority", "Patient"))
         elif isinstance(style, LimitOrder):
             order.orderType = "LMT"
+            order.tif = "GTC"
         elif isinstance(style, StopOrder):
             order.orderType = "STP"
+            order.tif = "GTC"
         elif isinstance(style, StopLimitOrder):
             order.orderType = "STP LMT"
+            order.tif = "GTC"
 
-        order.tif = "GTC"
+
         order.orderRef = self._create_order_ref(order)
 
         ib_order_id = self._tws.next_order_id

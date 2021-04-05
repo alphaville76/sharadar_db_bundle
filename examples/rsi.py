@@ -115,7 +115,3 @@ def run_this_algorithm():
 if __name__ == "__main__":
     # execute only if run as a script
     run_this_algorithm()
-
-if __name__ == "__main__":
-    # execute only if run as a script
-    run_this_algorithm()
