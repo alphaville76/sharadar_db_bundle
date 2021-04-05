@@ -7,6 +7,9 @@ def cancel_orders_eod(context, data):
     the canceled orders and resubmit them a day later at market open.
 
     See also zipline.finance.blotter.simulation_blotter.SimulationBlotter.execute_cancel_policy
+
+    To apply, use:
+        schedule_function(cancel_orders_eod, date_rules.every_day(), time_rules.market_close())
     """
     # Delete the previous stored orders
 
@@ -29,8 +32,11 @@ def cancel_orders_eod(context, data):
 def resubmit_canceled_orders(context, data):
     """
     Try to resubmit canceled orders for the first 15 days of the month
+
+    To apply, use:
+        schedule_function(resubmit_canceled_orders, date_rules.every_day(), time_rules.market_open())
     """
-    if get_datetime().day > context.PARAM['max_resubmit_day']:
+    if get_datetime().day > context.PARAM.get('max_resubmit_day', 15):
         return
 
     for sid, amount in list(context.canceled_orders.items()):
