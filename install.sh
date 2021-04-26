@@ -1,7 +1,7 @@
-export INSTALL_DIR="~/dev/sharadar_db_bundle"
+export INSTALL_DIR=~/dev/sharadar_db_bundle
 mkdir -p $INSTALL_DIR
 cd $INSTALL_DIR
-virtualenv -p /usr/bin/python3.6 venv
+virtualenv -p /usr/bin/python3.8 venv
 source venv/bin/activate
 python -m pip install --upgrade pip
 pip install pytest

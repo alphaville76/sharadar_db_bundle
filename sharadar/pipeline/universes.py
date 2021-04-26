@@ -91,7 +91,7 @@ def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
     universe_start = prices_start.tz_localize('utc')
     universe_end = prices_end.tz_localize('utc')
     universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
-    if universe_last_date is not pd.NaT:
+    if not pd.isnull(universe_last_date):
         universe_start = universe_last_date
     log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
     UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     universe_name = TRADABLE_STOCKS_US
     screen = TradableStocksUS()
     universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
-    if universe_last_date is not pd.NaT:
+    if not pd.isnull(universe_last_date):
         universe_start = universe_last_date
     log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
     UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)

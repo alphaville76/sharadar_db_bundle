@@ -43,7 +43,7 @@ def process_data_table(df):
     return df
 
 def must_fetch_entire_table(date):
-    if date == pd.NaT:
+    if pd.isnull(date):
         return True
     return pd.to_datetime(date, utc=True) <= OLDEST_DATE_SEP;
 
@@ -229,19 +229,23 @@ def _ingest(start_session, end_session, calendar=get_calendar('XNYS'), output_di
 
     asset_db_reader = SQLiteAssetFinder(asset_dbpath)
     start_date_fundamentals = asset_db_reader.last_available_fundamentals_dt
-    log.info("Start creating Fundamentals dataframe from %s..." % start_date_fundamentals)
+    log.info("Start creating Fundamentals dataframe...")
     if must_fetch_entire_table(start_date_fundamentals):
+        log.info("Fetch entire table.")
         sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
     else:
+        log.info("Start date: %s" % start_date_fundamentals)
         sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_date_fundamentals, end_fetch_date)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
 
     start_date_metrics = asset_db_reader.last_available_daily_metrics_dt
-    log.info("Start creating daily metrics dataframe from %s..." % start_date_metrics)
+    log.info("Start creating daily metrics dataframe...")
     if must_fetch_entire_table(start_date_metrics):
+        log.info("Fetch entire table.")
         daily_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
     else:
+        log.info("Start date: %s" % start_date_fundamentals)
         daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_date_metrics, end_fetch_date)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
