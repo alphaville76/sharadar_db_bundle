@@ -6,7 +6,7 @@ from contextlib import closing
 from zipline.utils.calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
 from sharadar.util.logger import log
-from zipline.data.adjustments import SQLiteAdjustmentWriter
+from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader
 from six import (
     iteritems,
     string_types,
@@ -19,6 +19,12 @@ from zipline.data.bar_reader import (
 
 from singleton_decorator import singleton
 from sharadar.util.cache import cached
+from zipline.utils.numpy_utils import (
+    float64_dtype,
+    uint32_dtype,
+    uint64_dtype,
+)
+from zipline.data.data_portal import DataPortal
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "properties" (
@@ -143,7 +149,7 @@ class SQLiteDailyBarWriter(object):
                     try:
                         c.execute(sql % values)
                     except sqlite3.OperationalError as e:
-                        log.error(str(e) + "; values: " + str(values))
+                        log.error("SqlError %s: %s" % (e, (sql % values)))
                     count += 1
                     pbar.update(count)
 
@@ -265,11 +271,11 @@ class SQLiteDailyBarReader(SessionBarReader):
 
 class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
-
-    def __init__(self, filename, equity_daily_bar_reader, calendar):
-        self._filename = filename
+    def __init__(self, adjustment_dbpath, equity_daily_bar_reader, asset_finder, calendar):
+        self._filename = adjustment_dbpath
         self._equity_daily_bar_reader = equity_daily_bar_reader
         self._calendar = calendar
+        self._asset_finder = asset_finder
 
         # Create schema, if not exists
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
@@ -297,7 +303,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
             actual_dtypes = frame.dtypes
             for colname, expected in iteritems(expected_dtypes):
                 actual = actual_dtypes[colname]
-                if not np.issubdtype(actual, expected):
+                if actual != expected:
                     raise TypeError(
                         "Expected data of type {expected} for column"
                         " '{colname}', but got '{actual}'.".format(
@@ -324,4 +330,94 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         self.write_frame('splits', splits)
         self.write_frame('mergers', mergers)
         self.write_dividend_data(dividends, stock_dividends)
+
+    def calc_dividend_ratios(self, dividends):
+        """
+        Calculate the ratios to apply to equities when looking back at pricing
+        history so that the price is smoothed over the ex_date, when the market
+        adjusts to the change in equity value due to upcoming dividend.
+
+        Returns
+        -------
+        DataFrame
+            A frame in the same format as splits and mergers, with keys
+            - sid, the id of the equity
+            - effective_date, the date in seconds on which to apply the ratio.
+            - ratio, the ratio to apply to backwards looking pricing data.
+        """
+        if dividends is None or dividends.empty:
+            return pd.DataFrame(np.array(
+                [],
+                dtype=[
+                    ('sid', uint64_dtype),
+                    ('effective_date', uint32_dtype),
+                    ('ratio', float64_dtype),
+                ],
+            ))
+
+        pricing_reader = self._equity_daily_bar_reader
+        input_sids = dividends.sid.values
+        unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
+        dates = pricing_reader.sessions.values
+        start = pd.Timestamp(dates[0], tz='UTC')
+        end = pd.Timestamp(dates[-1], tz='UTC')
+        calendar = self._equity_daily_bar_reader.trading_calendar
+
+        data_portal = DataPortal(self._asset_finder,
+                                 trading_calendar=calendar,
+                                 first_trading_day=start,
+                                 equity_daily_reader=self._equity_daily_bar_reader,
+                                 adjustment_reader= SQLiteAdjustmentReader(self._filename))
+
+        close = data_portal.get_history_window(assets=unique_sids,
+                                               end_dt=end,
+                                               bar_count=calendar.session_distance(start, end),
+                                               frequency='1d',
+                                               field='close',
+                                               data_frequency='daily').values
+
+        date_ix = np.searchsorted(dates, dividends.ex_date.values)
+        mask = date_ix > 0
+
+        date_ix = date_ix[mask]
+        sids_ix = sids_ix[mask]
+        input_dates = dividends.ex_date.values[mask]
+
+        # subtract one day to get the close on the day prior to the merger
+        previous_close = close[date_ix - 1, sids_ix]
+        input_sids = input_sids[mask]
+
+        amount = dividends.amount.values[mask]
+        ratio = 1.0 - amount / previous_close
+
+        non_nan_ratio_mask = ~np.isnan(ratio)
+        for ix in np.flatnonzero(~non_nan_ratio_mask):
+            ex_date = pd.Timestamp(input_dates[ix], tz='UTC')
+            start_date = self._asset_finder.retrieve_asset(input_sids[ix]).start_date
+            if ex_date != start_date:
+                log.warn(
+                    "Couldn't compute ratio for dividend"
+                    " sid={sid}, ex_date={ex_date:%Y-%m-%d}, start_date={start_date:%Y-%m-%d}, amount={amount:.3f}",
+                    sid=input_sids[ix],
+                    ex_date=ex_date,
+                    amount=amount[ix],
+                    start_date=start_date
+                )
+
+        valid_ratio_mask = non_nan_ratio_mask > 0
+        for ix in np.flatnonzero(~valid_ratio_mask):
+            log.warn(
+                "Dividend ratio <= 0 for dividend"
+                " sid={sid}, ex_date={ex_date:%Y-%m-%d}, amount={amount:.3f}",
+                sid=input_sids[ix],
+                ex_date=pd.Timestamp(input_dates[ix]),
+                amount=amount[ix],
+            )
+
+        return pd.DataFrame({
+            'sid': input_sids[valid_ratio_mask],
+            'effective_date': input_dates[valid_ratio_mask],
+            'ratio': ratio[valid_ratio_mask],
+        })
+
 
