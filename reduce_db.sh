@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [ ! $# -eq 1 ]
   then
     echo "You must provide the START_DATE argument"
@@ -22,4 +24,4 @@ sqlite3 adjustments.sqlite "DELETE FROM splits WHERE effective_date < $start_dat
 sqlite3 adjustments.sqlite "VACUUM"
 
 sqlite3 assets-7.sqlite "DELETE FROM equity_supplementary_mappings WHERE start_date < $start_date_ns"
-sqlite3 assets-7.sqlite  "VACUUM"
+sqlite3 assets-7.sqlite "VACUUM"
