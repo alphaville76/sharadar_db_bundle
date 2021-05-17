@@ -106,7 +106,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 
     log.info("Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     quandl.ApiConfig.api_key=api_key
-    df = quandl.get_table(table_name, lastupdated={'gte':start,'lte':end}, paginate=True)
+    df = quandl.get_table(table_name, date={'gte':start,'lte':end}, paginate=True)
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
         df.set_index(index_col, inplace=True)
@@ -115,7 +115,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 def fetch_sf1_table_date(api_key, start, end=None):
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     quandl.ApiConfig.api_key=api_key
-    df = quandl.get_table('SHARADAR/SF1', dimension=['ARQ','ART'], lastupdated={'gte':start,'lte':end},
+    df = quandl.get_table('SHARADAR/SF1', dimension=['ARQ','ART'], date={'gte':start,'lte':end},
                           qopts={'latest':1}, paginate=True)
 
     return df
