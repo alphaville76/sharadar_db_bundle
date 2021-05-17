@@ -3,7 +3,7 @@
 if [ ! $# -eq 1 ]
   then
     echo "You must provide the START_DATE argument"
-    echo "Usage $0 <START_DATE>
+    echo "Usage $0 <START_DATE>"
     exit 1
 fi
 
