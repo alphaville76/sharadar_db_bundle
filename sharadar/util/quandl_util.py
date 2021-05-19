@@ -124,3 +124,6 @@ def fetch_sf1_table_date(api_key, start, end=None):
                           paginate=True)
 
     return df
+
+def last_available_date():
+    return quandl.get("USTREASURY/YIELD", rows=1).index[-1].strftime('%Y-%m-%d')

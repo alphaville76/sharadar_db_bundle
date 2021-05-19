@@ -17,7 +17,7 @@ from zipline.utils.calendars import get_calendar
 from zipline.utils.memoize import lazyval
 from pandas.tseries.offsets import DateOffset
 from datetime import timedelta
-
+from sharadar.util.logger import log
 
 @singleton
 class SQLiteAssetFinder(AssetFinder):
@@ -118,6 +118,9 @@ class SQLiteAssetFinder(AssetFinder):
         """
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
         if len(result) == 0:
+            log.warn("No result: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
+                (sids, field_name, as_of_date, n)
+            )
             return []
         #shape: (windows lenghts=1, num of assets)
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')

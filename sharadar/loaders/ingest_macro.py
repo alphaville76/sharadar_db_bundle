@@ -6,7 +6,7 @@ import pandas as pd
 from sharadar.util.output_dir import get_output_dir
 from sharadar.loaders.constant import OLDEST_DATE_SEP, METADATA_HEADERS
 from trading_calendars import get_calendar
-from sharadar.util.calendar_util import last_trading_date
+from sharadar.util.quandl_util import last_available_date
 
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
@@ -50,7 +50,7 @@ def _append_ohlc(df):
 
 
 def create_macro_equities_df(calendar=get_calendar('XNYS')):
-    end_date = pd.to_datetime(last_trading_date())
+    end_date = pd.to_datetime(last_available_date())
     df = pd.DataFrame(columns=METADATA_HEADERS)
     #_add_macro_def(df, 10001, pd.to_datetime('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')
     #_add_macro_def(df, 10002, pd.to_datetime('1997-12-31'), end_date, 'TR2M', 'US Treasury Bill 2 MO')
@@ -74,7 +74,7 @@ def create_macro_equities_df(calendar=get_calendar('XNYS')):
 
 
 def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
-    end = last_trading_date()
+    end = last_available_date()
 
     # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
     tres_df = quandl.get("USTREASURY/YIELD", start_date=start, end_date=end)
@@ -126,8 +126,7 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
     return prices
 
 
-
-def ingest(start, end):
+def ingest(start):
     from sharadar.pipeline.engine import load_sharadar_bundle
     from zipline.assets import ASSET_DB_VERSION
     from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter
@@ -136,7 +135,6 @@ def ingest(start, end):
     from sharadar.loaders.constant import EXCHANGE_DF
 
 
-    bundle = load_sharadar_bundle()
     calendar = get_calendar('XNYS')
     macro_equities_df = create_macro_equities_df()
     macro_prices_df = create_macro_prices_df(start)
@@ -149,18 +147,15 @@ def ingest(start, end):
     sql_daily_bar_writer.write(macro_prices_df)
     return macro_prices_df.shape[0]
 
-
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) < 2:
-        print("Usage: ingest_macro [start_date] [end_date]")
+    if len(sys.argv) < 1:
+        print("Usage: ingest_macro [start_date]")
         sys.exit(os.EX_USAGE)
 
 
     start = sys.argv[1]
 
-    end = sys.argv[2] if len(sys.argv) > 2 else None
-
-    print("Adding macro data from %s to %s ..." % (start, end))
-    n = ingest(start, end)
+    print("Adding macro data from %s..." % (start))
+    n = ingest(start)
     print("inserted/updated %d entries" % n)

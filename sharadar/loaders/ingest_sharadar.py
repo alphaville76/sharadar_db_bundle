@@ -18,7 +18,7 @@ from sharadar.util.logger import log, logfilename
 from contextlib import closing
 import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
-from sharadar.util.calendar_util import last_trading_date
+from sharadar.util.quandl_util import last_available_date
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
@@ -151,7 +151,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
-    end_session = pd.to_datetime(last_trading_date())
+    end_session = pd.to_datetime(last_available_date())
     # Check valid trading dates, according to the selected exchange calendar
     sessions = calendar.sessions_in_range(start_session, end_session)
 
