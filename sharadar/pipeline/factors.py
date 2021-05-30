@@ -12,7 +12,6 @@ from zipline.pipeline.factors import AverageDollarVolume
 from sharadar.pipeline.engine import history, returns
 from sharadar.util.logger import log
 
-
 def nanmean(a, axis=0):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -153,7 +152,7 @@ def get_daily_metrics(asset_finder, assets, field, today, n, mult=1):
 class MarketCap(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'marketcap', today, self.window_length, 1e6)
@@ -164,7 +163,7 @@ class MarketCap(CustomFactor, BundleLoader):
 class EV(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = out[:] = get_daily_metrics(self.asset_finder(), assets, 'ev', today, self.window_length, 1e6)
@@ -175,7 +174,7 @@ class EV(CustomFactor, BundleLoader):
 class EvEbit(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'evebit', today, self.window_length)
@@ -187,7 +186,7 @@ class EvEbit(CustomFactor, BundleLoader):
 class EvEbitda(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'evebitda', today, self.window_length)
@@ -199,7 +198,7 @@ class EvEbitda(CustomFactor, BundleLoader):
 class PriceBook(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'pb', today, self.window_length)
@@ -211,7 +210,7 @@ class PriceBook(CustomFactor, BundleLoader):
 class PriceEarnings(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'pe', today, self.window_length)
@@ -223,7 +222,7 @@ class PriceEarnings(CustomFactor, BundleLoader):
 class PriceSales(CustomFactor, BundleLoader):
     inputs = []
     window_length = 1
-    window_safe = False
+    window_safe = True
 
     def compute(self, today, assets, out):
         out[:] = get_daily_metrics(self.asset_finder(), assets, 'ps', today, self.window_length)

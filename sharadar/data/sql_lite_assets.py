@@ -114,7 +114,7 @@ class SQLiteAssetFinder(AssetFinder):
     def get_fundamentals(self, sids, field_name, as_of_date=None, n=1):
         """
         n=1 is the most recent quarter or last ttm, n=2 indicate the previous quarter or ttm and so on...
-        It's different from the original zipline windows_lenght
+        It's different from the original zipline window_length
         """
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
         if len(result) == 0:

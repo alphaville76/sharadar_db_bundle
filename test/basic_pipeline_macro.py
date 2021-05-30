@@ -15,9 +15,8 @@ bundle = load_sharadar_bundle()
 
 def ingest_macro():
     start = bundle.equity_daily_bar_reader.first_trading_day
-    end = bundle.equity_daily_bar_reader.last_available_dt
-    print("Adding macro data from %s to %s ..." % (start, end))
-    print(ingest(start, end))
+    print("Adding macro data from %s ..." % (start))
+    print(ingest(start))
 
 #ingest_macro()
 
