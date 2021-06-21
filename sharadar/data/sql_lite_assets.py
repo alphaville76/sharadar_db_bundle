@@ -157,8 +157,8 @@ class SQLiteAssetFinder(AssetFinder):
     @cached
     def get_fundamentals_ttm(self, sids, field_name, as_of_date=None, k=1):
         """
-        k=1 is the sum of the last twelve months, k=2 is the sum of the previouns twelve months and so on...
-        It's different from windows_lenght
+        k=1 is the sum of the last twelve months, k=2 is the sum of the previous twelve months and so on...
+        It's different from windows_length
         """
         result = self._get_result_ttm(sids, field_name + '_arq', as_of_date, k)
         if len(result) == 0:
@@ -320,11 +320,14 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         sane = True
 
         field = 'category'
+
         expected = ['ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
-                    'ADR Preferred Stock', 'ADR Stock Warrant', 'CEF', 'Canadian Common Stock',
-                    'Canadian Common Stock Primary Class', 'Canadian Preferred Stock', 'Canadian Stock Warrant',
+                    'ADR Preferred Stock', 'ADR Stock Warrant', 'CEF',
+                    'Canadian Common Stock', 'Canadian Common Stock Primary Class', 'Canadian Common Stock Secondary Class',
+                    'Canadian Preferred Stock', 'Canadian Stock Warrant',
                     'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class',
                     'Domestic Preferred Stock', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
+
         if not self._check_field(field, expected):
             sane = False
 
