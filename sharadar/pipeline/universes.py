@@ -1,9 +1,11 @@
 import sqlite3
+from collections import namedtuple
 from contextlib import closing
 
 import numpy as np
 import pandas as pd
 from click import progressbar
+from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
 from sharadar.pipeline.engine import make_pipeline_engine
 from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from sharadar.util.logger import log
@@ -28,7 +30,7 @@ CREATE INDEX "ix_date_%s" ON "%s" ("date");
 
 
 class UniverseWriter(object):
-    def __init__(self, universes_db_path):
+    def __init__(self, universes_db_path=os.path.join(get_output_dir(), "universes.sqlite")):
         self.engine = make_pipeline_engine()
         self.universes_db_path = universes_db_path
 
@@ -58,7 +60,7 @@ class UniverseWriter(object):
 
 @singleton
 class UniverseReader(object):
-    def __init__(self, db_path):
+    def __init__(self, db_path=os.path.join(get_output_dir(), "universes.sqlite")):
         db = sqlite3.connect(db_path, isolation_level=None)
         db.row_factory = lambda cursor, row: row[0]
         self.cursor = db.cursor()
@@ -83,26 +85,12 @@ class UniverseReader(object):
             return pd.NaT
         return pd.Timestamp(res[0], tz='UTC')
 
-
-def create_tradable_stocks_universe(output_dir, prices_start, prices_end):
-    universes_dbpath = os.path.join(output_dir, "universes.sqlite")
-    universe_name = TRADABLE_STOCKS_US
-    screen = TradableStocksUS()
-    universe_start = prices_start.tz_localize('utc')
-    universe_end = prices_end.tz_localize('utc')
-    universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
-    if not pd.isnull(universe_last_date):
-        universe_start = universe_last_date
-    log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
-    UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
-
-
-def StocksUS():
+def stocks_us(context):
     return (
             (USEquityPricing.close.latest > 3) &
             Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
             (Sector().notnull()) &
-            (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
+            (~Sector().element_of(context.PARAM['exclude_sectors'])) &
             (IsDomesticCommonStock().eq(1)) &
             (Fundamentals(field='revenue_arq') > 0) &
             (Fundamentals(field='assets_arq') > 0) &
@@ -110,12 +98,24 @@ def StocksUS():
             (EV() > 0)
     )
 
-def TradableStocksUS(min_percentile = 30):
+def base_universe(context):
+    min_percentile = context.PARAM['min_percentile']
     return (
-        (StocksUS()) &
-        (AverageDollarVolume(window_length=200).percentile_between(min_percentile, 100.0, mask=StocksUS())) &
-        (MarketCap().percentile_between(min_percentile, 100.0, mask=StocksUS()))
+        (stocks_us(context)) &
+        (AverageDollarVolume(window_length=200).percentile_between(min_percentile, 100.0, mask=stocks_us(context))) &
+        (MarketCap().percentile_between(min_percentile, 100.0, mask=stocks_us(context)))
     )
+
+def context():
+    class Object(object):
+        pass
+    ctx = Object()
+
+    ctx.PARAM = {}
+    ctx.PARAM['min_percentile'] = 20
+    ctx.PARAM['exclude_sectors'] = ['Financial Services', 'Real Estate', 'Energy', 'Utilities']
+
+    return ctx
 
 
 class NamedUniverse(CustomFilter):
@@ -134,16 +134,18 @@ class NamedUniverse(CustomFilter):
         out[:] = assets.isin(sids)
 
 
-if __name__ == "__main__":
+def update_universe(name, screen):
     universe_start = pd.to_datetime('1998-10-16', utc=True)
-    universe_end = pd.to_datetime('2020-12-30', utc=True)
-
-    from sharadar.util.output_dir import get_output_dir
-    universes_dbpath = os.path.join(get_output_dir(), "universes.sqlite")
-    universe_name = TRADABLE_STOCKS_US
-    screen = TradableStocksUS()
-    universe_last_date = UniverseReader(universes_dbpath).get_last_date(universe_name)
+    universe_end = SQLiteDailyBarReader().last_available_dt
+    universe_last_date = UniverseReader().get_last_date(name)
     if not pd.isnull(universe_last_date):
         universe_start = universe_last_date
-    log.info("Start creating universe '%s' from %s to %s ..." % (universe_name, universe_start, universe_end))
-    UniverseWriter(universes_dbpath).write(universe_name, screen, universe_start, universe_end)
+    log.info("Start creating or updating universe '%s' from %s to %s ..." % (name, universe_start, universe_end))
+    UniverseWriter().write(name, screen, universe_start, universe_end)
+
+
+if __name__ == "__main__":
+    screen = base_universe(context())
+
+
+    update_universe(TRADABLE_STOCKS_US, screen)

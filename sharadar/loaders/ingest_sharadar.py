@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import quandl
+from sharadar.pipeline.universes import update_universe, TRADABLE_STOCKS_US, base_universe, context
 from trading_calendars import get_calendar
 from sharadar.util.output_dir import get_output_dir
 from sharadar.util.quandl_util import fetch_entire_table
@@ -249,6 +250,9 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
         daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_date_metrics)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
+
+    screen = base_universe(context())
+    update_universe(TRADABLE_STOCKS_US, screen)
 
     if sanity_check:
         if asset_db_writer.check_sanity():

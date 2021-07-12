@@ -25,6 +25,9 @@ from zipline.utils.numpy_utils import (
     uint64_dtype,
 )
 from zipline.data.data_portal import DataPortal
+from sharadar.util.output_dir import get_output_dir
+import os
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "properties" (
@@ -163,7 +166,7 @@ class SQLiteDailyBarReader(SessionBarReader):
     --------
     zipline.data.us_equity_pricing.BcolzDailyBarReader
     """
-    def __init__(self, filename):
+    def __init__(self, filename=os.path.join(get_output_dir(), "prices.sqlite")):
         self._filename = filename
 
     def _query(self, sql):
