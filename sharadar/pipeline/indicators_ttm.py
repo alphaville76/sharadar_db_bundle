@@ -48,7 +48,7 @@ class CashFlowYieldEV(CustomFactor):
     def compute(self, today, assets, out, cf, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = cf[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 
@@ -65,7 +65,7 @@ class FreeCashFlowYieldEV(CustomFactor):
     def compute(self, today, assets, out, cf, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = cf[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 
@@ -82,7 +82,7 @@ class SalesYieldEV(CustomFactor):
     def compute(self, today, assets, out, sales, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = sales[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 class SalesYieldNoUSDEV(CustomFactor):
@@ -98,5 +98,5 @@ class SalesYieldNoUSDEV(CustomFactor):
     def compute(self, today, assets, out, sales, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = sales[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 

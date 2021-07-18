@@ -142,7 +142,8 @@ class InflationRateBeta(CustomFactor):
         out[:] = beta
 
 
-def adjust_for_inflation(rate, len, rateint, rateinf):
-    interest_rate = rateint[-len] / 100.0
-    inflation_rate = rateinf[-len] / 100.0
+def adjust_for_inflation(rate, interest_rate, inflation_rate):
+    """
+    All rates expressed as decimals: for example 2% is 0.02
+    """
     return ((1.0 + rate) / (1.0 + interest_rate) - 1.0) / (1.0 + inflation_rate)

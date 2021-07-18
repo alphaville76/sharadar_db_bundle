@@ -76,6 +76,9 @@ def create_macro_equities_df(calendar=get_calendar('XNYS')):
 def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
     end = last_available_date()
 
+    if start is not None and start > end:
+        start = end
+
     # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
     tres_df = quandl.get("USTREASURY/YIELD", start_date=start, end_date=end)
     # sids

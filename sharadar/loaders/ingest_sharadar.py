@@ -145,7 +145,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         df.append(df_ticker_synch)
 
 
-def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), sanity_check=True):
+def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), universe=False, sanity_check=True):
     os.makedirs(output_dir, exist_ok=True)
 
     print("logfiles:", logfilename)
@@ -251,8 +251,9 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
 
-    screen = base_universe(context())
-    update_universe(TRADABLE_STOCKS_US, screen)
+    if universe:
+        screen = base_universe(context())
+        update_universe(TRADABLE_STOCKS_US, screen)
 
     if sanity_check:
         if asset_db_writer.check_sanity():

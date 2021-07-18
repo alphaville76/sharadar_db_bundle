@@ -16,7 +16,7 @@ class EarningYieldEV(CustomFactor):
     def compute(self, today, assets, out, earning, ev, rateint, rateinf):
         l = self.window_length
         earning_yield_ev = earning[-l] / ev[-l]
-        out[:] = adjust_for_inflation(earning_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(earning_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 class BookValueYieldEV(CustomFactor):
@@ -32,7 +32,7 @@ class BookValueYieldEV(CustomFactor):
     def compute(self, today, assets, out, bv, ev, rateint, rateinf):
         l = self.window_length
         bv_yield_ev = bv[-l] / ev[-l]
-        out[:] = adjust_for_inflation(bv_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(bv_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 class CashFlowYieldEV(CustomFactor):
@@ -48,7 +48,7 @@ class CashFlowYieldEV(CustomFactor):
     def compute(self, today, assets, out, cf, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = cf[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
 
 class SalesYieldEV(CustomFactor):
@@ -64,5 +64,5 @@ class SalesYieldEV(CustomFactor):
     def compute(self, today, assets, out, sales, ev, rateint, rateinf):
         l = self.window_length
         cf_yield_ev = sales[-l] / ev[-l]
-        out[:] = adjust_for_inflation(cf_yield_ev, l, rateint, rateinf)
+        out[:] = adjust_for_inflation(cf_yield_ev, rateint[-l]/100.0, rateinf[-l]/100.0)
 
