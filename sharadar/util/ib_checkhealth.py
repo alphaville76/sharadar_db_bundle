@@ -1,14 +1,29 @@
 from sharadar.live.brokers.ib_broker import TWSConnection
 import os
+import sys
+from os.path import basename
 
-tws = TWSConnection('localhost:4002:123')
-tws.bind()
+def checkhealth(port):
+    tws = TWSConnection('localhost:'+port+':123')
+    tws.bind()
 
-if tws.isConnected():
-    tws.disconnect()
-    os._exit(os.EX_OK)
-else:
-    os._exit(os.EX_IOERR)
+    if tws.isConnected():
+        tws.disconnect()
+        return os.EX_OK
+    else:
+        return os.EX_IOERR
+
+if __name__ == "__main__":
+
+    if len(sys.argv) == 2:
+        print("Algo name:", sys.argv[1])
+        ex = checkhealth(sys.argv[1])
+        os._exit(ex)
+    else:
+        print("Usage:", basename(sys.argv[0]), 'PORT')
+        sys.exit(1)
+
+
 
 
 
