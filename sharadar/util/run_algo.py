@@ -211,8 +211,9 @@ def _run(handle_data,
             backtest_start = start
             backtest_end = bundle_data.equity_daily_bar_reader.last_available_dt
 
-            if not os.path.exists(state_filename):
-                log.info("No state file: backtesting from %s to %s." % (backtest_start.date(), backtest_end.date()))
+            abs_state_file = os.path.abspath(state_filename)
+            if not os.path.exists(abs_state_file):
+                log.info("No state file '%s': backtesting from %s to %s." % (abs_state_file, backtest_start.date(), backtest_end.date()))
                 backtest_data = DataPortal(
                     bundle_data.asset_finder,
                     trading_calendar=trading_calendar,
