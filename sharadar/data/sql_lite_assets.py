@@ -337,7 +337,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             sane = False
 
         field = 'exchange'
-        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+        #TODO share constant from factory.py
+        expected = ['BATS', 'CBOE', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
         if not self._check_field(field, expected):
             sane = False
 

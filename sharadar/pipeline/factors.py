@@ -85,7 +85,7 @@ class AbstractClassifier(CustomClassifier, BundleLoader):
 
 class Exchange(AbstractClassifier):
     def __init__(self):
-        categories = ['NYSE', 'NASDAQ', 'OTC', 'NYSEMKT', 'NYSEARCA', 'BATS']
+        categories = ['BATS', 'CBOE', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
         field = 'exchange'
         super().__init__(categories, field)
 
