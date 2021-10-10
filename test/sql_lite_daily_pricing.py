@@ -4,7 +4,9 @@ import quandl
 from os import environ as env
 import pandas as pd
 from sharadar.loaders.ingest_sharadar import process_data_table
-from zipline.utils.calendars import get_calendar
+from trading_calendars import get_calendar
+
+from sharadar.util import quandl_util
 from sharadar.util.equity_supplementary_util import lookup_sid
 from zipline.data.bar_reader import (
     NoDataBeforeDate,
@@ -35,7 +37,7 @@ def create_data_list(df, sharadar_metadata_df):
 
 quandl.ApiConfig.api_key=env["QUANDL_API_KEY"]
 
-sharadar_metadata_df = quandl.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
+sharadar_metadata_df = quandl_util.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
 sharadar_metadata_df.set_index('ticker', inplace=True)
 
 related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
@@ -43,14 +45,14 @@ related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
 related_tickers = ' ' + related_tickers.astype(str) + ' '
 
 def dt(s):
-    return pd.to_datetime(s)
+    return pd.to_datetime(s, utc=True)
 
 start = dt('2019-04-16')
 end = dt('2019-04-22')
 
 # dataframe with sid insted of ticker
 #data = quandl.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, ticker=['AAPL', 'IBM', 'PINS'], paginate=True)
-data = quandl.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, paginate=True)
+data = quandl_util.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, paginate=True)
 #data['sid'] = data['ticker'].apply(lambda x: sharadar_metadata_df.loc[x]['permaticker'])
 data['sid'] = data['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
 data = process_data_table(data)

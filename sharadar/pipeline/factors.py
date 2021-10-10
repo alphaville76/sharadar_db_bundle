@@ -85,7 +85,8 @@ class AbstractClassifier(CustomClassifier, BundleLoader):
 
 class Exchange(AbstractClassifier):
     def __init__(self):
-        categories = ['NYSE', 'NASDAQ', 'OTC', 'NYSEMKT', 'NYSEARCA', 'BATS']
+        # TODO share constant with sql_lite_assets
+        categories = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
         field = 'exchange'
         super().__init__(categories, field)
 

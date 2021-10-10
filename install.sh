@@ -1,10 +1,8 @@
-export INSTALL_DIR=~/dev/sharadar_db_bundle
-mkdir -p $INSTALL_DIR
-cd $INSTALL_DIR
-virtualenv -p /usr/bin/python3.8 venv
-source venv/bin/activate
+#!/bin/bash
+
+virtualenv -p /usr/bin/python3.8 ~/zipline-reloaded-venv
+source ~/zipline-reloaded-venv/bin/activate
 python -m pip install --upgrade pip
-pip install pytest
 export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
 
 # Install TA LIB
@@ -16,15 +14,14 @@ cd ta-lib
 ./configure
 make
 
-# Install zipline-trades and deps
+# Install zipline-reloaded with source code
 cd $PYTHON_LIBS
-sudo dnf install -y libpq5-devel
-git clone https://github.com/shlomikushchi/zipline-trader.git
-cd zipline-trader
-pip install wheel
-pip install -r etc/requirements_build.in
-export DISABLE_BCOLZ_AVX2=true
-pip install --no-binary=bcolz -e .[all] -r etc/requirements_blaze.in
+pip install zipline-reloaded # for dependecies
+git clone git@github.com:stefan-jansen/zipline-reloaded.git
+#cd zipline-reloaded
+#python setup.py build_ext --inplace
+#python setup.py install
+pip install pyfolio-reloaded
 
 # Install TWS api
 cd $PYTHON_LIBS
@@ -33,8 +30,7 @@ unzip twsapi_macunix.976.01.zip -d twsapi
 cd twsapi/IBJts/source/pythonclient
 python setup.py install
 
-pip install memoization singleton_decorator quandl pyfolio mailjet_rest
-pip install pandas==0.22.0
+
 cd $PYTHON_LIBS
 git clone https://github.com/alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle

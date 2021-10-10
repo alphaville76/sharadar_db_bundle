@@ -3,6 +3,8 @@ import os
 from os import environ as env
 from pandas.tseries.offsets import DateOffset
 import pandas as pd
+
+from sharadar.util import quandl_util
 from sharadar.util.output_dir import get_output_dir
 from sharadar.loaders.constant import OLDEST_DATE_SEP, METADATA_HEADERS
 from trading_calendars import get_calendar
@@ -21,16 +23,16 @@ def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
     # Remove timezone, otherwise "TypeError: data type not understood"
     df.loc[sid] = (ticker, asset_name,
                    start_date,
-                   end_date.tz_localize(None),
+                   end_date,
                    start_date,
-                   auto_close_date.tz_localize(None),
+                   auto_close_date,
                    exchange)
 
 def _quandl_get_monthly_to_daily(name, start, end, transform=None):
-    m_start = (pd.to_datetime(start) - DateOffset(months=6)).strftime('%Y-%m-%d')
-    df = quandl.get(name, start_date=m_start, transform=transform)
-    new_index = pd.date_range(start=m_start, end=end)
-    ret = df.reindex(new_index, method='ffill').loc[pd.date_range(start, end)]
+    m_start = (dt(start) - DateOffset(months=6)).strftime('%Y-%m-%d')
+    df = quandl_util.get(name, start_date=m_start, transform=transform)
+    new_index = pd.date_range(start=m_start, end=end, tz='UTC')
+    ret = df.reindex(new_index, method='ffill').loc[pd.date_range(start, end, tz='UTC')]
     return ret
 
 
@@ -49,27 +51,30 @@ def _append_ohlc(df):
     return df
 
 
+def dt(s):
+    return pd.to_datetime(s, utc=True)
+
 def create_macro_equities_df(calendar=get_calendar('XNYS')):
-    end_date = pd.to_datetime(last_available_date())
+    end_date = dt(last_available_date())
     df = pd.DataFrame(columns=METADATA_HEADERS)
-    #_add_macro_def(df, 10001, pd.to_datetime('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')
-    #_add_macro_def(df, 10002, pd.to_datetime('1997-12-31'), end_date, 'TR2M', 'US Treasury Bill 2 MO')
-    _add_macro_def(df, 10003, pd.to_datetime('1990-01-02'), end_date, 'TR3M', 'US Treasury Bill 3 MO')
-    _add_macro_def(df, 10006, pd.to_datetime('1990-01-02'), end_date, 'TR6M', 'US Treasury Bill 6 MO')
-    _add_macro_def(df, 10012, pd.to_datetime('1990-01-02'), end_date, 'TR1Y', 'US Treasury Bond 1 YR')
-    _add_macro_def(df, 10024, pd.to_datetime('1990-01-02'), end_date, 'TR2Y', 'US Treasury Bond 2 YR')
-    _add_macro_def(df, 10036, pd.to_datetime('1990-01-02'), end_date, 'TR3Y', 'US Treasury Bond 3 YR')
-    _add_macro_def(df, 10060, pd.to_datetime('1990-01-02'), end_date, 'TR5Y', 'US Treasury Bond 5 YR')
-    _add_macro_def(df, 10084, pd.to_datetime('1990-01-02'), end_date, 'TR7Y', 'US Treasury Bond 7 YR')
-    _add_macro_def(df, 10120, pd.to_datetime('1990-01-02'), end_date, 'TR10Y', 'US Treasury Bond 10 YR')
-    _add_macro_def(df, 10240, pd.to_datetime('1990-01-02'), end_date, 'TR20Y', 'US Treasury Bond 20 YR')
+    #_add_macro_def(df, 10001, dt('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')
+    #_add_macro_def(df, 10002, dt('1997-12-31'), end_date, 'TR2M', 'US Treasury Bill 2 MO')
+    _add_macro_def(df, 10003, dt('1990-01-02'), end_date, 'TR3M', 'US Treasury Bill 3 MO')
+    _add_macro_def(df, 10006, dt('1990-01-02'), end_date, 'TR6M', 'US Treasury Bill 6 MO')
+    _add_macro_def(df, 10012, dt('1990-01-02'), end_date, 'TR1Y', 'US Treasury Bond 1 YR')
+    _add_macro_def(df, 10024, dt('1990-01-02'), end_date, 'TR2Y', 'US Treasury Bond 2 YR')
+    _add_macro_def(df, 10036, dt('1990-01-02'), end_date, 'TR3Y', 'US Treasury Bond 3 YR')
+    _add_macro_def(df, 10060, dt('1990-01-02'), end_date, 'TR5Y', 'US Treasury Bond 5 YR')
+    _add_macro_def(df, 10084, dt('1990-01-02'), end_date, 'TR7Y', 'US Treasury Bond 7 YR')
+    _add_macro_def(df, 10120, dt('1990-01-02'), end_date, 'TR10Y', 'US Treasury Bond 10 YR')
+    _add_macro_def(df, 10240, dt('1990-01-02'), end_date, 'TR20Y', 'US Treasury Bond 20 YR')
     #_add_macro_def(df, 10360, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
-    _add_macro_def(df, 10400, pd.to_datetime('1996-12-31'), end_date, 'CBOND', 'US Corporate Bond Yield')
-    _add_macro_def(df, 10410, pd.to_datetime('1990-01-02'), end_date, 'INDPRO', 'Industrial Production Index')
-    _add_macro_def(df, 10420, pd.to_datetime('1990-01-02'), end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
-    _add_macro_def(df, 10430, pd.to_datetime('1990-01-02'), end_date, 'PMICMP', 'Purchasing Managers Index')
-    _add_macro_def(df, 10440, pd.to_datetime('1990-01-02'), end_date, 'UNRATE', 'Civilian Unemployment Rate')
-    _add_macro_def(df, 10450, pd.to_datetime('1990-01-02'), end_date, 'RATEINF', 'US Inflation Rates YoY')
+    _add_macro_def(df, 10400, dt('1996-12-31'), end_date, 'CBOND', 'US Corporate Bond Yield')
+    _add_macro_def(df, 10410, dt('1990-01-02'), end_date, 'INDPRO', 'Industrial Production Index')
+    _add_macro_def(df, 10420, dt('1990-01-02'), end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
+    _add_macro_def(df, 10430, dt('1990-01-02'), end_date, 'PMICMP', 'Purchasing Managers Index')
+    _add_macro_def(df, 10440, dt('1990-01-02'), end_date, 'UNRATE', 'Civilian Unemployment Rate')
+    _add_macro_def(df, 10450, dt('1990-01-02'), end_date, 'RATEINF', 'US Inflation Rates YoY')
     return df
 
 
@@ -80,14 +85,14 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
         start = end
 
     # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
-    tres_df = quandl.get("USTREASURY/YIELD", start_date=start, end_date=end)
+    tres_df = quandl_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
     # sids
     tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
     # TR1M, TR2M and TR30Y excluded because of too many missing data
     tres_df.drop(columns=[10001, 10002, 10360], inplace=True)
 
     sessions = calendar.sessions_in_range(start, end)
-    tres_df = tres_df.reindex(sessions.tz_localize(None))
+    tres_df = tres_df.reindex(sessions)
     tres_df = tres_df.fillna(method='ffill')
     tres_df = tres_df.dropna()
 
@@ -96,7 +101,7 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
     prices = _append_ohlc(prices)
 
     # https://www.quandl.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
-    corp_bond_df = _to_prices_df(quandl.get("ML/USEY", start_date=start, end_date=end), 10400)
+    corp_bond_df = _to_prices_df(quandl_util.get("ML/USEY", start_date=start, end_date=end), 10400)
     prices = prices.append(corp_bond_df)
 
     # Industrial Production Change

@@ -382,7 +382,6 @@ def run(ctx,
         handle_data=None,
         before_trading_start=None,
         analyze=None,
-        teardown=None,
         algofile=algofile,
         algotext=algotext,
         defines=define,
@@ -399,13 +398,9 @@ def run(ctx,
         local_namespace=local_namespace,
         environ=os.environ,
         blotter=blotter,
-        benchmark_spec=benchmark_spec,
         broker=brokerobj,
         state_filename=state_file,
-        realtime_bar_target=realtime_bar_target,
-        performance_callback=None,
-        stop_execution_callback=None,
-        execution_id=None
+        benchmark_symbol='SPY'
     )
 
     if output == '-':

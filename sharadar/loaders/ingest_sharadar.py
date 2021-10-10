@@ -3,8 +3,10 @@ import os
 import pandas as pd
 import numpy as np
 import quandl
-from sharadar.pipeline.universes import update_universe, TRADABLE_STOCKS_US, base_universe, context
+
 from trading_calendars import get_calendar
+
+from sharadar.util import quandl_util
 from sharadar.util.output_dir import get_output_dir
 from sharadar.util.quandl_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import lookup_sid
@@ -78,7 +80,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
 
 def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    dividends_df = quandl.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['dividend', 'spinoffdividend'], paginate=True)
+    dividends_df = quandl_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['dividend', 'spinoffdividend'], paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
     tickers_dividends = dividends_df['ticker'].unique()
@@ -94,7 +96,7 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     return dividends_df
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    splits_df = quandl.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['split'], paginate=True)
+    splits_df = quandl_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['split'], paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -120,7 +122,7 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
 def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
     this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
 
-    missing_dates = this_cal.tz_localize(None).difference(df_ticker.index.get_level_values(0).tz_localize(None)).values
+    missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
     if len(missing_dates) > 0:
         sid = df_ticker.index.get_level_values('sid')[0]
         ticker = df_ticker['ticker'][0]
@@ -128,7 +130,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
                  % (len(missing_dates), ticker, this_cal[0], this_cal[-1], missing_dates))
 
         sids = np.full(len(this_cal), sid)
-        synch_index = pd.MultiIndex.from_arrays([this_cal.tz_localize(None), sids], names=('date', 'sid'))
+        synch_index = pd.MultiIndex.from_arrays([this_cal, sids], names=('date', 'sid'))
         df_ticker_synch = df_ticker.reindex(synch_index)
 
         # Forward fill missing data, volume and dividens must remain 0
@@ -152,7 +154,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
-    end_session = pd.to_datetime(last_available_date())
+    end_session = pd.to_datetime(last_available_date(), utc=True)
     # Check valid trading dates, according to the selected exchange calendar
     sessions = calendar.sessions_in_range(start_session, end_session)
 
@@ -252,6 +254,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
 
     if universe:
+        from sharadar.pipeline.universes import update_universe, TRADABLE_STOCKS_US, base_universe, context
         screen = base_universe(context())
         update_universe(TRADABLE_STOCKS_US, screen)
 
@@ -265,7 +268,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
 
 def create_metadata():
-    sharadar_metadata_df = quandl.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+    sharadar_metadata_df = quandl_util.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
     # Add a space at the begin and end of relatedtickers, search for ' TICKER '
@@ -287,10 +290,10 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             asset_name = sharadar_metadata.loc['name']
 
-            # The date when this asset was created (tzinfo=None).
+            # The date when this asset was created (tzinfo=UTC).
             start_date = sharadar_metadata.loc['firstpricedate']
 
-            # The last date we have trade data for this asset (tzinfo=None)..
+            # The last date we have trade data for this asset (tzinfo=UTC)..
             end_date = sharadar_metadata.loc['lastpricedate']
 
             # The first date we have trade data for this asset.
@@ -306,8 +309,8 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             # Synch to the official exchange calendar, if necessary
             date_index = df_ticker.index.get_level_values('date')
-            start_date_df = date_index[0]
-            end_date_df = date_index[-1]
+            start_date_df = date_index[0] # (tzinfo=UTC)
+            end_date_df = date_index[-1] # (tzinfo=UTC)
             synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
 
             # Add a row to the metadata DataFrame.

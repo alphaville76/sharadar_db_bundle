@@ -7,7 +7,6 @@ import time
 import datetime
 from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.pipeline.universes import TradableStocksUS
 
 from os import environ as env
 import quandl
@@ -87,6 +86,26 @@ assert stocks.iloc[0]['mkt_cap']         == 1395121798000
 assert stocks.iloc[0]['sharefactor_arq'] == 1.00
 assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
 
+def stocks_us():
+    return (
+            (USEquityPricing.close.latest > 3) &
+            Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
+            (Sector().notnull()) &
+            (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
+            (IsDomesticCommonStock().eq(1)) &
+            (Fundamentals(field='revenue_arq') > 0) &
+            (Fundamentals(field='assets_arq') > 0) &
+            (Fundamentals(field='equity_arq') > 0) &
+            (EV() > 0)
+    )
+
+def base_universe(context):
+    min_percentile = context.PARAM['min_percentile']
+    return (
+        (stocks_us()) &
+        (AverageDollarVolume(window_length=200).percentile_between(min_percentile, 100.0, mask=stocks_us())) &
+        (MarketCap().percentile_between(min_percentile, 100.0, mask=stocks_us()))
+    )
 
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
@@ -94,8 +113,8 @@ pipe = Pipeline(columns={
     'Sector': Sector()
 },
 screen = (
-    (TradableStocksUS()) &
-    (AverageDollarVolume(window_length = 200, mask=TradableStocksUS()).top(10))
+    (stocks_us()) &
+    (AverageDollarVolume(window_length = 200, mask=stocks_us()).top(10))
 )
 )
 stocks = spe.run_pipeline(pipe, pipe_end)
