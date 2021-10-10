@@ -1,17 +1,11 @@
-import pandas as pd
-import numpy as np
 from zipline.pipeline import Pipeline
-from zipline.pipeline.data import USEquityPricing
 from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
-import time
-import datetime
 from sharadar.pipeline.factors import *
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.pipeline.universes import TradableStocksUS
-
 from os import environ as env
 import quandl
+
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 pd.set_option('display.float_format', lambda x: '%.2f' % x)

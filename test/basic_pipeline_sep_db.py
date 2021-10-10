@@ -38,6 +38,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+print(stocks.head())
 print("stocks.shape [close]", stocks.shape)
 assert stocks.shape == (9, 1)
 
@@ -49,6 +50,7 @@ pipe_mkt_cap = Pipeline(columns={
 
 start_time = time.time()
 stocks = spe.run_pipeline(pipe_mkt_cap, pipe_start, pipe_end)
+print(stocks.head(20))
 print("stocks.shape [mkt cap]", stocks.shape)
 #assert stocks.shape == (30019, 1)
 
@@ -65,6 +67,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end)
+print(stocks.head())
 print(stocks.shape)
 #assert stocks.shape == (15, 4)
 
@@ -81,10 +84,13 @@ print(stocks.iloc[0])
 assert stocks.iloc[0]['cash']            == 39771000000
 assert stocks.iloc[0]['close']           == 318.85
 assert stocks.iloc[0]['debt']            == 108292000000
-assert stocks.iloc[0]['ev']              == 1463642798000
-assert stocks.iloc[0]['mkt_cap']         == 1395121798000
+assert stocks.iloc[0]['ev']              == 1475010300000
+assert stocks.iloc[0]['mkt_cap']         == 1406489300000
 assert stocks.iloc[0]['sharefactor_arq'] == 1.00
-assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
+
+#TODO check the factor 17501920000/4375480000=4
+#assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
+
 
 def stocks_us():
     return (
@@ -118,7 +124,7 @@ screen = (
 )
 )
 stocks = spe.run_pipeline(pipe, pipe_end)
-print(stocks)
+print(stocks.head())
 print("stocks.shape", stocks.shape)
 assert stocks.shape == (10, 3)
 
@@ -132,5 +138,6 @@ pipe = Pipeline(columns={
 screen = StaticAssets(macro)
 )
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+print(stocks.head())
 print("stocks.shape [close]", stocks)
 assert stocks.shape == (4050, 1)
