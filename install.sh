@@ -18,10 +18,16 @@ make
 cd $PYTHON_LIBS
 pip install zipline-reloaded # for dependecies
 git clone git@github.com:stefan-jansen/zipline-reloaded.git
-#cd zipline-reloaded
-#python setup.py build_ext --inplace
-#python setup.py install
+cd zipline-reloaded
+python setup.py build_ext --inplace
+python setup.py install
+
+# Install pyfolio-reloaded with source code
+cd $PYTHON_LIBS
 pip install pyfolio-reloaded
+git clone git@github.com:stefan-jansen/pyfolio-reloaded
+cd pyfolio-reloaded
+python setup.py install
 
 # Install TWS api
 cd $PYTHON_LIBS

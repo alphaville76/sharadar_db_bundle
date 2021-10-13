@@ -93,7 +93,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
     transactions_closed = rt.add_closing_transactions(positions, transactions)
     trades = rt.extract_round_trips(
         transactions_closed,
-        portfolio_value=positions.sum(axis="columns") / (1 + returns)
+        portfolio_value=positions.sum(axis="columns") / (1 + rets)
     )
 
     if show_image:
@@ -432,8 +432,8 @@ def print_portfolio(log, context):
 if __name__ == "__main__":
     import warnings
     warnings.filterwarnings('ignore')
-    algo_file = '../../algo/cluster/clustersF7.py'
-    perf_dump_file = '../../algo/cluster/clustersF7_2021-07-08_1200_perf.dump'
+    algo_file = '../../algo/haugen/haugen.py'
+    perf_dump_file = '../../algo/haugen/haugen_2021-10-12_0154_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
     now = datetime.datetime.now()
     create_report(perf, algo_file, now)
