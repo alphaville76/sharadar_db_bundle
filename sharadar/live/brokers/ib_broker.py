@@ -27,8 +27,8 @@ import pandas as pd
 import numpy as np
 
 from sharadar.live.brokers.broker import Broker
-from zipline.finance.order import (Order as ZPOrder,
-                                   ORDER_STATUS as ZP_ORDER_STATUS)
+from zipline.finance.order import Order as ZPOrder
+from zipline.finance.order import ORDER_STATUS as ZP_ORDER_STATUS
 from zipline.finance.execution import (MarketOrder,
                                        LimitOrder,
                                        StopOrder,

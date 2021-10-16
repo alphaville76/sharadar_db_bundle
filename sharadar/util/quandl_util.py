@@ -5,7 +5,7 @@ import quandl
 from six.moves.urllib.parse import urlencode
 from io import BytesIO
 from zipfile import ZipFile
-
+import numpy as np
 from click import progressbar
 
 from logbook import Logger, StreamHandler, INFO, ERROR
@@ -71,7 +71,8 @@ def load_data_table(file, index_col=None, parse_dates=False):
             data_table = pd.read_csv(table_file, index_col=index_col,
                          parse_dates=parse_dates, na_values=['NA'])
 
-    return data_table
+    return datetime_to_utc(data_table)
+
 
 def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
     log.info("Start loading the entire %s dataset..." % table_name)
@@ -106,7 +107,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 
     log.info("Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     quandl.ApiConfig.api_key=api_key
-    df = quandl.get_table(table_name,
+    df = get_table(table_name,
                           date={'gte':start,'lte':end},
                           paginate=True)
     if index_col is not None:
@@ -117,7 +118,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 def fetch_sf1_table_date(api_key, start, end=None):
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     quandl.ApiConfig.api_key=api_key
-    df = quandl.get_table('SHARADAR/SF1',
+    df = get_table('SHARADAR/SF1',
                           dimension=['ARQ','ART'],
                           lastupdated={'gte':start,'lte':end},
                           qopts={'latest':1},
@@ -125,5 +126,22 @@ def fetch_sf1_table_date(api_key, start, end=None):
 
     return df
 
+
 def last_available_date():
-    return quandl.get("USTREASURY/YIELD", rows=1).index[-1].strftime('%Y-%m-%d')
+    return get("USTREASURY/YIELD", rows=1).index[-1].strftime('%Y-%m-%d')
+
+
+def get(dataset, **kwargs):
+    return quandl.get(dataset, **kwargs).tz_localize('UTC')
+
+def get_table(datatable_code, **options):
+    df = quandl.get_table(datatable_code, **options)
+
+    return datetime_to_utc(df);
+
+
+def datetime_to_utc(df):
+    for col in df.select_dtypes(include=[np.datetime64]).columns:
+        df[col] = df[col].dt.tz_localize('UTC')
+    return df
+

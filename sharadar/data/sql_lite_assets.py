@@ -6,14 +6,13 @@ from sharadar.util.cache import cached
 from singleton_decorator import singleton
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
-from zipline.assets.continuous_futures import CHAIN_PREDICATES
 from zipline.assets.asset_db_schema import (
     asset_router,
     equities as equities_table,
     equity_symbol_mappings,
     futures_contracts as futures_contracts_table,
 )
-from zipline.utils.calendars import get_calendar
+from trading_calendars import get_calendar
 from zipline.utils.memoize import lazyval
 from pandas.tseries.offsets import DateOffset
 from datetime import timedelta
@@ -22,8 +21,8 @@ from sharadar.util.logger import log
 @singleton
 class SQLiteAssetFinder(AssetFinder):
 
-    def __init__(self, engine, future_chain_predicates=CHAIN_PREDICATES):
-        super().__init__(engine, future_chain_predicates)
+    def __init__(self, engine):
+        super().__init__(engine)
         self.is_live_trading = False
 
     def _retrieve_asset_dicts(self, sids, asset_tbl, querying_equities):
@@ -337,8 +336,9 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             sane = False
 
         field = 'exchange'
-        #TODO share constant from factory.py
-        expected = ['BATS', 'CBOE', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+        # TODO share constant with factors.py
+        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+
         if not self._check_field(field, expected):
             sane = False
 

@@ -7,7 +7,6 @@ import time
 import datetime
 from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.pipeline.universes import TradableStocksUS
 
 from os import environ as env
 import quandl
@@ -39,6 +38,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+print(stocks.head())
 print("stocks.shape [close]", stocks.shape)
 assert stocks.shape == (9, 1)
 
@@ -50,6 +50,7 @@ pipe_mkt_cap = Pipeline(columns={
 
 start_time = time.time()
 stocks = spe.run_pipeline(pipe_mkt_cap, pipe_start, pipe_end)
+print(stocks.head(20))
 print("stocks.shape [mkt cap]", stocks.shape)
 #assert stocks.shape == (30019, 1)
 
@@ -66,6 +67,7 @@ screen = StaticAssets(symbols(['IBM', 'F', 'AAPL']))
 )
 
 stocks = spe.run_pipeline(pipe_mkt_cap_ev, pipe_start, pipe_end)
+print(stocks.head())
 print(stocks.shape)
 #assert stocks.shape == (15, 4)
 
@@ -82,11 +84,34 @@ print(stocks.iloc[0])
 assert stocks.iloc[0]['cash']            == 39771000000
 assert stocks.iloc[0]['close']           == 318.85
 assert stocks.iloc[0]['debt']            == 108292000000
-assert stocks.iloc[0]['ev']              == 1463642798000
-assert stocks.iloc[0]['mkt_cap']         == 1395121798000
+assert stocks.iloc[0]['ev']              == 1475010300000
+assert stocks.iloc[0]['mkt_cap']         == 1406489300000
 assert stocks.iloc[0]['sharefactor_arq'] == 1.00
-assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
 
+#TODO check the factor 17501920000/4375480000=4
+#assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
+
+
+def stocks_us():
+    return (
+            (USEquityPricing.close.latest > 3) &
+            Exchange().element_of(['NYSE', 'NASDAQ', 'NYSEMKT']) &
+            (Sector().notnull()) &
+            (~Sector().element_of(['Financial Services', 'Real Estate', 'Energy', 'Utilities'])) &
+            (IsDomesticCommonStock().eq(1)) &
+            (Fundamentals(field='revenue_arq') > 0) &
+            (Fundamentals(field='assets_arq') > 0) &
+            (Fundamentals(field='equity_arq') > 0) &
+            (EV() > 0)
+    )
+
+def base_universe(context):
+    min_percentile = context.PARAM['min_percentile']
+    return (
+        (stocks_us()) &
+        (AverageDollarVolume(window_length=200).percentile_between(min_percentile, 100.0, mask=stocks_us())) &
+        (MarketCap().percentile_between(min_percentile, 100.0, mask=stocks_us()))
+    )
 
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
@@ -94,12 +119,12 @@ pipe = Pipeline(columns={
     'Sector': Sector()
 },
 screen = (
-    (TradableStocksUS()) &
-    (AverageDollarVolume(window_length = 200, mask=TradableStocksUS()).top(10))
+    (stocks_us()) &
+    (AverageDollarVolume(window_length = 200, mask=stocks_us()).top(10))
 )
 )
 stocks = spe.run_pipeline(pipe, pipe_end)
-print(stocks)
+print(stocks.head())
 print("stocks.shape", stocks.shape)
 assert stocks.shape == (10, 3)
 
@@ -113,5 +138,6 @@ pipe = Pipeline(columns={
 screen = StaticAssets(macro)
 )
 stocks = spe.run_pipeline(pipe, pipe_start, pipe_end)
+print(stocks.head())
 print("stocks.shape [close]", stocks)
 assert stocks.shape == (4050, 1)

@@ -3,7 +3,7 @@ import numpy as np
 import sqlite3
 import click
 from contextlib import closing
-from zipline.utils.calendars import get_calendar
+from trading_calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
 from sharadar.util.logger import log
 from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader
@@ -180,7 +180,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         return res[0][0] == 1
 
     def _fmt_date(self, dt):
-        return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00"
+        return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00+00:00"
 
     @cached
     def get_value(self, sid, dt, field):
