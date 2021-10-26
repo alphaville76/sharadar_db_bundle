@@ -1,4 +1,5 @@
 import os, sys
+import subprocess
 from os import environ as env
 from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
 from zipline.api import get_datetime
@@ -11,46 +12,38 @@ from sharadar.util.mail import send_mail
 # log in local time instead of UTC
 set_datetime_format("local")
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
+LOG_LEVEL_MAP = {'CRITICAL': 2, 'ERROR': 3, 'WARNING': 4, 'NOTICE': 5, 'INFO': 6, 'DEBUG': 7, 'TRACE': 7}
 
-now = datetime.datetime.now()
-logfilename = os.path.join(env["HOME"], "log", "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
 log = Logger('sharadar_db_bundle')
-log_file_handler = FileHandler(logfilename, level=DEBUG, bubble=True)
-log_file_handler.format_string = LOG_ENTRY_FMT
-log.handlers.append(log_file_handler)
-log_std_handler = StreamHandler(sys.stdout, level=INFO)
-log_std_handler.format_string = LOG_ENTRY_FMT
-log.handlers.append(log_std_handler)
 
 
-def log_top_mem_usage(logger, snapshot, key_type='lineno', limit=10):
-    snapshot = snapshot.filter_traces((
-        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-        tracemalloc.Filter(False, "<unknown>"),
-    ))
-    top_stats = snapshot.statistics(key_type)
+class SharadarDbBundleLogger(Logger):
+    def __init__(self, logname='Backtest', level=NOTSET):
+        super().__init__(logname, level)
 
-    logger.info("Top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        logger.info("#%s: %s:%s: %.1f KiB"
-              % (index, frame.filename, frame.lineno, stat.size / 1024))
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            logger.info('    %s' % line)
+        now = datetime.datetime.now()
+        logfilename = os.path.join(env["HOME"], "log",
+                                   "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
 
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        logger.info("%s other: %.1f KiB" % (len(other), size / 1024))
-    total = sum(stat.size for stat in top_stats)
-    logger.info("Total allocated size: %.1f KiB" % (total / 1024))
+        log_file_handler = FileHandler(logfilename, level=DEBUG, bubble=True)
+        log_file_handler.format_string = LOG_ENTRY_FMT
+        self.handlers.append(log_file_handler)
+
+        log_std_handler = StreamHandler(sys.stdout, level=INFO)
+        log_std_handler.format_string = LOG_ENTRY_FMT
+        self.handlers.append(log_std_handler)
+
+    def process_record(self, record):
+        super().process_record(record)
+        if os.name == 'posix':
+            msg = record.message.encode("unicode_escape").decode("utf-8")
+            cmd = "echo '%s' | systemd-cat -t sharadar_db_bundle -p %d" % (msg, LOG_LEVEL_MAP[record.level_name])
+            subprocess.run(cmd, shell=True)
+
 
 
 class BacktestLogger(Logger):
-
-
-    def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET):
+    def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET, record_time=get_datetime):
         super().__init__(logname, level)
 
         path, ext = os.path.splitext(filename)
@@ -65,6 +58,7 @@ class BacktestLogger(Logger):
         self.handlers.append(stream_handler)
 
         self.arena = arena
+        self.record_time = record_time
 
     def process_record(self, record):
         """
@@ -73,9 +67,17 @@ class BacktestLogger(Logger):
         super().process_record(record)
         if self.arena == 'live':
             send_mail(record.channel + " " + record.level_name, record.message)
-        record.time = get_datetime()
+        record.time = self.record_time()
 
 if __name__ == '__main__':
+    log = SharadarDbBundleLogger()
     log.info("Hello World!")
-    BacktestLogger(__file__, arena='live', logname="Myname").warn("Hello World!")
+    log.error("ciao")
+    log.warning("ciao\nbello")
+
+
+    import pandas as pd
+    def log_time():
+        return pd.to_datetime("today")
+    BacktestLogger(__file__, arena='live', logname="Myname", record_time=log_time).warn("Hello World!")
 
