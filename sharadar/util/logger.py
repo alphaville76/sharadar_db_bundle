@@ -1,24 +1,21 @@
-import os, sys
-import subprocess
-from os import environ as env
-from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
-from zipline.api import get_datetime
 import datetime
-import linecache
 import os
-import tracemalloc
+import subprocess
+import sys
+from os import environ as env
+
+from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
 from sharadar.util.mail import send_mail
+from zipline.api import get_datetime
 
 # log in local time instead of UTC
 set_datetime_format("local")
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
 LOG_LEVEL_MAP = {'CRITICAL': 2, 'ERROR': 3, 'WARNING': 4, 'NOTICE': 5, 'INFO': 6, 'DEBUG': 7, 'TRACE': 7}
 
-log = Logger('sharadar_db_bundle')
-
 
 class SharadarDbBundleLogger(Logger):
-    def __init__(self, logname='Backtest', level=NOTSET):
+    def __init__(self, logname='sharadar_db_bundle', level=NOTSET):
         super().__init__(logname, level)
 
         now = datetime.datetime.now()
@@ -40,6 +37,8 @@ class SharadarDbBundleLogger(Logger):
             cmd = "echo '%s' | systemd-cat -t sharadar_db_bundle -p %d" % (msg, LOG_LEVEL_MAP[record.level_name])
             subprocess.run(cmd, shell=True)
 
+
+log = SharadarDbBundleLogger()
 
 
 class BacktestLogger(Logger):
@@ -68,6 +67,7 @@ class BacktestLogger(Logger):
         if self.arena == 'live':
             send_mail(record.channel + " " + record.level_name, record.message)
         record.time = self.record_time()
+
 
 if __name__ == '__main__':
     log = SharadarDbBundleLogger()
