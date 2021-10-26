@@ -1,17 +1,13 @@
-import pandas as pd
-import requests
-import sys
-import quandl
-from six.moves.urllib.parse import urlencode
 from io import BytesIO
 from zipfile import ZipFile
-import numpy as np
-from click import progressbar
 
-from logbook import Logger, StreamHandler, INFO, ERROR
-log = Logger('quandl_util.py')
-StreamHandler(sys.stdout, level=INFO).push_application()
-StreamHandler(sys.stderr, level=ERROR).push_application()
+import numpy as np
+import pandas as pd
+import quandl
+import requests
+from click import progressbar
+from sharadar.util.logger import log
+from six.moves.urllib.parse import urlencode
 
 ONE_MEGABYTE = 1024 * 1024
 QUANDL_DATA_URL = (
