@@ -17,7 +17,7 @@ from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 from zipline.assets import ASSET_DB_VERSION
 from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
-from sharadar.util.logger import log, logfilename
+from sharadar.util.logger import log
 from contextlib import closing
 import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
@@ -150,7 +150,7 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
 def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), universe=False, sanity_check=True):
     os.makedirs(output_dir, exist_ok=True)
 
-    print("logfiles:", logfilename)
+    print("logfiles:", log.filename)
 
     log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 

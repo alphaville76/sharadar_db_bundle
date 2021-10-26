@@ -19,10 +19,10 @@ class SharadarDbBundleLogger(Logger):
         super().__init__(logname, level)
 
         now = datetime.datetime.now()
-        logfilename = os.path.join(env["HOME"], "log",
+        self.filename = os.path.join(env["HOME"], "log",
                                    "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
 
-        log_file_handler = FileHandler(logfilename, level=DEBUG, bubble=True)
+        log_file_handler = FileHandler(self.filename, level=DEBUG, bubble=True)
         log_file_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(log_file_handler)
 
