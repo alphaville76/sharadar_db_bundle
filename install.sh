@@ -1,7 +1,7 @@
 #!/bin/bash
-
-virtualenv -p /usr/bin/python3.8 ~/zipline-reloaded-venv
-source ~/zipline-reloaded-venv/bin/activate
+export VENV_NAME=zipline-reloaded-venv
+virtualenv -p /usr/bin/python3.8 ~/$VENV_NAME
+source ~/$VENV_NAME/bin/activate
 python -m pip install --upgrade pip
 export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
 
@@ -38,7 +38,11 @@ python setup.py install
 
 
 cd $PYTHON_LIBS
-git clone https://github.com/alphaville76/sharadar_db_bundle.git
+sudo dnf install -y systemd-devel
+pip install systemd
+pip install quandl memoization mailjet-rest singleton-decorator
+
+git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle
 python setup.py install
 python test/basic_pipeline_sep_db.py
