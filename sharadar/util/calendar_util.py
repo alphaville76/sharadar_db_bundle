@@ -1,5 +1,5 @@
 import pandas as pd
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 
 
 def last_trading_date(date:str = pd.to_datetime("today").strftime('%Y-%m-%d'), calendar = get_calendar('XNYS')):

@@ -3,7 +3,7 @@ import numpy as np
 import sqlite3
 import click
 from contextlib import closing
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 from zipline.data.session_bars import SessionBarReader
 from sharadar.util.logger import log
 from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader

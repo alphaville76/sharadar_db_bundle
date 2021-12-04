@@ -12,7 +12,7 @@ from zipline.assets.asset_db_schema import (
     equity_symbol_mappings,
     futures_contracts as futures_contracts_table,
 )
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 from zipline.utils.memoize import lazyval
 from pandas.tseries.offsets import DateOffset
 from datetime import timedelta

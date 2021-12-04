@@ -16,7 +16,7 @@ import zipline
 import pkgutil
 
 from zipline.data import bundles as bundles_module
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 from zipline.utils.compat import wraps
 from zipline.utils.cli import Date, Timestamp
 from zipline.utils.run_algo import BenchmarkSpec

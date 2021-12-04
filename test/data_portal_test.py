@@ -1,4 +1,4 @@
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 from zipline.pipeline.loaders import USEquityPricingLoader
 from zipline.pipeline.data import USEquityPricing
 from zipline.data.data_portal import DataPortal

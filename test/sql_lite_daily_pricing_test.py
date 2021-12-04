@@ -4,7 +4,7 @@ import quandl
 from os import environ as env
 import pandas as pd
 from sharadar.loaders.ingest_sharadar import process_data_table
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 
 from sharadar.util import quandl_util
 from sharadar.util.equity_supplementary_util import lookup_sid

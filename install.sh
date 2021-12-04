@@ -43,7 +43,6 @@ sudo dnf install -y systemd-devel
 pip install systemd
 pip install quandl memoization mailjet-rest singleton-decorator
 #see https://github.com/stefan-jansen/zipline-reloaded/issues/29
-pip install "pandas<1.3.0"
 
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle

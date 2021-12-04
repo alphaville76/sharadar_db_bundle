@@ -127,7 +127,7 @@ class RealtimeClock(object):
         """
         from datetime import timedelta
         num_days = 5
-        from trading_calendars import get_calendar
+        from exchange_calendars import get_calendar
         self.sessions = get_calendar("NYSE").sessions_in_range(
             str(pd.to_datetime('now', utc=True).date() - timedelta(days=num_days * 2)),
             str(pd.to_datetime('now', utc=True).date() + timedelta(days=num_days * 2))

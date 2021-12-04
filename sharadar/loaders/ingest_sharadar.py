@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import quandl
 
-from trading_calendars import get_calendar
+from exchange_calendars import get_calendar
 
 from sharadar.util import quandl_util
 from sharadar.util.output_dir import get_output_dir
