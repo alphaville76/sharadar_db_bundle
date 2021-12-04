@@ -29,6 +29,11 @@ def nanstd(a, axis=0):
         warnings.simplefilter("ignore", category=RuntimeWarning)
         return np.nanstd(a, axis)
 
+def divide(a, b):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        return a / b
+
 
 class Fundamentals(CustomFactor, BundleLoader):
     inputs = []
@@ -390,8 +395,9 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     variance of residuals : np.array[M]
     """
     if standardize:
-        Y = (Y - nanmean(Y, axis=0)) / nanstd(Y, axis=0)
-        X = (X - nanmean(X, axis=0)) / nanstd(X, axis=0)
+        Y = divide((Y - nanmean(Y, axis=0)), nanstd(Y, axis=0))
+        X = divide((X - nanmean(X, axis=0)), nanstd(X, axis=0))
+
 
     # shape: (N, M)
     X = np.where(np.isnan(Y), np.nan, X)

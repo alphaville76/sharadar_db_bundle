@@ -1,6 +1,8 @@
 import datetime
 import time
 import os
+
+import click
 import pandas as pd
 from sharadar.util.cache import cached
 from sharadar.pipeline.fx import SimpleFXRateReader
@@ -202,7 +204,7 @@ def returns(assets, start, end, periods=1, field='close'):
     return df
 
 
-class CliProgressPublisher(object):
+class LogProgressPublisher(object):
 
     def publish(self, model):
         try:
@@ -216,3 +218,18 @@ class CliProgressPublisher(object):
                 log.info("Percent completed: %3.0f%% (%s - %s): %s" % (completed, start, end, work))
         except:
             log.error("Cannot publish progress state.")
+
+class CliProgressPublisher(object):
+
+    def __init__(self):
+        self.pbar = click.progressbar(length=100, label="Analyzing Pipeline...")
+
+    def publish(self, model):
+        start = str(model.current_chunk_bounds[0].date())
+        end = str(model.current_chunk_bounds[1].date())
+        completed = model.percent_complete
+
+        self.pbar.update(completed)
+        self.pbar.label = "Pipeline from %s to %s" % (start, end)
+        if model.state == "success":
+            log.info("Pipeline from %s to %s completed in %s." % (start, end, str(datetime.timedelta(seconds=int(model.execution_time)))))
