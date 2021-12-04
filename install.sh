@@ -1,6 +1,7 @@
 #!/bin/bash
-export VENV_NAME=zipline-reloaded-venv
-virtualenv -p /usr/bin/python3.8 ~/$VENV_NAME
+export PYTHON_VERSION=3.8
+export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
+virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
 python -m pip install --upgrade pip
 export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
@@ -41,6 +42,8 @@ cd $PYTHON_LIBS
 sudo dnf install -y systemd-devel
 pip install systemd
 pip install quandl memoization mailjet-rest singleton-decorator
+#see https://github.com/stefan-jansen/zipline-reloaded/issues/29
+pip install "pandas<1.3.0"
 
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle
