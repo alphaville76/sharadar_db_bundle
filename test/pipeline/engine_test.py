@@ -3,7 +3,6 @@ from sharadar.pipeline.engine import (
     symbol,
     symbols,
     prices,
-    prices_old,
     returns,
     trading_date)
 import pandas as pd

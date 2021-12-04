@@ -1,5 +1,5 @@
+from trading_calendars import get_calendar
 from zipline.pipeline.loaders import USEquityPricingLoader
-from zipline.utils.calendars import get_calendar
 from zipline.pipeline.data import USEquityPricing
 from zipline.data.data_portal import DataPortal
 from sharadar.pipeline.engine import symbols, make_pipeline_engine, load_sharadar_bundle

@@ -1,9 +1,5 @@
-import unittest
-
-from ibapi.order_state import OrderState
-from sharadar import *
 import pandas as pd
-
+from ibapi.order_state import OrderState
 # fix to allow zip_longest on Python 2.X and 3.X
 from sharadar.live.brokers.ib_broker import TWSConnection, IBBroker
 
@@ -13,13 +9,11 @@ except ImportError:                     # Python 2
     from itertools import izip_longest as zip_longest
 from math import fabs
 
-from mock import patch, sentinel, Mock, MagicMock
+from mock import patch, sentinel
 
-from ibapi.client import EClient
-from ibapi.wrapper import EWrapper, TickTypeEnum
 from ibapi.contract import Contract
 from ibapi.order import Order
-from ibapi.execution import ExecutionFilter, Execution
+from ibapi.execution import Execution
 
 from zipline.testing.fixtures import WithSimParams
 from zipline.finance.execution import (StopLimitOrder,
@@ -44,33 +38,15 @@ class TestIBBroker(WithSimParams,
 
         tws.start()
 
-        tws._add_bar('SPY', 12.4, 10,
-                     pd.to_datetime('2017-09-27 10:30:00', utc=True),
-                     10, 12.401, False)
-        tws._add_bar('SPY', 12.41, 10,
-                     pd.to_datetime('2017-09-27 10:30:40', utc=True),
-                     20, 12.411, False)
-        tws._add_bar('SPY', 12.44, 20,
-                     pd.to_datetime('2017-09-27 10:31:10', utc=True),
-                     40, 12.441, False)
-        tws._add_bar('SPY', 12.74, 5,
-                     pd.to_datetime('2017-09-27 10:37:10', utc=True),
-                     45, 12.741, True)
-        tws._add_bar('SPY', 12.99, 15,
-                     pd.to_datetime('2017-09-27 12:10:00', utc=True),
-                     60, 12.991, False)
-        tws._add_bar('XIV', 100.4, 100,
-                     pd.to_datetime('2017-09-27 9:32:00', utc=True),
-                     100, 100.401, False)
-        tws._add_bar('XIV', 100.41, 100,
-                     pd.to_datetime('2017-09-27 9:32:20', utc=True),
-                     200, 100.411, True)
-        tws._add_bar('XIV', 100.44, 200,
-                     pd.to_datetime('2017-09-27 9:41:10', utc=True),
-                     400, 100.441, False)
-        tws._add_bar('XIV', 100.74, 50,
-                     pd.to_datetime('2017-09-27 11:42:10', utc=True),
-                     450, 100.741, False)
+        tws._add_bar('SPY', 12.4, 10, pd.to_datetime('2017-09-27 10:30:00', utc=True))
+        tws._add_bar('SPY', 12.41, 10, pd.to_datetime('2017-09-27 10:30:40', utc=True))
+        tws._add_bar('SPY', 12.44, 20, pd.to_datetime('2017-09-27 10:31:10', utc=True))
+        tws._add_bar('SPY', 12.74, 5, pd.to_datetime('2017-09-27 10:37:10', utc=True))
+        tws._add_bar('SPY', 12.99, 15, pd.to_datetime('2017-09-27 12:10:00', utc=True))
+        tws._add_bar('XIV', 100.4, 100, pd.to_datetime('2017-09-27 9:32:00', utc=True))
+        tws._add_bar('XIV', 100.41, 100, pd.to_datetime('2017-09-27 9:32:20', utc=True))
+        tws._add_bar('XIV', 100.44, 200, pd.to_datetime('2017-09-27 9:41:10', utc=True))
+        tws._add_bar('XIV', 100.74, 50, pd.to_datetime('2017-09-27 11:42:10', utc=True))
 
         return tws.bars
 

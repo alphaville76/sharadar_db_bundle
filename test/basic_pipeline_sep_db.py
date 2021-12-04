@@ -10,6 +10,10 @@ from zipline.pipeline.factors import AverageDollarVolume
 
 from os import environ as env
 import quandl
+
+import faulthandler
+faulthandler.enable()
+
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
 bundle = load_sharadar_bundle()
