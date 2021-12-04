@@ -1,9 +1,10 @@
-from zipline.pipeline import Pipeline
+import quandl
 from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from sharadar.pipeline.factors import *
 from trading_calendars import get_calendar
 from zipline.pipeline import Pipeline
 from zipline.pipeline.filters import StaticAssets
+from os import environ as env
 
 quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
 
