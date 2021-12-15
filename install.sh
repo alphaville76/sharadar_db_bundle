@@ -1,5 +1,5 @@
 #!/bin/bash
-export PYTHON_VERSION=3.8
+export PYTHON_VERSION=3.9
 export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
 virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
@@ -41,8 +41,8 @@ python setup.py install
 cd $PYTHON_LIBS
 sudo dnf install -y systemd-devel
 pip install systemd
-pip install quandl memoization mailjet-rest singleton-decorator
-#see https://github.com/stefan-jansen/zipline-reloaded/issues/29
+pip install quandl memoization mailjet-rest singleton-decorator polling psutil
+pip uninstall tables
 
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd sharadar_db_bundle

@@ -116,7 +116,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
     def _create_clock(self):
         # This method is taken from TradingAlgorithm.
         # The clock has been replaced to use RealtimeClock
-        trading_o_and_c = self.trading_calendar.schedule.ix[
+        trading_o_and_c = self.trading_calendar.schedule.loc[
             self.sim_params.sessions]
         assert self.sim_params.data_frequency == 'minute'
 
