@@ -95,7 +95,7 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
     @lazyval
     def execution_period_values(self):
         # calculate the list of periods that match the given criteria
-        sessions = self.cal.all_sessions
+        sessions = self.cal.sessions
         return set(
             pd.Series(data=sessions)
             .groupby([sessions.year, sessions.month])

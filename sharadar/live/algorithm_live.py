@@ -69,7 +69,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         kwargs['blotter'] = blotter_live
 
         super(self.__class__, self).__init__(*args, **kwargs)
-        log.info("initialization done")
 
     @api_method
     def get_environment(self, field='platform'):
@@ -99,6 +98,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
                           exclude_list=self._context_persistence_excludes)
 
         self.initialized = True
+        log.info("initialization done")
 
     def handle_data(self, data):
         super(self.__class__, self).handle_data(data)
@@ -121,19 +121,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         assert self.sim_params.data_frequency == 'minute'
 
         minutely_emission = True
-        market_opens = trading_o_and_c['market_open']
-        market_closes = trading_o_and_c['market_close']
-
-        # The calendar's execution times are the minutes over which we actually
-        # want to run the clock. Typically the execution times simply adhere to
-        # the market open and close times. In the case of the futures calendar,
-        # for example, we only want to simulate over a subset of the full 24
-        # hour calendar, so the execution times dictate a market open time of
-        # 6:31am US/Eastern and a close of 5:00pm US/Eastern.
-        execution_opens = \
-            self.trading_calendar.execution_time_from_open(market_opens)
-        execution_closes = \
-            self.trading_calendar.execution_time_from_close(market_closes)
+        execution_opens = trading_o_and_c['market_open']
+        execution_closes = trading_o_and_c['market_close']
 
         before_trading_start_minutes = ((pd.to_datetime(execution_opens.values)
                                          .tz_localize('UTC').tz_convert('US/Eastern') -
@@ -166,8 +155,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
             self.data_portal,
             self.trading_client.clock,
             self._create_benchmark_source(),
-            self.restrictions,
-            universe_func=self._calculate_universe
+            self.restrictions
         )
 
         return self.trading_client.transform()

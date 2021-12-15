@@ -50,8 +50,8 @@ class RealtimeClock(object):
         beginning_of_today = pd.to_datetime(today, utc=True)
 
         self.sessions = sessions[(beginning_of_today <= sessions)]
-        self.execution_opens = execution_opens[(beginning_of_today <= execution_opens)]
-        self.execution_closes = execution_closes[(beginning_of_today <= execution_closes)]
+        self.execution_opens = execution_opens[(beginning_of_today.tz_localize(None) <= execution_opens)]
+        self.execution_closes = execution_closes[(beginning_of_today.tz_localize(None) <= execution_closes)]
         self.before_trading_start_minutes = before_trading_start_minutes[
             (beginning_of_today <= before_trading_start_minutes)]
 

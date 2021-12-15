@@ -40,8 +40,7 @@ python setup.py install
 
 cd $PYTHON_LIBS
 sudo dnf install -y systemd-devel
-pip install systemd
-pip install quandl memoization mailjet-rest singleton-decorator polling psutil
+pip install -r requirements.txt --upgrade --no-deps
 pip uninstall tables
 
 git clone git@github.com:alphaville76/sharadar_db_bundle.git

@@ -174,7 +174,7 @@ def prices(assets, start, end, field='close', offset=0):
     if offset > 0:
         start = trading_calendar.sessions_window(start, -offset)[0]
 
-    bar_count = trading_calendar.session_distance(start, end)
+    bar_count = trading_calendar.sessions_distance(start, end)
 
     data_portal = DataPortal(bundle.asset_finder,
                              trading_calendar=trading_calendar,

@@ -374,7 +374,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         close = data_portal.get_history_window(assets=unique_sids,
                                                end_dt=end,
-                                               bar_count=calendar.session_distance(start, end),
+                                               bar_count=calendar.sessions_distance(start, end),
                                                frequency='1d',
                                                field='close',
                                                data_frequency='daily').values

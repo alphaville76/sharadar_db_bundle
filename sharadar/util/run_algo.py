@@ -109,7 +109,7 @@ def _run(handle_data,
         end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else start
 
     # date parameter validation
-    if trading_calendar.session_distance(start, end) < 0:
+    if trading_calendar.sessions_distance(start, end) < 0:
         raise _RunAlgoError(
             'There are no trading days between %s and %s' % (
                 start.date(),

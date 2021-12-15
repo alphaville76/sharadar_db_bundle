@@ -21,7 +21,7 @@ trading_calendar = get_calendar('NYSE')
 
 start_date = pd.to_datetime('2020-08-26', utc=True)
 end_date = pd.to_datetime('2020-09-02', utc=True)
-bar_count = trading_calendar.session_distance(start_date, end_date)
+bar_count = trading_calendar.sessions_distance(start_date, end_date)
 
 # Create a data portal
 data_portal = DataPortal(bundle.asset_finder,
