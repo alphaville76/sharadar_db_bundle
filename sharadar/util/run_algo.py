@@ -36,6 +36,10 @@ from exchange_calendars import register_calendar_alias
 from exchange_calendars.errors import CalendarNameCollision
 from sharadar.pipeline.engine import returns
 
+#ignore exchange_calendars FutureWarning
+from warnings import simplefilter
+simplefilter(action='ignore', category=FutureWarning)
+
 class _RunAlgoError(click.ClickException, ValueError):
     """Signal an error that should have a different message if invoked from
     the cli.
@@ -98,7 +102,7 @@ def _run(handle_data,
         trading_calendar = get_calendar('XNYS')
 
     bundle_data = load_sharadar_bundle(bundle)
-    now = pd.Timestamp.utcnow()
+    now = pd.Timestamp.utcnow().normalize()
     if start is None:
         start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else now
 
@@ -235,8 +239,8 @@ def _run(handle_data,
             else:
                 log.warn("State file already exists. Do not run the backtest.")
 
-            # Set start and end to now for live trading
-            start = pd.Timestamp.utcnow()
+            # Change start and end to now for live trading
+            start = pd.Timestamp.utcnow().normalize()
             if not trading_calendar.is_session(start.date()):
                 start = trading_calendar.next_open(start)
             end = start
