@@ -33,7 +33,9 @@ class SharadarDbBundleLogger(Logger):
     def process_record(self, record):
         super().process_record(record)
         if os.name == 'posix':
-            msg = record.message.encode("unicode_escape").decode("utf-8").replace('\n', '; ')
+            msg = record.message.encode("unicode_escape").decode("utf-8")
+            msg = msg.replace('\n', ' ')
+            msg = msg.replace('"', "'")
             cmd = 'echo "%s" | systemd-cat -t sharadar_db_bundle -p %d' % (msg, LOG_LEVEL_MAP[record.level_name])
             subprocess.run(cmd, shell=True)
 
