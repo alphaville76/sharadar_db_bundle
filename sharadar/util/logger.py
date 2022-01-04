@@ -33,7 +33,7 @@ class SharadarDbBundleLogger(Logger):
     def process_record(self, record):
         super().process_record(record)
         if os.name == 'posix':
-            msg = record.message.encode("unicode_escape").decode("utf-8")
+            msg = record.message.encode("unicode_escape").decode("utf-8").replace('\n', '; ')
             cmd = 'echo "%s" | systemd-cat -t sharadar_db_bundle -p %d' % (msg, LOG_LEVEL_MAP[record.level_name])
             subprocess.run(cmd, shell=True)
 
@@ -64,7 +64,7 @@ class BacktestLogger(Logger):
         use the date of the trading day for log purposes
         """
         super().process_record(record)
-        if self.arena == 'live':
+        if self.arena == 'live' and record.level >= INFO:
             send_mail(record.channel + " " + record.level_name, record.message)
         record.time = self.record_time()
 
