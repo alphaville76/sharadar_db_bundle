@@ -124,7 +124,7 @@ def fetch_sf1_table_date(api_key, start, end=None):
 
 
 def last_available_date():
-    return get("USTREASURY/YIELD", rows=1).index[-1].strftime('%Y-%m-%d')
+    return get_table('SHARADAR/TICKERS', ticker='SPY')['lastpricedate'][0].strftime('%Y-%m-%d')
 
 
 def get(dataset, **kwargs):
