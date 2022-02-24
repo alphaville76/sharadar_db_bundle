@@ -2,16 +2,16 @@ from os import environ as env
 import os
 import pandas as pd
 import numpy as np
-import quandl
+import nasdaqdatalink
 
 from exchange_calendars import get_calendar
 
-from sharadar.util import quandl_util
+from sharadar.util import nasdaqdatalink_util
 from sharadar.util.output_dir import get_output_dir
-from sharadar.util.quandl_util import fetch_entire_table
+from sharadar.util.nasdaqdatalink_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
-from sharadar.util.quandl_util import fetch_table_by_date, fetch_sf1_table_date
+from sharadar.util.nasdaqdatalink_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 from zipline.assets import ASSET_DB_VERSION
@@ -21,11 +21,11 @@ from sharadar.util.logger import log
 from contextlib import closing
 import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
-from sharadar.util.quandl_util import last_available_date
+from sharadar.util.nasdaqdatalink_util import last_available_date
 from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
-quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
 def process_data_table(df):
     # 'close' prices are adjusted only for stock splits, but not for dividends.
@@ -53,11 +53,11 @@ def fetch_data(start, end):
     Fetch the Sharadar Equity Prices (SEP) and Sharadar Fund Prices (SFP). Entire dataset or by date.
     """
     if must_fetch_entire_table(start):
-        df_sep = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
-        df_sfp = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SFP", parse_dates=['date'])
+        df_sep = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SEP", parse_dates=['date'])
+        df_sfp = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SFP", parse_dates=['date'])
     else:
-        df_sep = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/SEP', start, end)
-        df_sfp = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/SFP', start, end)
+        df_sep = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/SEP', start, end)
+        df_sfp = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/SFP', start, end)
 
 
     df = df_sep.append(df_sfp)
@@ -80,7 +80,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
 
 def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    dividends_df = quandl_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['dividend', 'spinoffdividend'], paginate=True)
+    dividends_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['dividend', 'spinoffdividend'], paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
     tickers_dividends = dividends_df['ticker'].unique()
@@ -96,7 +96,7 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     return dividends_df
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    splits_df = quandl_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['split'], paginate=True)
+    splits_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['split'], paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -160,7 +160,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     prices_dbpath = os.path.join(output_dir, "prices.sqlite")
 
-    # use string format expected by quandl
+    # use string format expected by nasdaqdatalink
     start_fetch_date = sessions[0].strftime('%Y-%m-%d')
     #end_fetch_date = None if sessions[-1].strftime('%Y-%m-%d') == last_trading_date() else sessions[-1].strftime('%Y-%m-%d')
     if os.path.exists(prices_dbpath):
@@ -235,10 +235,10 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     log.info("Start creating Fundamentals dataframe...")
     if must_fetch_entire_table(start_date_fundamentals):
         log.info("Fetch entire table.")
-        sf1_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
+        sf1_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
     else:
         log.info("Start date: %s" % start_date_fundamentals)
-        sf1_df = fetch_sf1_table_date(env["QUANDL_API_KEY"], start_date_fundamentals)
+        sf1_df = fetch_sf1_table_date(env["NASDAQ_API_KEY"], start_date_fundamentals)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
 
@@ -246,10 +246,10 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     log.info("Start creating daily metrics dataframe...")
     if must_fetch_entire_table(start_date_metrics):
         log.info("Fetch entire table.")
-        daily_df = fetch_entire_table(env["QUANDL_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
+        daily_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
     else:
         log.info("Start date: %s" % start_date_fundamentals)
-        daily_df = fetch_table_by_date(env["QUANDL_API_KEY"], 'SHARADAR/DAILY', start_date_metrics)
+        daily_df = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/DAILY', start_date_metrics)
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
 
@@ -268,7 +268,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
 
 def create_metadata():
-    sharadar_metadata_df = quandl_util.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+    sharadar_metadata_df = nasdaqdatalink_util.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
     # Add a space at the begin and end of relatedtickers, search for ' TICKER '
@@ -317,7 +317,7 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange
     return equities_df
 
-def from_quandl():
+def from_nasdaqdatalink():
     """
     ticker,date,open,high,low,close,volume,dividends,lastupdated
     A,2008-01-02,36.67,36.8,36.12,36.3,1858900.0,0.0,2017-11-01
@@ -326,10 +326,10 @@ def from_quandl():
 
     from zipline.data import bundles
     from zipline.finance import metrics
-    from sharadar.loaders.ingest_sharadar import from_quandl
+    from sharadar.loaders.ingest_sharadar import from_nasdaqdatalink
     from sharadar.util.metric_daily import default_daily
 
-    bundles.register("sharadar", from_quandl(), create_writers=False)
+    bundles.register("sharadar", from_nasdaqdatalink(), create_writers=False)
     metrics.register('default_daily', default_daily)
     """
 

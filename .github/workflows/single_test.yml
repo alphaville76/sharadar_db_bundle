@@ -54,9 +54,9 @@ jobs:
         python setup.py install
     - name: Install main package
       env:
-        QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
+        NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
       run: |
-        pip install memoization singleton_decorator quandl pyfolio mailjet_rest
+        pip install memoization singleton_decorator nasdaqdatalink pyfolio mailjet_rest
         pip install pandas==0.22.0
         mkdir ~/log
         cd $PYTHON_LIBS
@@ -68,6 +68,6 @@ jobs:
         #python test/basic_pipeline_test.py
     #- name: Unit-tests
     #  env:
-    #    QUANDL_API_KEY: ${{ secrets.QUANDL_API_KEY }}
+    #    NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
     #  run: |
     #    pytest

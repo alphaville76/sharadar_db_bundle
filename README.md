@@ -4,7 +4,7 @@ Unlike the standard zipline bundles, it allows incremental updates, because sql 
 
 Step 1. Make sure you can access Quandl, and you have a Quandl api key. I have set my Quandl api key as an environment variable.
 
->export QUANDL_API_KEY="your API key"  
+>export NASDAQ_API_KEY="your API key"  
 
 Step 2. Clone or download the code and install it using:
 
@@ -17,10 +17,10 @@ Add this code to your ~/.zipline/extension.py:
 ```python
 from zipline.data import bundles
 from zipline.finance import metrics
-from sharadar.loaders.ingest_sharadar import from_quandl
+from sharadar.loaders.ingest_sharadar import from_nasdaqdatalink
 from sharadar.util.metric_daily import default_daily
 
-bundles.register("sharadar", from_quandl(), create_writers=False)
+bundles.register("sharadar", from_nasdaqdatalink(), create_writers=False)
 metrics.register('default_daily', default_daily)
 ```
 

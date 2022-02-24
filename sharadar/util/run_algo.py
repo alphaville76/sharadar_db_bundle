@@ -414,7 +414,7 @@ def run_algorithm(initialize,
         The data frequency to run the algorithm at. For live trading the default is 'minute', otherwise 'daily'
     bundle : str, optional
         The name of the data bundle to use to load the data to run the backtest
-        with. This defaults to 'quantopian-quandl'.
+        with. This defaults to 'quantopian-nasdaqdatalink'.
     bundle_timestamp : datetime, optional
         The datetime to lookup the bundle data for. This defaults to the
         current time.

@@ -9,12 +9,12 @@ from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, M
 from zipline.pipeline.factors import AverageDollarVolume
 
 from os import environ as env
-import quandl
+import nasdaqdatalink
 
 import faulthandler
 faulthandler.enable()
 
-quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
 bundle = load_sharadar_bundle()
 
@@ -75,9 +75,9 @@ print(stocks.head())
 print(stocks.shape)
 #assert stocks.shape == (15, 4)
 
-print(quandl.get_table('SHARADAR/SEP', date={'gte':'2020-02-03', 'lte':'2020-02-05'}, ticker='AAPL'))
+print(nasdaqdatalink.get_table('SHARADAR/SEP', date={'gte':'2020-02-03', 'lte':'2020-02-05'}, ticker='AAPL'))
 print("---")
-print(quandl.get_table('SHARADAR/SF1',
+print(nasdaqdatalink.get_table('SHARADAR/SF1',
                        datekey='2020-01-29',
                        dimension='ARQ',
                        qopts={"columns":['sharefactor','sharesbas', 'price', 'marketcap']},

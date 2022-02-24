@@ -1,16 +1,16 @@
-import quandl
+import nasdaqdatalink
 import os
 from os import environ as env
 from pandas.tseries.offsets import DateOffset
 import pandas as pd
 
-from sharadar.util import quandl_util
+from sharadar.util import nasdaqdatalink_util
 from sharadar.util.output_dir import get_output_dir
 from sharadar.loaders.constant import OLDEST_DATE_SEP, METADATA_HEADERS
 from exchange_calendars import get_calendar
-from sharadar.util.quandl_util import last_available_date
+from sharadar.util.nasdaqdatalink_util import last_available_date
 
-quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
 
 def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
@@ -28,9 +28,9 @@ def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
                    auto_close_date,
                    exchange)
 
-def _quandl_get_monthly_to_daily(name, start, end, transform=None):
+def _nasdaqdatalink_get_monthly_to_daily(name, start, end, transform=None):
     m_start = (dt(start) - DateOffset(months=6)).strftime('%Y-%m-%d')
-    df = quandl_util.get(name, start_date=m_start, transform=transform)
+    df = nasdaqdatalink_util.get(name, start_date=m_start, transform=transform)
     new_index = pd.date_range(start=m_start, end=end, tz='UTC')
     ret = df.reindex(new_index, method='ffill').loc[pd.date_range(start, end, tz='UTC')]
     return ret
@@ -84,8 +84,8 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
     if start is not None and start > end:
         start = end
 
-    # https://www.quandl.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
-    tres_df = quandl_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
+    # https://data.nasdaq.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
+    tres_df = nasdaqdatalink_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
     # sids
     tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
     # TR1M, TR2M and TR30Y excluded because of too many missing data
@@ -100,34 +100,34 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
     prices = prices.swaplevel()
     prices = _append_ohlc(prices)
 
-    # https://www.quandl.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
-    corp_bond_df = _to_prices_df(quandl_util.get("ML/USEY", start_date=start, end_date=end), 10400)
+    # https://data.nasdaq.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
+    corp_bond_df = _to_prices_df(nasdaqdatalink_util.get("ML/USEY", start_date=start, end_date=end), 10400)
     prices = prices.append(corp_bond_df)
 
     # Industrial Production Change
     # Frequency: monthly
-    indpro_df = _to_prices_df(_quandl_get_monthly_to_daily("FRED/INDPRO", start, end), 10410)
+    indpro_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end), 10410)
     prices = prices.append(indpro_df)
 
     # rdiff: row-on-row % change
-    indpro_p_df = _to_prices_df(_quandl_get_monthly_to_daily("FRED/INDPRO", start, end, transform="rdiff"), 10420)
+    indpro_p_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end, transform="rdiff"), 10420)
     prices = prices.append(indpro_p_df)
 
     # ISM Purchasing Managers Index
-    # https://www.quandl.com/data/ISM/MAN_PMI-PMI-Composite-Index
+    # https://data.nasdaq.com/data/ISM/MAN_PMI-PMI-Composite-Index
     # Frequency: monthly
-    pmi_df = _to_prices_df(_quandl_get_monthly_to_daily("ISM/MAN_PMI", start, end), 10430)
+    pmi_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("ISM/MAN_PMI", start, end), 10430)
     prices = prices.append(pmi_df)
 
     # Civilian Unemployment Rate
-    # https://www.quandl.com/data/FRED/UNRATE-Civilian-Unemployment-Rate
+    # https://data.nasdaq.com/data/FRED/UNRATE-Civilian-Unemployment-Rate
     # Frequency: monthly
-    unrate_df = _to_prices_df(_quandl_get_monthly_to_daily("FRED/UNRATE", start, end), 10440)
+    unrate_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/UNRATE", start, end), 10440)
     prices = prices.append(unrate_df)
 
-    # https://www.quandl.com/data/RATEINF/INFLATION_USA-Inflation-YOY-USA
+    # https://data.nasdaq.com/data/RATEINF/INFLATION_USA-Inflation-YOY-USA
     # Frequency: monthly
-    inf_df = _to_prices_df(_quandl_get_monthly_to_daily("RATEINF/INFLATION_USA", start, end), 10450)
+    inf_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("RATEINF/INFLATION_USA", start, end), 10450)
     prices = prices.append(inf_df)
 
     prices.sort_index(inplace=True)

@@ -1,4 +1,4 @@
-import quandl
+import nasdaqdatalink
 from sharadar.pipeline.engine import load_sharadar_bundle, symbols, make_pipeline_engine
 from sharadar.pipeline.factors import *
 from exchange_calendars import get_calendar
@@ -6,7 +6,7 @@ from zipline.pipeline import Pipeline
 from zipline.pipeline.filters import StaticAssets
 from os import environ as env
 
-quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
@@ -31,10 +31,10 @@ if not calendar.is_session(pipe_start):
     pipe_start = calendar.previous_open(pipe_start).normalize()
 
 
-df = quandl.get_table('SHARADAR/SEP', date={'gte':pipe_start}, ticker='AAPL')
+df = nasdaqdatalink.get_table('SHARADAR/SEP', date={'gte':pipe_start}, ticker='AAPL')
 print(df)
 
-df = quandl.get_table("SHARADAR/DAILY", date={'gte':pipe_start}, ticker='AAPL')
+df = nasdaqdatalink.get_table("SHARADAR/DAILY", date={'gte':pipe_start}, ticker='AAPL')
 print(df)
 print("last_available_daily_metrics_dt", last_available_daily_metrics_dt)
 print("pipe_start", pipe_start)

@@ -3,15 +3,15 @@ from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
-import quandl
+import nasdaqdatalink
 import requests
 from click import progressbar
 from sharadar.util.logger import log
 from six.moves.urllib.parse import urlencode
 
 ONE_MEGABYTE = 1024 * 1024
-QUANDL_DATA_URL = (
-    'https://www.quandl.com/api/v3/datatables/'
+NASDAQ_DATALINK_URL = (
+    'https://data.nasdaq.com/api/v3/datatables/'
 )
 
 def download_with_progress(url, chunk_size, **progress_kwargs):
@@ -52,7 +52,7 @@ def format_metadata_url(api_key, table_name):
     query_params = [('api_key', api_key), ('qopts.export', 'true')]
 
     return (
-            QUANDL_DATA_URL + table_name + ".csv?" + urlencode(query_params)
+            NASDAQ_DATALINK_URL + table_name + ".csv?" + urlencode(query_params)
     )
 
 
@@ -86,7 +86,7 @@ def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, r
                 label="Downloading data from Quandl table " + table_name
             )
          
-            log.info("Parsing data from quandl table %s." % table_name)
+            log.info("Parsing data from nasdaqdatalink table %s." % table_name)
             return load_data_table(raw_file, index_col=index_col, parse_dates=parse_dates)
 
         except Exception:
@@ -97,12 +97,12 @@ def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, r
 
 def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     """
-    Load data from quandl and correct them so that they are unadjusted.
+    Load data from nasdaqdatalink and correct them so that they are unadjusted.
     The index must be the date
     """
 
     log.info("Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
-    quandl.ApiConfig.api_key=api_key
+    nasdaqdatalink.ApiConfig.api_key=api_key
     df = get_table(table_name,
                           date={'gte':start,'lte':end},
                           paginate=True)
@@ -113,7 +113,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 
 def fetch_sf1_table_date(api_key, start, end=None):
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
-    quandl.ApiConfig.api_key=api_key
+    nasdaqdatalink.ApiConfig.api_key=api_key
     df = get_table('SHARADAR/SF1',
                           dimension=['ARQ','ART'],
                           lastupdated={'gte':start,'lte':end},
@@ -128,10 +128,10 @@ def last_available_date():
 
 
 def get(dataset, **kwargs):
-    return quandl.get(dataset, **kwargs).tz_localize('UTC')
+    return nasdaqdatalink.get(dataset, **kwargs).tz_localize('UTC')
 
 def get_table(datatable_code, **options):
-    df = quandl.get_table(datatable_code, **options)
+    df = nasdaqdatalink.get_table(datatable_code, **options)
 
     return datetime_to_utc(df);
 

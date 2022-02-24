@@ -4,14 +4,14 @@ from zipline.pipeline.filters import StaticAssets
 from sharadar.pipeline.factors import *
 from zipline.pipeline.factors import AverageDollarVolume
 from os import environ as env
-import quandl
+import nasdaqdatalink
 
-quandl.ApiConfig.api_key = env["QUANDL_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
 pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
 bundle = load_sharadar_bundle()
-daily_df = quandl.get_table('SHARADAR/DAILY', date='2021-03-15', ticker='AAPL')
+daily_df = nasdaqdatalink.get_table('SHARADAR/DAILY', date='2021-03-15', ticker='AAPL')
 bundle_array = bundle.asset_finder.get_daily_metrics([110096,110097,199059], 'pb', pd.to_datetime('2021-03-15', utc=True), n=1)
 print(daily_df)
 print(bundle_array)
