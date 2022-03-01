@@ -85,7 +85,11 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
         start = end
 
     # https://data.nasdaq.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
-    tres_df = nasdaqdatalink_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
+    #tres_df = nasdaqdatalink_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
+    #FIXME use directly treasury.gov, implement date query
+    url_all = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/all?type=daily_treasury_yield_curve&field_tdr_date_value=all&page&_format=csv"
+    tres_df = pd.read_csv(url_all, index_col=0, na_values=['N/A'])
+    assert len(tres_df.columns) == 12
     # sids
     tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
     # TR1M, TR2M and TR30Y excluded because of too many missing data
