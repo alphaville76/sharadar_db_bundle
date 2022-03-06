@@ -21,6 +21,7 @@ from time import sleep
 
 from math import fabs
 
+from sharadar.live.brokers.ib_execution import TWSOrder
 from six import iteritems
 import polling
 import pandas as pd
@@ -703,10 +704,7 @@ class IBBroker(Broker):
 
         if isinstance(style, MarketOrder):
             order.orderType = "MKT"
-            order.tif = "DAY"
-            order.algoStrategy = "Adaptive"
-            order.algoParams = []
-            order.algoParams.append(TagValue("adaptivePriority", "Patient"))
+            order.tif = "GTC"
         elif isinstance(style, LimitOrder):
             order.orderType = "LMT"
             order.tif = "GTC"
@@ -716,6 +714,11 @@ class IBBroker(Broker):
         elif isinstance(style, StopLimitOrder):
             order.orderType = "STP LMT"
             order.tif = "GTC"
+        elif isinstance(style, TWSOrder):
+            order.orderType = style.get_order_type()
+            order.tif = style.get_time_in_force()
+
+
 
 
         order.orderRef = self._create_order_ref(order)
