@@ -147,7 +147,8 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         df.append(df_ticker_synch)
 
 
-def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(), universe=False, sanity_check=True):
+def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(),
+            universe=False, sanity_check=True, use_last_available_dt=True):
     os.makedirs(output_dir, exist_ok=True)
 
     print("logfiles:", log.filename)
@@ -162,10 +163,10 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     # use string format expected by nasdaqdatalink
     start_fetch_date = sessions[0].strftime('%Y-%m-%d')
-    #end_fetch_date = None if sessions[-1].strftime('%Y-%m-%d') == last_trading_date() else sessions[-1].strftime('%Y-%m-%d')
-    if os.path.exists(prices_dbpath):
+    if use_last_available_dt and os.path.exists(prices_dbpath):
         start_fetch_date = SQLiteDailyBarReader(prices_dbpath).last_available_dt.strftime('%Y-%m-%d')
-        log.info("Last available date: %s" % start_fetch_date)
+
+    log.info("Start fetch date: %s" % start_fetch_date)
 
     log.info("Start loading sharadar metadata...")
     related_tickers, sharadar_metadata_df = create_metadata()
