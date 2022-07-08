@@ -45,7 +45,7 @@ assert not pd.isna(stocks.iloc[0]['ev'])
 assert not pd.isna(stocks.iloc[0]['mkt_cap'])
 
 td_delta = 1
-sessions = calendar.all_sessions
+sessions = calendar.sessions
 dates= pd.Series(data=sessions)\
     .groupby([sessions.year, sessions.month])\
     .nth(td_delta)\

@@ -189,7 +189,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     # Additional MACRO data
     macro_equities_df = create_macro_equities_df()
-    equities_df = equities_df.append(macro_equities_df)
+    equities_df = pd.concat([equities_df, macro_equities_df])
 
     # Write equity metadata
     log.info("Start writing equities...")

@@ -111,33 +111,33 @@ def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
 
     # https://data.nasdaq.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
     corp_bond_df = _to_prices_df(nasdaqdatalink_util.get("ML/USEY", start_date=start, end_date=end), 10400)
-    prices = prices.append(corp_bond_df)
+    prices = pd.concat([prices, corp_bond_df])
 
     # Industrial Production Change
     # Frequency: monthly
     indpro_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end), 10410)
-    prices = prices.append(indpro_df)
+    prices = pd.concat([prices, indpro_df])
 
     # rdiff: row-on-row % change
     indpro_p_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end, transform="rdiff"), 10420)
-    prices = prices.append(indpro_p_df)
+    prices = pd.concat([prices, indpro_p_df])
 
     # ISM Purchasing Managers Index
     # https://data.nasdaq.com/data/ISM/MAN_PMI-PMI-Composite-Index
     # Frequency: monthly
     pmi_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("ISM/MAN_PMI", start, end), 10430)
-    prices = prices.append(pmi_df)
+    prices = pd.concat([prices, pmi_df])
 
     # Civilian Unemployment Rate
     # https://data.nasdaq.com/data/FRED/UNRATE-Civilian-Unemployment-Rate
     # Frequency: monthly
     unrate_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/UNRATE", start, end), 10440)
-    prices = prices.append(unrate_df)
+    prices = pd.concat([prices, unrate_df])
 
     # https://data.nasdaq.com/data/RATEINF/INFLATION_USA-Inflation-YOY-USA
     # Frequency: monthly
     inf_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("RATEINF/INFLATION_USA", start, end), 10450)
-    prices = prices.append(inf_df)
+    prices = pd.concat([prices, inf_df])
 
     prices.sort_index(inplace=True)
     return prices
