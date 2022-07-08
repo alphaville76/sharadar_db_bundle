@@ -27,6 +27,7 @@ import traceback
 
 nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
+
 def process_data_table(df):
     # 'close' prices are adjusted only for stock splits, but not for dividends.
     m = df['closeunadj'] / df['close']
@@ -43,10 +44,12 @@ def process_data_table(df):
     df = df.fillna({'volume': 0})
     return df
 
+
 def must_fetch_entire_table(date):
     if pd.isnull(date):
         return True
     return pd.to_datetime(date, utc=True) <= OLDEST_DATE_SEP
+
 
 def fetch_data(start, end):
     """
@@ -59,8 +62,8 @@ def fetch_data(start, end):
         df_sep = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/SEP', start, end)
         df_sfp = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/SFP', start, end)
 
-
-    df = df_sep.append(df_sfp)
+    #df = df_sep.append(df_sep)
+    df = pd.concat(df_sep, df_sep)
     df = df.drop_duplicates().reset_index(drop=True)
     return df
 
@@ -80,7 +83,8 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
 
 def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    dividends_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['dividend', 'spinoffdividend'], paginate=True)
+    dividends_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte': start},
+                                                 action=['dividend', 'spinoffdividend'], paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
     tickers_dividends = dividends_df['ticker'].unique()
@@ -95,8 +99,9 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     dividends_df.drop(['action', 'date', 'name', 'contraticker', 'contraname', 'ticker'], axis=1, inplace=True)
     return dividends_df
 
+
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    splits_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte':start}, action=['split'], paginate=True)
+    splits_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -174,10 +179,9 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     if len(prices_df) > 0:
         # the first price date may differ from start_fetch_date because we query quadl by lastupdate
         log.info("Price data for %d equities from %s to %s." %
-             (len(prices_df.index.get_level_values(1)), prices_df.index[0][0], prices_df.index[-1][0]))
+                 (len(prices_df.index.get_level_values(1)), prices_df.index[0][0], prices_df.index[-1][0]))
     else:
         log.info("No price data retrieved for period from %s." % start_fetch_date)
-
 
     # iterate over all the securities and pack data and metadata for writing
     tickers = prices_df['ticker'].unique()
@@ -185,7 +189,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress=True)
 
     # Additional MACRO data
-    macro_equities_df = create_macro_equities_df(calendar)
+    macro_equities_df = create_macro_equities_df()
     equities_df = equities_df.append(macro_equities_df)
 
     # Write equity metadata
@@ -230,7 +234,6 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     log.info("Start creating company info dataframe...")
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_asset_info(sharadar_metadata_df, cursor)
-
 
     start_date_fundamentals = asset_db_reader.last_available_fundamentals_dt
     log.info("Start creating Fundamentals dataframe...")
@@ -310,13 +313,14 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             # Synch to the official exchange calendar, if necessary
             date_index = df_ticker.index.get_level_values('date')
-            start_date_df = date_index[0] # (tzinfo=UTC)
-            end_date_df = date_index[-1] # (tzinfo=UTC)
+            start_date_df = date_index[0]  # (tzinfo=UTC)
+            end_date_df = date_index[-1]  # (tzinfo=UTC)
             synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
 
             # Add a row to the metadata DataFrame.
             equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange
     return equities_df
+
 
 def from_nasdaqdatalink():
     """
@@ -342,11 +346,9 @@ def from_nasdaqdatalink():
         except OSError as e:
             log.error("%s : %s" % (output_dir, e.strerror))
 
-
         try:
             _ingest(start_date, calendar)
         except Exception as e:
             log.error(traceback.format_exc())
 
     return ingest
-
