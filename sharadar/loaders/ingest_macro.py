@@ -54,7 +54,7 @@ def _append_ohlc(df):
 def dt(s):
     return pd.to_datetime(s, utc=True)
 
-def create_macro_equities_df(calendar=get_calendar('XNYS')):
+def create_macro_equities_df():
     end_date = dt(last_available_date())
     df = pd.DataFrame(columns=METADATA_HEADERS)
     #_add_macro_def(df, 10001, dt('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')

@@ -18,6 +18,7 @@ make
 # Install zipline-reloaded with source code
 cd $PYTHON_LIBS
 pip install zipline-reloaded # for dependecies
+pip install typing-extensions cython stack_data
 git clone git@github.com:stefan-jansen/zipline-reloaded.git
 cd zipline-reloaded
 python setup.py build_ext --inplace
