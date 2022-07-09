@@ -1,33 +1,29 @@
-import pandas as pd
-import numpy as np
+import os
 import sqlite3
-import click
 from contextlib import closing
+
+import click
+import numpy as np
+import pandas as pd
 from exchange_calendars import get_calendar
-from zipline.data.session_bars import SessionBarReader
+from sharadar.util.cache import cached
 from sharadar.util.logger import log
-from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader
+from sharadar.util.output_dir import get_output_dir
+from singleton_decorator import singleton
 from six import (
     iteritems,
-    string_types,
-    viewkeys,
 )
-
+from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader
 from zipline.data.bar_reader import (
     NoDataBeforeDate,
 )
-
-from singleton_decorator import singleton
-from sharadar.util.cache import cached
+from zipline.data.data_portal import DataPortal
+from zipline.data.session_bars import SessionBarReader
 from zipline.utils.numpy_utils import (
     float64_dtype,
     uint32_dtype,
     uint64_dtype,
 )
-from zipline.data.data_portal import DataPortal
-from sharadar.util.output_dir import get_output_dir
-import os
-
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS "properties" (
@@ -117,6 +113,7 @@ CREATE INDEX IF NOT EXISTS stock_dividends_payouts_ex_date ON stock_dividend_pay
 # Sqlite Maximum Number Of Columns in a table or query
 SQLITE_MAX_COLUMN = 2000
 
+
 @singleton
 class SQLiteDailyBarWriter(object):
     def __init__(self, filename, calendar):
@@ -129,7 +126,6 @@ class SQLiteDailyBarWriter(object):
             if c.fetchone()[0] == 0:
                 c.executescript(SCHEMA)
 
-
     def _validate(self, data):
         if not isinstance(data, pd.DataFrame):
             raise ValueError("data must be an instance of DataFrame.")
@@ -141,10 +137,10 @@ class SQLiteDailyBarWriter(object):
 
         df = data[['open', 'high', 'low', 'close', 'volume']]
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
-            properties = pd.Series({'calendar_name' : self._calendar.name})
+            properties = pd.Series({'calendar_name': self._calendar.name})
             properties.to_sql('properties', con, index_label='key', if_exists="replace")
 
-            with click.progressbar(length=len(df), label="Inserting price data...") as pbar:     
+            with click.progressbar(length=len(df), label="Inserting price data...") as pbar:
                 count = 0
                 for index, row in df.iterrows():
                     sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES ('%s',%f,%f,%f,%f,%f,%f)"
@@ -173,7 +169,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute(sql)
             return c.fetchall()
-        
+
     def _exist_sid(self, sid):
         sql = "SELECT COUNT(DISTINCT(sid)) FROM prices WHERE sid = %d" % sid
         res = self._query(sql)
@@ -240,7 +236,7 @@ class SQLiteDailyBarReader(SessionBarReader):
             else:
                 raise KeyError(sid)
 
-        return pd.Timestamp(res[0][0]).tz_convert('UTC')
+        return pd.Timestamp(res[0][0], tz='UTC')
 
     @property
     def last_available_dt(self):
@@ -248,7 +244,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0]).tz_convert('UTC')
+        return pd.Timestamp(res[0][0], tz='UTC')
 
     @property
     def trading_calendar(self):
@@ -264,7 +260,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0]).tz_convert('UTC')
+        return pd.Timestamp(res[0][0], tz='UTC')
 
     @property
     def sessions(self):
@@ -362,15 +358,15 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         input_sids = dividends.sid.values
         unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
         dates = pricing_reader.sessions.values
-        start = pd.Timestamp(dates[0]).tz_localize('UTC')
-        end = pd.Timestamp(dates[-1]).tz_localize('UTC')
+        start = pd.Timestamp(dates[0], tz='UTC')
+        end = pd.Timestamp(dates[-1], tz='UTC')
         calendar = self._equity_daily_bar_reader.trading_calendar
 
         data_portal = DataPortal(self._asset_finder,
                                  trading_calendar=calendar,
                                  first_trading_day=start,
                                  equity_daily_reader=self._equity_daily_bar_reader,
-                                 adjustment_reader= SQLiteAdjustmentReader(self._filename))
+                                 adjustment_reader=SQLiteAdjustmentReader(self._filename))
 
         close = data_portal.get_history_window(assets=unique_sids,
                                                end_dt=end,
@@ -395,7 +391,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         non_nan_ratio_mask = ~np.isnan(ratio)
         for ix in np.flatnonzero(~non_nan_ratio_mask):
-            ex_date = pd.Timestamp(input_dates[ix]).tz_localize('UTC')
+            ex_date = pd.Timestamp(input_dates[ix], tz='UTC')
             start_date = self._asset_finder.retrieve_asset(input_sids[ix]).start_date
             if ex_date != start_date:
                 log.warn(
@@ -422,5 +418,3 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
             'effective_date': input_dates[valid_ratio_mask],
             'ratio': ratio[valid_ratio_mask],
         })
-
-
