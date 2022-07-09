@@ -6,7 +6,7 @@ import pandas as pd
 
 from sharadar.util import nasdaqdatalink_util
 from sharadar.util.output_dir import get_output_dir
-from sharadar.loaders.constant import OLDEST_DATE_SEP, METADATA_HEADERS
+from sharadar.loaders.constant import METADATA_HEADERS
 from exchange_calendars import get_calendar
 from sharadar.util.nasdaqdatalink_util import last_available_date
 

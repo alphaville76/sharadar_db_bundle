@@ -1,10 +1,6 @@
-from sharadar.loaders.ingest_sharadar import create_metadata
+from sharadar.loaders.ingest_sharadar import _ingest
+import pandas as pd
+import exchange_calendars as xcals
 
-related_tickers, sharadar_metadata_df = create_metadata()
-
-sharadar_metadata = sharadar_metadata_df[sharadar_metadata_df['permaticker'] == 199623].iloc[0, :]
-
-start_date = sharadar_metadata.loc['firstpricedate']
-print(start_date)
-
-
+start_session = pd.to_datetime('2022-07-01', utc=True)
+_ingest(start_session, xcals.get_calendar('XNYS'), use_last_available_dt=False)
