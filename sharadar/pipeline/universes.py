@@ -83,7 +83,7 @@ class UniverseReader(object):
         res = self.cursor.fetchall()
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0]).tz_localize('UTC')
+        return pd.Timestamp(res[0], tz='UTC')
 
 def stocks_us(context):
     return (

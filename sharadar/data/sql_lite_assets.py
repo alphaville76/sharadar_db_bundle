@@ -204,7 +204,7 @@ class SQLiteAssetFinder(AssetFinder):
         res = self.engine.execute(sql).fetchall()
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0]).tz_localize('UTC')
+        return pd.Timestamp(res[0][0], tz='UTC')
 
 
 
