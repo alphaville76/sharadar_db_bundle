@@ -31,6 +31,7 @@ print(bundle_array)
 spe = make_pipeline_engine()
 pipe= Pipeline(columns={
     'close': USEquityPricing.close.latest,
+    'volume': USEquityPricing.volume.latest,
     'adv': AverageDollarVolume(window_length=3),
     'sharesbas_arq': Fundamentals(field='sharesbas_arq'),
     'sharefactor_arq': Fundamentals(field='sharefactor_arq'),
@@ -80,3 +81,7 @@ assert stocks.iloc[0]['mkt_cap']           == 1406489300000.00
 assert stocks.iloc[0]['sharefactor_arq']   ==             1.00
 assert stocks.iloc[0]['sharesbas_arq']     ==   17501920000.00
 assert abs(stocks.iloc[0]['adv'] - 13253087818.53) <= 1e-2
+
+pipe_start = pd.to_datetime('2022-06-24', utc=True)
+stocks = spe.run_pipeline(pipe, pipe_start)
+print(stocks.iloc[0])
