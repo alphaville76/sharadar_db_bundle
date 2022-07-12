@@ -9,7 +9,7 @@ export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
 # Install requirements
 cd $PYTHON_LIBS
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
-pip install -r requirements.txt --upgrade --no-deps
+pip install -r sharadar_db_bundle/requirements.txt --upgrade --no-deps
 pip uninstall tables
 
 # Install TA LIB
@@ -36,15 +36,16 @@ python setup.py install
 
 # Install TWS api
 cd $PYTHON_LIBS
-wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1011.01.zip
-unzip twsapi_macunix.1011.01.zip -d twsapi
-rm unzip twsapi_macunix.1011.01.zip
+wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1016.01.zip
+unzip twsapi_macunix.1016.01.zip -d twsapi
+rm unzip twsapi_macunix.1016.01.zip
 cd twsapi/IBJts/source/pythonclient
 python setup.py install
 
 sudo dnf install -y systemd-devel
 
 cd $PYTHON_LIBS/sharadar_db_bundle
+git clone git@github.com:alphaville76/algo.git
 python setup.py install
 python test/basic_pipeline_sep_db.py
 
