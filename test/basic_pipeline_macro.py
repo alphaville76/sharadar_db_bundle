@@ -9,15 +9,15 @@ bundle = load_sharadar_bundle()
 
 
 def ingest_macro():
-    start = bundle.equity_daily_bar_reader.first_trading_day
+    start = bundle.equity_daily_bar_reader.first_trading_day.strftime('%Y-%m-%d')
     print("Adding macro data from %s ..." % (start))
     print(ingest(start))
 
-#ingest_macro()
+ingest_macro()
 
 spe = make_pipeline_engine()
 
-pipe_start = pd.to_datetime('2021-01-04', utc=True)
+pipe_start = pd.to_datetime('2022-07-11', utc=True)
 pipe_end = bundle.equity_daily_bar_reader.last_available_dt
 macro = symbols(['TR3M', 'TR6M', 'TR1Y', 'TR2Y', 'TR3Y', 'TR5Y', 'TR7Y', 'TR10Y','TR20Y','CBOND', 'INDPRO', 'INDPROPCT', 'PMICMP', 'UNRATE', 'RATEINF'])
 pipe = Pipeline(columns={

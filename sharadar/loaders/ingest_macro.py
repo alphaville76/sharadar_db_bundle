@@ -3,12 +3,18 @@ import os
 from os import environ as env
 from pandas.tseries.offsets import DateOffset
 import pandas as pd
-
-from sharadar.util import nasdaqdatalink_util
+import requests
 from sharadar.util.output_dir import get_output_dir
 from sharadar.loaders.constant import METADATA_HEADERS
 from exchange_calendars import get_calendar
 from sharadar.util.nasdaqdatalink_util import last_available_date
+import pandas_datareader.data as pdr
+import sharadar.loaders.constant as k
+import random
+
+# To clean the database if necessary use:
+# delete from prices where sid in (10003,   10006,  10012,  10024,  10036,  10060,  10084,  10120,  10240, 10400, 10410, 10420, 10430, 10440, 10450)
+
 
 nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
 
@@ -28,15 +34,8 @@ def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
                    auto_close_date,
                    exchange)
 
-def _nasdaqdatalink_get_monthly_to_daily(name, start, end, transform=None):
-    m_start = (dt(start) - DateOffset(months=6)).strftime('%Y-%m-%d')
-    df = nasdaqdatalink_util.get(name, start_date=m_start, transform=transform)
-    new_index = pd.date_range(start=m_start, end=end, tz='UTC')
-    ret = df.reindex(new_index, method='ffill').loc[pd.date_range(start, end, tz='UTC')]
-    return ret
-
-
 def _to_prices_df(df, sid):
+    df.index = df.index.tz_localize('UTC')
     df['sid'] = sid
     df.set_index('sid', append=True, inplace=True)
     df = _append_ohlc(df)
@@ -51,97 +50,128 @@ def _append_ohlc(df):
     return df
 
 
-def dt(s):
+def utc(s):
     return pd.to_datetime(s, utc=True)
 
 def create_macro_equities_df():
-    end_date = dt(last_available_date())
+    # TR1M, TR2M and TR30Y excluded because of too many missing data
+    end_date = utc(last_available_date())
     df = pd.DataFrame(columns=METADATA_HEADERS)
-    #_add_macro_def(df, 10001, dt('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')
-    #_add_macro_def(df, 10002, dt('1997-12-31'), end_date, 'TR2M', 'US Treasury Bill 2 MO')
-    _add_macro_def(df, 10003, dt('1990-01-02'), end_date, 'TR3M', 'US Treasury Bill 3 MO')
-    _add_macro_def(df, 10006, dt('1990-01-02'), end_date, 'TR6M', 'US Treasury Bill 6 MO')
-    _add_macro_def(df, 10012, dt('1990-01-02'), end_date, 'TR1Y', 'US Treasury Bond 1 YR')
-    _add_macro_def(df, 10024, dt('1990-01-02'), end_date, 'TR2Y', 'US Treasury Bond 2 YR')
-    _add_macro_def(df, 10036, dt('1990-01-02'), end_date, 'TR3Y', 'US Treasury Bond 3 YR')
-    _add_macro_def(df, 10060, dt('1990-01-02'), end_date, 'TR5Y', 'US Treasury Bond 5 YR')
-    _add_macro_def(df, 10084, dt('1990-01-02'), end_date, 'TR7Y', 'US Treasury Bond 7 YR')
-    _add_macro_def(df, 10120, dt('1990-01-02'), end_date, 'TR10Y', 'US Treasury Bond 10 YR')
-    _add_macro_def(df, 10240, dt('1990-01-02'), end_date, 'TR20Y', 'US Treasury Bond 20 YR')
-    #_add_macro_def(df, 10360, end_date, 'TR30Y', 'US Treasury Bond 30 YR')
-    _add_macro_def(df, 10400, dt('1996-12-31'), end_date, 'CBOND', 'US Corporate Bond Yield')
-    _add_macro_def(df, 10410, dt('1990-01-02'), end_date, 'INDPRO', 'Industrial Production Index')
-    _add_macro_def(df, 10420, dt('1990-01-02'), end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
-    _add_macro_def(df, 10430, dt('1990-01-02'), end_date, 'PMICMP', 'Purchasing Managers Index')
-    _add_macro_def(df, 10440, dt('1990-01-02'), end_date, 'UNRATE', 'Civilian Unemployment Rate')
-    _add_macro_def(df, 10450, dt('1990-01-02'), end_date, 'RATEINF', 'US Inflation Rates YoY')
+    #_add_macro_def(df, 10001, utc('1997-12-31'), end_date, 'TR1M', 'US Treasury Bill 1 MO')
+    #_add_macro_def(df, 10002, utc('1997-12-31'), end_date, 'TR2M', 'US Treasury Bill 2 MO')
+    _add_macro_def(df, 10003, utc('1990-01-02'), end_date, 'TR3M', 'US Treasury Bill 3 MO')
+    _add_macro_def(df, 10006, utc('1990-01-02'), end_date, 'TR6M', 'US Treasury Bill 6 MO')
+    _add_macro_def(df, 10012, utc('1990-01-02'), end_date, 'TR1Y', 'US Treasury Bond 1 YR')
+    _add_macro_def(df, 10024, utc('1990-01-02'), end_date, 'TR2Y', 'US Treasury Bond 2 YR')
+    _add_macro_def(df, 10036, utc('1990-01-02'), end_date, 'TR3Y', 'US Treasury Bond 3 YR')
+    _add_macro_def(df, 10060, utc('1990-01-02'), end_date, 'TR5Y', 'US Treasury Bond 5 YR')
+    _add_macro_def(df, 10084, utc('1990-01-02'), end_date, 'TR7Y', 'US Treasury Bond 7 YR')
+    _add_macro_def(df, 10120, utc('1990-01-02'), end_date, 'TR10Y', 'US Treasury Bond 10 YR')
+    _add_macro_def(df, 10240, utc('1990-01-02'), end_date, 'TR20Y', 'US Treasury Bond 20 YR')
+    #_add_macro_def(df, 10360, utc('1990-01-02'), end_date, 'TR30Y', 'US Treasury Bond 30 YR')
+    _add_macro_def(df, 10400, utc('1996-12-31'), end_date, 'CBOND', 'US Corporate Bond Yield')
+    _add_macro_def(df, 10410, utc('1990-01-02'), end_date, 'INDPRO', 'Industrial Production Index')
+    _add_macro_def(df, 10420, utc('1990-01-02'), end_date, 'INDPROPCT', 'Industrial Production Montly % Change')
+    _add_macro_def(df, 10430, utc('1990-01-02'), end_date, 'PMICMP', 'Purchasing Managers Index')
+    _add_macro_def(df, 10440, utc('1990-01-02'), end_date, 'UNRATE', 'Civilian Unemployment Rate')
+    _add_macro_def(df, 10450, utc('1990-01-02'), end_date, 'RATEINF', 'US Inflation Rates YoY')
     return df
 
-
-def create_macro_prices_df(start: str, calendar=get_calendar('XNYS')):
-    end = last_available_date()
+def create_macro_prices_df(start_str: str, calendar=get_calendar('XNYS')):
+    start = pd.to_datetime(start_str)
+    end = pd.to_datetime(last_available_date())
 
     if start is not None and start > end:
         start = end
 
-    # https://data.nasdaq.com/data/USTREASURY/YIELD-Treasury-Yield-Curve-Rates
-    #tres_df = nasdaqdatalink_util.get("USTREASURY/YIELD", start_date=start, end_date=end)
-    year = start[0:4]
-    if year != pd.to_datetime("today").strftime('%Y'):
-        # if the start is the current year, load only data for the current year,
-        # otherwise load the whole history.
-        year = "all"
-    url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/%s/all?type=daily_treasury_yield_curve&field_tdr_date_value=%s&page&_format=csv"
-    url = url % (year, year)
-    tres_df = pd.read_csv(url, index_col=0, parse_dates=True, na_values=['N/A']).tz_localize('UTC')
-    assert len(tres_df.columns) == 12
-    # sids
-    tres_df.columns = [10001, 10002, 10003, 10006, 10012, 10024, 10036, 10060, 10084, 10120, 10240, 10360]
-    # TR1M, TR2M and TR30Y excluded because of too many missing data
-    tres_df.drop(columns=[10001, 10002, 10360], inplace=True)
+    #TODO optimize only CPIAUCNS need 13, the rest 6, maybe even 3
+    m_start = start - DateOffset(months=13)
 
+    # Interest Rates (T-bills and T-bonds)
+    # Frequency: daily
+    tres_df = pdr.DataReader(['DTB3', 'DTB6', 'DGS1', 'DGS1', 'DGS2', 'DGS3', 'DGS5', 'DGS7', 'DGS10'], 'fred', start, end)
+
+    # sids
+    tres_df.columns =        [10003,   10006,  10012,  10024,  10036,  10060,  10084,  10120,  10240]
+
+    tres_df.index = tres_df.index.tz_localize('UTC')
     sessions = calendar.sessions_in_range(start, end)
-    tres_df = tres_df.reindex(sessions)
-    tres_df = tres_df.fillna(method='ffill')
-    tres_df = tres_df.dropna()
+    tres_df = tres_df.reindex(sessions).fillna(method='ffill').dropna()
 
     prices = tres_df.unstack().to_frame()
     prices = prices.swaplevel()
     prices = _append_ohlc(prices)
 
-    # https://data.nasdaq.com/data/ML/USEY-US-Corporate-Bond-Index-Yield
-    corp_bond_df = _to_prices_df(nasdaqdatalink_util.get("ML/USEY", start_date=start, end_date=end), 10400)
+    # USEY-US-Corporate-Bond-Index-Yield (BAMLC0A0CMEY)
+    # Frequency: daily
+    corp_bond_df = _to_prices_df(pdr.DataReader(['BAMLC0A0CMEY'], 'fred', start, end).fillna(method="ffill"), 10400)
     prices = pd.concat([prices, corp_bond_df])
+
 
     # Industrial Production Change
     # Frequency: monthly
-    indpro_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end), 10410)
-    prices = pd.concat([prices, indpro_df])
+    indpro_df = pdr.DataReader(['INDPRO'], 'fred', m_start, end)\
+        .reindex(pd.date_range(start=m_start, end=end), method='ffill').loc[pd.date_range(start, end)]
+    prices = pd.concat([prices, _to_prices_df(indpro_df, 10410)])
 
     # rdiff: row-on-row % change
-    indpro_p_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/INDPRO", start, end, transform="rdiff"), 10420)
-    prices = pd.concat([prices, indpro_p_df])
-
-    # ISM Purchasing Managers Index
-    # https://data.nasdaq.com/data/ISM/MAN_PMI-PMI-Composite-Index
     # Frequency: monthly
-    pmi_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("ISM/MAN_PMI", start, end), 10430)
-    prices = pd.concat([prices, pmi_df])
+    indpro_p_df = pdr.DataReader(['INDPRO'], 'fred', m_start, end).pct_change()\
+        .reindex(pd.date_range(start=m_start, end=end), method='ffill').loc[pd.date_range(start, end)]
+    prices = pd.concat([prices, _to_prices_df(indpro_p_df, 10420)])
 
     # Civilian Unemployment Rate
     # https://data.nasdaq.com/data/FRED/UNRATE-Civilian-Unemployment-Rate
     # Frequency: monthly
-    unrate_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("FRED/UNRATE", start, end), 10440)
-    prices = pd.concat([prices, unrate_df])
+    unrate_df = pdr.DataReader(['UNRATE'], 'fred', m_start, end)\
+        .reindex(pd.date_range(start=m_start, end=end), method='ffill').loc[pd.date_range(start, end)]
+    prices = pd.concat([prices, _to_prices_df(unrate_df, 10440)])
 
     # https://data.nasdaq.com/data/RATEINF/INFLATION_USA-Inflation-YOY-USA
     # Frequency: monthly
-    inf_df = _to_prices_df(_nasdaqdatalink_get_monthly_to_daily("RATEINF/INFLATION_USA", start, end), 10450)
-    prices = pd.concat([prices, inf_df])
+    inf_df = (pdr.DataReader(['CPIAUCNS'], 'fred', m_start, end).pct_change(periods=12) * 100.00).round(2)\
+        .reindex(pd.date_range(start=m_start, end=end), method='ffill').loc[pd.date_range(start, end)]
+    prices = pd.concat([prices, _to_prices_df(inf_df, 10450)])
 
-    prices.sort_index(inplace=True)
-    return prices
+    # ISM Purchasing Managers Index
+    # https://data.nasdaq.com/data/ISM/MAN_PMI-PMI-Composite-Index
+    # https://www.economy.com/united-states/ism-purchasing-managers-index ?
+    # Frequency: monthly
+    pmi_df = retrieve_ism_pmi()\
+        .reindex(pd.date_range(start=m_start, end=end), method='ffill').loc[pd.date_range(start, end)]
+    prices = pd.concat([prices, _to_prices_df(pmi_df, 10430)])
 
+    return prices.sort_index()
+
+
+# Retrive the entire set from investing.com
+# U.S. ISM Manufacturing Purchasing Managers Index (PMI)
+# https://www.investing.com/economic-calendar/ism-manufacturing-pmi-173
+def retrieve_ism_pmi():
+    head = {
+        "User-Agent": random.choice(k.USER_AGENTS),
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "text/html",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+    }
+
+    # U.S. ISM Manufacturing Purchasing Managers Index (PMI)
+    # https://www.investing.com/economic-calendar/ism-manufacturing-pmi-173
+    url = 'https://sbcharts.investing.com/events_charts/us/173.json'
+    response = requests.get(url, headers=head)
+    if response.status_code != 200:
+        raise ConnectionError(
+            f"ERR#0015: error {response.status_code}, try again later."
+        )
+
+    data = response.json()["data"]
+    df = pd.DataFrame(data, columns=['timestamp', 'value', 'forecast'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('timestamp', inplace=True)
+    df.drop(columns=['forecast'], inplace=True)
+
+    return df
 
 def ingest(start):
     from sharadar.pipeline.engine import load_sharadar_bundle
@@ -171,7 +201,7 @@ if __name__ == "__main__":
         sys.exit(os.EX_USAGE)
 
 
-    start = sys.argv[1]
+    start = '1990-01-02' if len(sys.argv) == 1 else sys.argv[1]
 
     print("Adding macro data from %s..." % (start))
     n = ingest(start)

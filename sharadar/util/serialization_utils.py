@@ -1,65 +1,44 @@
-#
-# Copyright 2015 Quantopian, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import pickle
+import json
+
+# Persistence blacklist/whitelist and excludes gives a way to include/
+# exclude (so do not persist on disk if initiated or excluded from the serialization
+# function that reinstate or save the context variable to its last state).
+# trading client can never be serialized, the initialized function and
+# perf tracker remember the context variables and the past performance
+# and need to be whitelisted
+_context_blacklist = ['trading_client']
+_context_whitelist = ['initialized', 'perf_tracker']
 
 
-# Label for the serialization version field in the state returned by
-# __getstate__.
-VERSION_LABEL = '_stateversion_'
-CHECKSUM_KEY = '__state_checksum'
-
-
-def load_context(state_file_path, context, checksum):
+def load_context(state_file_path, context):
     with open(state_file_path, 'rb') as f:
-        try:
-            loaded_state = pickle.load(f)
-        except (pickle.UnpicklingError, IndexError):
-            raise ValueError("Corrupt state file: {}".format(state_file_path))
-        else:
-            if CHECKSUM_KEY not in loaded_state or \
-               loaded_state[CHECKSUM_KEY] != checksum:
-                raise TypeError("Checksum mismatch during state load. "
-                                "The given state file was not created "
-                                "for the algorithm in use")
-            else:
-                del loaded_state[CHECKSUM_KEY]
+        loaded_state = pickle.load(f)
 
-            for k, v in loaded_state.items():
-                setattr(context, k, v)
+        for k, v in loaded_state.items():
+            setattr(context, k, v)
 
 
-def store_context(state_file_path, context, checksum, exclude_list):
+def store_context(state_file_path, context):
+    exclude_list = _context_blacklist + [e for e in context.__dict__.keys() if e not in _context_whitelist]
+    fields_to_store = list(set(context.__dict__.keys()) - set(exclude_list))
+
     state = {}
-    fields_to_store = list(set(context.__dict__.keys()) -
-                           set(exclude_list))
-
     for field in fields_to_store:
         state[field] = getattr(context, field)
-
-    state[CHECKSUM_KEY] = checksum
 
     with open(state_file_path, 'wb') as f:
         pickle.dump(state, f)
 
+
 if __name__ == '__main__':
     import sys
+
     context_file_path = sys.argv[1]
     with open(context_file_path, 'rb') as f:
         context = pickle.load(f)
 
     import pprint
+
     pp = pprint.PrettyPrinter()
     pp.pprint(context)

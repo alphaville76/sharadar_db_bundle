@@ -8,9 +8,12 @@ def cached(user_function=None, max_size=None, ttl=None, algorithm=CachingAlgorit
     Entry point for the configuration of the memoization cache
     """
 
-    if mem().percent > 75:
-        # Do not cache if memory usage more than 75%
-        return user_function
+    # if mem().percent > 75:
+    #     # Do not cache if memory usage more than 75%
+    #     return user_function
+    #
+    # return memoization.cached(user_function, max_size, ttl, algorithm, thread_safe, order_independent)
 
-    return memoization.cached(user_function, max_size, ttl, algorithm, thread_safe, order_independent)
+    #FIXME no cache
+    return user_function
 

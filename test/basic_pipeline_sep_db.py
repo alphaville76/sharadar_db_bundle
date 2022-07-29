@@ -135,7 +135,7 @@ assert stocks.shape == (10, 3)
 
 pipe_start = pd.to_datetime('2020-02-03', utc=True)
 pipe_end = pd.to_datetime('2021-02-26', utc=True)
-macro = symbols(['TR3M', 'TR6M', 'TR1Y', 'TR2Y', 'TR3Y', 'TR5Y', 'TR7Y', 'TR10Y','TR20Y','CBOND', 'INDPRO', 'INDPROPCT', 'PMICMP', 'UNRATE', 'RATEINF'])
+macro = symbols(['TR3M', 'TR6M', 'TR1Y', 'TR2Y', 'TR3Y', 'TR5Y', 'TR7Y', 'TR10Y','TR20Y','CBOND', 'INDPRO', 'INDPROPCT', 'UNRATE', 'RATEINF'])
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
 },

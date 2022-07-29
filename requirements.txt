@@ -83,7 +83,6 @@ SQLAlchemy==1.4.39
 stack-data==0.3.0
 statsmodels==0.13.2
 TA-Lib==0.4.24
-tables==3.7.0
 threadpoolctl==3.1.0
 toml==0.10.2
 tomli==2.0.1
@@ -96,4 +95,4 @@ urllib3==1.26.10
 virtualenv==20.15.1
 wcwidth==0.2.5
 yfinance==0.1.72
-
+pandas_datareader==0.10.0

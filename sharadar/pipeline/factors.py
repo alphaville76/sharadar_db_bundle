@@ -3,6 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from sharadar.pipeline.engine import BundleLoader, symbol
+from sharadar.util.numpy_invalid_values_util import nandivide, nanlog
 from zipline.lib.labelarray import LabelArray
 from zipline.pipeline.classifiers import CustomClassifier
 from zipline.pipeline.data import USEquityPricing
@@ -263,12 +264,12 @@ def time_trend(Y, allowed_missing=0):
     X_var = nanvar(X, axis=0)
 
     # shape: (M,)
-    beta = np.divide(XY_cov, X_var)
-    alpha = Y_mean - beta * X_mean
-    Y_est = alpha + np.multiply(beta, X)
-    residual = Y - Y_est
+    beta = nandivide(XY_cov, X_var)
+    alpha = np.subtract(Y_mean, np.multiply(beta, X_mean))
+    Y_est = np.add(alpha, np.multiply(beta, X))
+    residual = np.subtract(Y, Y_est)
     s2 = np.nansum(residual ** 2, axis=0) / (n - 2.0)
-    std_err2 = s2 / (n * X_var)
+    std_err2 = nandivide(s2, np.multiply(n, X_var))
     std_err = np.sqrt(std_err2)
 
     # Write nans back to locations where we have more
@@ -316,7 +317,7 @@ def _robust(x, fn):
 
 def _logscale(x):
     # Given: y=log(1+x), y≈x when x is small (less than 1).
-    return np.sign(x) * np.log(np.abs(x + np.sign(x)))
+    return np.sign(x) * nanlog(np.abs(x + np.sign(x)))
 
 
 # to avoid divide by zero
@@ -410,7 +411,7 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     X_variances = nanmean(X_residual ** 2, axis=0)
 
     # shape: (M,)
-    beta = np.divide(covariances, X_variances)
+    beta = nandivide(covariances, X_variances)
 
     Y_est = np.multiply(beta, X)
     residual = Y - Y_est
@@ -487,7 +488,7 @@ class TradingVolume(CustomFactor):
 
     def compute(self, today, assets, out, monthly_dollar_volume, market_cap):
         length = self.window_length
-        out[:] = monthly_dollar_volume[-length] / market_cap[-length]
+        out[:] = nandivide(monthly_dollar_volume[-length], market_cap[-length])
 
 
 class InvestmentToAssets(CustomFactor, BundleLoader):
@@ -503,7 +504,7 @@ class InvestmentToAssets(CustomFactor, BundleLoader):
         l = self.window_length
         assets_t = self.asset_finder().get_fundamentals(assets, 'assets_art', today, n=l)
         assets_t_minus_1 = self.asset_finder().get_fundamentals(assets, 'assets_art', today, n=(l + 4))
-        out[:] = assets_t / assets_t_minus_1 - 1.0
+        out[:] = nandivide(assets_t , assets_t_minus_1 - 1.0)
 
 
 def shift(arr, num, fill_value=np.nan):

@@ -53,15 +53,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         self.algo_filename = kwargs.get('algo_filename', "<algorithm>")
         self.state_filename = kwargs.pop('state_filename', None)
-        # Persistence blacklist/whitelist and excludes gives a way to include/
-        # exclude (so do not persist on disk if initiated or excluded from the serialization
-        # function that reinstate or save the context variable to its last state).
-        # trading client can never be serialized, the initialized function and
-        # perf tracker remember the context variables and the past performance
-        # and need to be whitelisted
-        self._context_persistence_blacklist = ['trading_client']
-        self._context_persistence_whitelist = ['initialized', 'perf_tracker']
-        self._context_persistence_excludes = []
 
         # blotter is always initialized to SimulationBlotter in run_algo.py.
         # we override it here to use the LiveBlotter for live algos
@@ -77,41 +68,25 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         return super(self.__class__, self).get_environment(field)
 
     def initialize(self, *args, **kwargs):
-        self._context_persistence_excludes = \
-            self._context_persistence_blacklist + \
-            [e for e in self.__dict__.keys()
-             if e not in self._context_persistence_whitelist]
-
         if os.path.isfile(self.state_filename):
             log.info("Loading state from {}".format(self.state_filename))
-            load_context(self.state_filename,
-                         context=self,
-                         checksum=self.algo_filename)
+            load_context(self.state_filename, context=self)
 
         self.initialized = False
 
         with ZiplineAPI(self):
             super(self.__class__, self).initialize(*args, **kwargs)
-            store_context(self.state_filename,
-                          context=self,
-                          checksum=self.algo_filename,
-                          exclude_list=self._context_persistence_excludes)
+            store_context(self.state_filename, context=self)
 
         self.initialized = True
         log.info("initialization done")
 
     def handle_data(self, data):
         super(self.__class__, self).handle_data(data)
-        store_context(self.state_filename,
-                      context=self,
-                      checksum=self.algo_filename,
-                      exclude_list=self._context_persistence_excludes)
+        store_context(self.state_filename, context=self)
 
     def teardown(self):
-        store_context(self.state_filename,
-                      context=self,
-                      checksum=self.algo_filename,
-                      exclude_list=self._context_persistence_excludes)
+        store_context(self.state_filename, context=self)
 
     def _create_clock(self):
         # This method is taken from TradingAlgorithm.

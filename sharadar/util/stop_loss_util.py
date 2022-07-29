@@ -1,7 +1,6 @@
-from zipline.api import get_datetime
-from zipline.api import order_target
+from zipline.api import order_target, get_open_orders
 from sharadar.util.performance import print_portfolio
-
+import time
 
 def stop_loss_portfolio(context, data, log):
     """
@@ -63,3 +62,16 @@ def close_all(context, data, exclude=[], log=None):
             if log:
                 log.debug("Close all position for %s" % (str(stock)))
             order_target(stock, 0)
+
+
+def await_no_open_orders(timeout_sec=3600, log=None):
+    start_time = time.time()
+    while len(get_open_orders()) > 0:
+        if log:
+            log.info("Still %d open orders." % len(get_open_orders()))
+        if (time.time() - start_time) > timeout_sec:
+            log.info("Open orders timeout (%d seconds) reached!" % timeout_sec)
+            return
+        time.sleep(1)
+    if log:
+        log.info("No pending orders!")
