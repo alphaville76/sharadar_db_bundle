@@ -85,7 +85,7 @@ def create_macro_prices_df(start_str: str, calendar=get_calendar('XNYS')):
         start = end
 
     #TODO optimize only CPIAUCNS need 13, the rest 6, maybe even 3
-    m_start = start - DateOffset(months=13)
+    m_start = start - DateOffset(months=14)
 
     # Interest Rates (T-bills and T-bonds)
     # Frequency: daily
@@ -201,7 +201,7 @@ if __name__ == "__main__":
         sys.exit(os.EX_USAGE)
 
 
-    start = '1990-01-02' if len(sys.argv) == 1 else sys.argv[1]
+    start = '2022-07-27' if len(sys.argv) == 1 else sys.argv[1]
 
     print("Adding macro data from %s..." % (start))
     n = ingest(start)

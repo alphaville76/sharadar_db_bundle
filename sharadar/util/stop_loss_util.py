@@ -68,7 +68,7 @@ def await_no_open_orders(timeout_sec=3600, log=None):
     start_time = time.time()
     while len(get_open_orders()) > 0:
         if log:
-            log.info("Still %d open orders." % len(get_open_orders()))
+            log.info("Still %d open orders: %s" % (len(get_open_orders()), str([k.symbol for (k, v) in get_open_orders().items()]) ))
         if (time.time() - start_time) > timeout_sec:
             log.info("Open orders timeout (%d seconds) reached!" % timeout_sec)
             return

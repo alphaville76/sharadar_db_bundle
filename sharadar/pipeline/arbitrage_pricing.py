@@ -1,6 +1,7 @@
 import numpy as np
 from sharadar.pipeline.engine import symbol
 from sharadar.pipeline.factors import beta_residual
+from sharadar.util.numpy_invalid_values_util import nanlog, nanlog1p
 from zipline.pipeline import CustomFactor
 from zipline.pipeline.data import USEquityPricing
 
@@ -29,12 +30,12 @@ class TBillBeta(CustomFactor):
 
     def compute(self, today, assets, out, close, rate):
         # monthly log returns
-        monthly_r = np.diff(np.log(close[0::21, :]), axis=0)
+        monthly_r = np.diff(nanlog(close[0::21, :]), axis=0)
         r = 12.*monthly_r
 
         # Treasury Bonds rates means every 21 daily
-        t_r = np.log1p(rate)
-        t_r = np.mean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
+        t_r = nanlog1p(rate)
+        t_r = np.nanmean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
 
         beta = beta_residual(r, t_r, standardize=True)[0]
         out[:] = beta
@@ -50,14 +51,14 @@ class TBillBondSpreadBeta(CustomFactor):
 
     def compute(self, today, assets, out, close):
         # monthly log returns
-        monthly_r = np.diff(np.log(close[0::21, :]), axis=0)
+        monthly_r = np.diff(nanlog(close[0::21, :]), axis=0)
         r = 12.*monthly_r
 
         # Treasury Bonds spreads means every 21 daily
-        t_bond_30y = np.log1p(prices_by_sid(assets, close, 10240))
-        t_bill_3m = np.log1p(prices_by_sid(assets, close, 10003))
+        t_bond_30y = nanlog1p(prices_by_sid(assets, close, 10240))
+        t_bill_3m = nanlog1p(prices_by_sid(assets, close, 10003))
         t_r = t_bond_30y - t_bill_3m
-        t_r = np.mean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
+        t_r = np.nanmean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
 
         beta = beta_residual(r, t_r, standardize=True)[0]
         out[:] = beta
@@ -74,14 +75,14 @@ class CorpGvrnBondsSpreadBeta(CustomFactor):
 
     def compute(self, today, assets, out, close):
         # monthly log returns
-        monthly_r = np.diff(np.log(close[0::21, :]), axis=0)
+        monthly_r = np.diff(nanlog(close[0::21, :]), axis=0)
         r = 12.*monthly_r
 
         # Treasury Bonds spreads means every 21 daily
-        t_bond = np.log1p(prices_by_sid(assets, close, 10084))
-        c_bond = np.log1p(prices_by_sid(assets, close, 10400))
+        t_bond = nanlog1p(prices_by_sid(assets, close, 10084))
+        c_bond = nanlog1p(prices_by_sid(assets, close, 10400))
         t_r = t_bond - c_bond
-        t_r = np.mean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
+        t_r = np.nanmean(t_r.reshape(-1, 21), axis=1)[1:].reshape(11, 1)
 
         beta = beta_residual(r, t_r, allowed_missing=2, standardize=True)[0]
         out[:] = beta
@@ -96,8 +97,8 @@ class PurchaseManagerIndexBeta(CustomFactor):
         # 10430	Purchasing Managers Index
         pmi = prices_by_sid(assets, close, 10430)
 
-        monthly_close = np.diff(np.log(close[0::21, :]), axis=0)
-        monthly_rate = np.diff(np.log(pmi[0::21, :]), axis=0)
+        monthly_close = np.diff(nanlog(close[0::21, :]), axis=0)
+        monthly_rate = np.diff(nanlog(pmi[0::21, :]), axis=0)
 
         beta = beta_residual(monthly_close, monthly_rate, standardize=True)[0]
 
@@ -135,7 +136,7 @@ class InflationRateBeta(CustomFactor):
     window_length = 252
 
     def compute(self, today, assets, out, close, rateinf):
-        monthly_close = np.diff(np.log(close[0::21, :]), axis=0)
+        monthly_close = np.diff(nanlog(close[0::21, :]), axis=0)
         monthly_rateinf = rateinf[0::21, :][1:, :]
         beta = beta_residual(monthly_close, monthly_rateinf, standardize=True)[0]
 

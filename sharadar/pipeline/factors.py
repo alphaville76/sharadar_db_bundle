@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from sharadar.pipeline.engine import BundleLoader, symbol
-from sharadar.util.numpy_invalid_values_util import nandivide, nanlog
+from sharadar.util.numpy_invalid_values_util import nandivide, nanlog, nansubtract, nanmean, nanvar, nanstd
 from zipline.lib.labelarray import LabelArray
 from zipline.pipeline.classifiers import CustomClassifier
 from zipline.pipeline.data import USEquityPricing
@@ -13,27 +13,7 @@ from zipline.pipeline.factors import AverageDollarVolume
 from sharadar.pipeline.engine import history, returns
 from sharadar.util.logger import log
 
-def nanmean(a, axis=0):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        return np.nanmean(a, axis)
 
-
-def nanvar(a, axis=0):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        return np.nanvar(a, axis)
-
-
-def nanstd(a, axis=0):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        return np.nanstd(a, axis)
-
-def divide(a, b):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        return a / b
 
 
 class Fundamentals(CustomFactor, BundleLoader):
@@ -396,14 +376,14 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     variance of residuals : np.array[M]
     """
     if standardize:
-        Y = divide((Y - nanmean(Y, axis=0)), nanstd(Y, axis=0))
-        X = divide((X - nanmean(X, axis=0)), nanstd(X, axis=0))
+        Y = nandivide(nansubtract(Y, nanmean(Y, axis=0)), nanstd(Y, axis=0))
+        X = nandivide(nansubtract(X, nanmean(X, axis=0)), nanstd(X, axis=0))
 
 
     # shape: (N, M)
     X = np.where(np.isnan(Y), np.nan, X)
 
-    X_residual = X - nanmean(X, axis=0)
+    X_residual = nansubtract(X, nanmean(X, axis=0))
 
     # shape: (M,)
     covariances = nanmean(X_residual * Y, axis=0)
@@ -414,7 +394,7 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
     beta = nandivide(covariances, X_variances)
 
     Y_est = np.multiply(beta, X)
-    residual = Y - Y_est
+    residual = nansubtract(Y, Y_est)
     residual_var = nanvar(residual, axis=0)
 
     # Write nans back to locations where we have more
