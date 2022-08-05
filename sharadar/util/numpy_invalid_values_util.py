@@ -2,7 +2,9 @@ import warnings
 import numpy as np
 
 def nansubtract(a, b):
-    return np.subtract(a, b, out=np.full_like(b, fill_value=np.nan), where=np.isfinite(b))
+    if np.shape(a) == np.shape(b):
+        return np.subtract(a, b, out=np.full_like(b, fill_value=np.nan), where=np.isfinite(b))
+    return np.subtract(a, b)
 
 def nandivide(a, b):
     return np.divide(a, b, out=np.full_like(a, fill_value=np.nan), where=b != 0)

@@ -12,3 +12,8 @@ np.testing.assert_array_almost_equal(np.array([np.nan, np.nan, 0., 0.69314718, 1
 np.testing.assert_array_almost_equal(np.array([np.nan, np.nan, 0.69314718, 1.09861229, 1.38629436]), nanlog1p(a))
 
 np.testing.assert_array_almost_equal(np.array([np.nan,  0., np.nan,  0.,  0.]), nansubtract(c, c))
+
+#non-broadcastable output operand with shape (8156,) doesn't match the broadcast shape (252,8156)
+a1 = np.ones((10,))
+b1 = np.ones((4,10))
+nansubtract(a1, b1)

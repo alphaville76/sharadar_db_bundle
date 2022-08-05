@@ -1,6 +1,8 @@
 import os
 from zipline.utils.paths import data_root
 
+SHARADAR_BUNDLE_NAME = 'sharadar'
+SHARADAR_BUNDLE_DIR = 'latest'
 
 def get_data_filepath(name, environ=None):
     """
@@ -17,6 +19,6 @@ def get_data_filepath(name, environ=None):
 def get_output_dir():
     return os.path.join(get_data_filepath(SHARADAR_BUNDLE_NAME), SHARADAR_BUNDLE_DIR)
 
+def get_cache_dir():
+    return os.path.join(get_data_filepath(SHARADAR_BUNDLE_NAME), SHARADAR_BUNDLE_DIR, 'cache')
 
-SHARADAR_BUNDLE_NAME = 'sharadar'
-SHARADAR_BUNDLE_DIR = 'latest'

@@ -437,8 +437,8 @@ class ExcessReturn(CustomFactor):
         market_index = np.where((assets == 118691) == True)[0][0]
         market_close = assets_close[:, market_index]
 
-        assets_returns = (assets_close[-1] / assets_close[0]) - 1.0
-        market_returns = (market_close[-1] / market_close[0]) - 1.0
+        assets_returns = nandivide(assets_close[-1], assets_close[0]) - 1.0
+        market_returns = nandivide(market_close[-1], market_close[0]) - 1.0
         out[:] = assets_returns - market_returns
 
 
@@ -534,3 +534,4 @@ class ForwardsReturns(CustomFactor, BundleLoader):
         end_dt = self.bar_reader().trading_calendar.sessions_window(today, self.window_length)[-1]
 
         out[:] = returns(assets, today, end_dt)
+

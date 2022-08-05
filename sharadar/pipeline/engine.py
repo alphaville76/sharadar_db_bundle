@@ -1,20 +1,21 @@
 import datetime
-import time
+import re
 import os
-
+import numpy as np
 import click
 import pandas as pd
 from sharadar.util.cache import cached
 from sharadar.pipeline.fx import SimpleFXRateReader
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
-from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR
+from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR, get_cache_dir
 from sharadar.util.logger import log
 from six import iteritems
 from toolz import juxt, groupby
 from zipline.data.bundles.core import BundleData, asset_db_path, adjustment_db_path
 from zipline.data.adjustments import SQLiteAdjustmentReader
-from zipline.pipeline import SimplePipelineEngine
+from zipline.lib.labelarray import LabelArray
+from zipline.pipeline import SimplePipelineEngine, CustomClassifier
 from zipline.pipeline.loaders.equity_pricing_loader import USEquityPricingLoader
 from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.term import LoadableTerm
@@ -22,12 +23,27 @@ from zipline.utils import paths as pth
 from zipline.pipeline.hooks.progress import ProgressHooks
 from zipline.pipeline.domain import US_EQUITIES
 from zipline.data.data_portal import DataPortal
+from os.path import exists
+
 
 def to_string(obj):
     try:
         return str(obj)
     except AttributeError:
         return type(obj).__name__
+
+
+def get_valid_filename(name):
+    s = str(name).strip().replace(" ", "_")
+    return re.sub(r"(?u)[^-\w.]", "", s)
+
+
+def create_term_filename(dates, sid_array, term):
+    # all the dates in the chunk, as id we use the unix epoch of first and last date
+    # the sid array is a sorted array of positive integers, there the sum is okay as id
+    return "%d-%d-%d-%s.npy" % (
+        int(dates[0].timestamp()), int(dates[-1].timestamp()), np.sum(sid_array), get_valid_filename(str(term))
+    )
 
 
 class BundlePipelineEngine(SimplePipelineEngine):
@@ -47,6 +63,178 @@ class BundlePipelineEngine(SimplePipelineEngine):
             return super().run_pipeline(pipeline, start_date, end_date, hooks)
 
         return super().run_chunked_pipeline(pipeline, start_date, end_date, chunksize, hooks)
+
+    def compute_chunk(
+        self, graph, dates, sids, workspace, refcounts, execution_order, hooks
+    ):
+        """
+        Compute the Pipeline terms in the graph for the requested start and end
+        dates.
+
+        This is where we do the actual work of running a pipeline.
+
+        Parameters
+        ----------
+        graph : zipline.pipeline.graph.ExecutionPlan
+            Dependency graph of the terms to be executed.
+        dates : pd.DatetimeIndex
+            Row labels for our root mask.
+        sids : pd.Int64Index
+            Column labels for our root mask.
+        workspace : dict
+            Map from term -> output.
+            Must contain at least entry for `self._root_mask_term` whose shape
+            is `(len(dates), len(assets))`, but may contain additional
+            pre-computed terms for testing or optimization purposes.
+        refcounts : dict[Term, int]
+            Dictionary mapping terms to number of dependent terms. When a
+            term's refcount hits 0, it can be safely discarded from
+            ``workspace``. See TermGraph.decref_dependencies for more info.
+        execution_order : list[Term]
+            Order in which to execute terms.
+        hooks : implements(PipelineHooks)
+            Hooks to instrument pipeline execution.
+
+        Returns
+        -------
+        results : dict
+            Dictionary mapping requested results to outputs.
+        """
+        self._validate_compute_chunk_params(graph, dates, sids, workspace)
+
+        get_loader = self._get_loader
+
+        # Copy the supplied initial workspace so we don't mutate it in place.
+        workspace = workspace.copy()
+        domain = graph.domain
+
+        # Many loaders can fetch data more efficiently if we ask them to
+        # retrieve all their inputs at once. For example, a loader backed by a
+        # SQL database can fetch multiple columns from the database in a single
+        # query.
+        #
+        # To enable these loaders to fetch their data efficiently, we group
+        # together requests for LoadableTerms if they are provided by the same
+        # loader and they require the same number of extra rows.
+        #
+        # The extra rows condition is a simplification: we don't currently have
+        # a mechanism for asking a loader to fetch different windows of data
+        # for different terms, so we only batch requests together when they're
+        # going to produce data for the same set of dates.
+        def loader_group_key(term):
+            loader = get_loader(term)
+            extra_rows = graph.extra_rows[term]
+            return loader, extra_rows
+
+        # Only produce loader groups for the terms we expect to load.  This
+        # ensures that we can run pipelines for graphs where we don't have a
+        # loader registered for an atomic term if all the dependencies of that
+        # term were supplied in the initial workspace.
+        will_be_loaded = graph.loadable_terms - workspace.keys()
+        loader_groups = groupby(
+            loader_group_key,
+            (t for t in execution_order if t in will_be_loaded),
+        )
+
+
+        for term in execution_order:
+            # `term` may have been supplied in `initial_workspace`, or we may
+            # have loaded `term` as part of a batch with another term coming
+            # from the same loader (see note on loader_group_key above). In
+            # either case, we already have the term computed, so don't
+            # recompute.
+
+            # Check if a term is in the cache (addition to super class)
+            term_filename = get_cache_dir() + '/' + create_term_filename(dates, sids, term)
+            if exists(term_filename):
+                log.info("load %s from cache" % str(term))
+                if isinstance(term, CustomClassifier):
+                    term_labels = np.load(term_filename, allow_pickle=True, fix_imports=True)
+                    workspace[term] = LabelArray(term_labels, term.missing_value, categories=term.categories)
+                else:
+                    workspace[term] = np.load(term_filename, allow_pickle=True, fix_imports=True)
+            # ---------------------------------------
+
+            if term in workspace:
+                continue
+
+            # Asset labels are always the same, but date labels vary by how
+            # many extra rows are needed.
+            mask, mask_dates = graph.mask_and_dates_for_term(
+                term,
+                self._root_mask_term,
+                workspace,
+                dates,
+            )
+
+            if isinstance(term, LoadableTerm):
+                loader = get_loader(term)
+                to_load = sorted(
+                    loader_groups[loader_group_key(term)], key=lambda t: t.dataset
+                )
+                self._ensure_can_load(loader, to_load)
+                with hooks.loading_terms(to_load):
+                    loaded = loader.load_adjusted_array(
+                        domain,
+                        to_load,
+                        mask_dates,
+                        sids,
+                        mask,
+                    )
+                assert set(loaded) == set(to_load), (
+                    "loader did not return an AdjustedArray for each column\n"
+                    "expected: %r\n"
+                    "got:      %r"
+                    % (
+                        sorted(to_load, key=repr),
+                        sorted(loaded, key=repr),
+                    )
+                )
+                workspace.update(loaded)
+            else:
+                with hooks.computing_term(term):
+                    workspace[term] = term._compute(
+                        self._inputs_for_term(
+                            term,
+                            workspace,
+                            graph,
+                            domain,
+                            refcounts,
+                        ),
+                        mask_dates,
+                        sids,
+                        mask,
+                    )
+                if term.ndim == 2:
+                    assert workspace[term].shape == mask.shape
+                else:
+                    assert workspace[term].shape == (mask.shape[0], 1)
+
+                # Decref dependencies of ``term``, and clear any terms
+                # whose refcounts hit 0.
+                for garbage in graph.decref_dependencies(term, refcounts):
+                    del workspace[garbage]
+
+        # At this point, all the output terms are in the workspace.
+
+        # Save all terms to cache (addition to super class)
+        for term_key, term_values in workspace.items():
+            term_filename = get_cache_dir() + '/' + create_term_filename(dates, sids, term_key)
+            if not exists(term_filename):
+                log.info("save %s to cache" % str(term_key))
+                if isinstance(term_values, LabelArray):
+                    # missing_value is always NA
+                    np.save(term_filename, term_values.as_string_array(), allow_pickle=True, fix_imports=True)
+                else:
+                    np.save(term_filename, term_values, allow_pickle=True, fix_imports=True)
+        # --------------------------------------------------
+
+        out = {}
+        graph_extra_rows = graph.extra_rows
+        for name, term in graph.outputs.items():
+            # Truncate off extra rows from outputs.
+            out[name] = workspace[term][graph_extra_rows[term] :]
+        return out
 
 
 class BundleLoader:
