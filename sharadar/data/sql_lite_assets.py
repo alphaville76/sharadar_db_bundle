@@ -2,7 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 import warnings
-from sharadar.util.cache import cached
+
 from singleton_decorator import singleton
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
@@ -109,7 +109,7 @@ class SQLiteAssetFinder(AssetFinder):
         result =  self.engine.execute(cmd).fetchall()
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
 
-    @cached
+    # @cached
     def get_fundamentals(self, sids, field_name, as_of_date=None, n=1):
         """
         n=1 is the most recent quarter or last ttm, n=2 indicate the previous quarter or ttm and so on...
@@ -124,7 +124,7 @@ class SQLiteAssetFinder(AssetFinder):
         #shape: (windows lenghts=1, num of assets)
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
     
-    @cached
+    # @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):
         """
         it returns an array of this form:
@@ -153,7 +153,7 @@ class SQLiteAssetFinder(AssetFinder):
         df = df.reindex(columns=sids)
         return df.values.astype('float64')
         
-    @cached
+    # @cached
     def get_fundamentals_ttm(self, sids, field_name, as_of_date=None, k=1):
         """
         k=1 is the sum of the last twelve months, k=2 is the sum of the previous twelve months and so on...
@@ -164,7 +164,7 @@ class SQLiteAssetFinder(AssetFinder):
             return []
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
     
-    @cached
+    # @cached
     def get_info(self, sids, field_name, as_of_date=None):
         """
         Unlike get_fundamentals(.), it use the string 'NA' for unknown values, 
@@ -175,7 +175,7 @@ class SQLiteAssetFinder(AssetFinder):
             return []
         return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
 
-    @cached
+    # @cached
     def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar = get_calendar('XNYS')):
         assert n > 0
         sessions = calendar.sessions_window(as_of_date, -n+1)

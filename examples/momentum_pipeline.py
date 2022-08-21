@@ -44,7 +44,7 @@ def initialize(context):
 
 def make_pipeline():
     rsi = RSI()
-    return Pipeline(
+    return SharadarPipeline(
         columns = {
             'longs': rsi.top(3),
             'shorts': rsi.bottom(3),

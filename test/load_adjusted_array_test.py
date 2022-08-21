@@ -4,7 +4,6 @@ from zipline.pipeline.data import USEquityPricing
 import pandas as pd
 import numpy as np
 from sharadar.pipeline.engine import symbols, make_pipeline_engine, load_sharadar_bundle
-
 bundle = load_sharadar_bundle()
 loader = USEquityPricingLoader.without_fx(bundle.equity_daily_bar_reader, bundle.adjustment_reader)
 

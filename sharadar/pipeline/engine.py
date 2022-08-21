@@ -1,55 +1,55 @@
 import datetime
-import re
+import hashlib
 import os
-import numpy as np
-import click
-import pandas as pd
-from sharadar.util.cache import cached
-from sharadar.pipeline.fx import SimpleFXRateReader
-from sharadar.data.sql_lite_assets import SQLiteAssetFinder
-from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
-from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR, get_cache_dir
-from sharadar.util.logger import log
-from six import iteritems
-from toolz import juxt, groupby
-from zipline.data.bundles.core import BundleData, asset_db_path, adjustment_db_path
-from zipline.data.adjustments import SQLiteAdjustmentReader
-from zipline.lib.labelarray import LabelArray
-from zipline.pipeline import SimplePipelineEngine, CustomClassifier
-from zipline.pipeline.loaders.equity_pricing_loader import USEquityPricingLoader
-from zipline.pipeline.data import USEquityPricing
-from zipline.pipeline.term import LoadableTerm
-from zipline.utils import paths as pth
-from zipline.pipeline.hooks.progress import ProgressHooks
-from zipline.pipeline.domain import US_EQUITIES
-from zipline.data.data_portal import DataPortal
 from os.path import exists
 
-
-def to_string(obj):
-    try:
-        return str(obj)
-    except AttributeError:
-        return type(obj).__name__
-
-
-def get_valid_filename(name):
-    s = str(name).strip().replace(" ", "_")
-    return re.sub(r"(?u)[^-\w.]", "", s)
-
-
-def create_term_filename(dates, sid_array, term):
-    # all the dates in the chunk, as id we use the unix epoch of first and last date
-    # the sid array is a sorted array of positive integers, there the sum is okay as id
-    return "%d-%d-%d-%s.npy" % (
-        int(dates[0].timestamp()), int(dates[-1].timestamp()), np.sum(sid_array), get_valid_filename(str(term))
-    )
+import click
+import numpy as np
+import pandas as pd
+from sharadar.data.sql_lite_assets import SQLiteAssetFinder
+from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
+from sharadar.util.logger import log
+from sharadar.util.output_dir import SHARADAR_BUNDLE_NAME, SHARADAR_BUNDLE_DIR, get_cache_dir
+from toolz import groupby
+from zipline.data.adjustments import SQLiteAdjustmentReader
+from zipline.data.bundles.core import BundleData, asset_db_path, adjustment_db_path
+from zipline.data.data_portal import DataPortal
+from zipline.lib.adjusted_array import AdjustedArray
+from zipline.lib.labelarray import LabelArray
+from zipline.pipeline import SimplePipelineEngine, CustomClassifier, TermGraph
+from zipline.pipeline.data import USEquityPricing
+from zipline.pipeline.domain import US_EQUITIES
+from zipline.pipeline.hooks.progress import ProgressHooks
+from zipline.pipeline.loaders.equity_pricing_loader import USEquityPricingLoader
+from zipline.pipeline.term import LoadableTerm, Term
+from zipline.utils import paths as pth
 
 
 class BundlePipelineEngine(SimplePipelineEngine):
     def __init__(self, get_loader, asset_finder, default_domain=US_EQUITIES, populate_initial_workspace=None,
                  default_hooks=None):
         super().__init__(get_loader, asset_finder, default_domain, populate_initial_workspace, default_hooks)
+
+    def _compute_root_mask(self, domain, start_date, end_date, extra_rows):
+
+        root_mask_filename = "root-%s_%s_%s_%s_%d.pkl" % (
+            start_date.strftime("%Y-%m-%d"),
+            end_date.strftime("%Y-%m-%d"),
+            domain.calendar_name,
+            domain.country_code,
+            extra_rows
+        )
+
+        root_mask_filepath = get_cache_dir() + '/' + root_mask_filename
+        if exists(root_mask_filepath):
+            log.info("Load root mask file: " + root_mask_filename)
+            root_mask = pd.read_pickle(root_mask_filepath)
+        else:
+            root_mask = super()._compute_root_mask(domain, start_date, end_date, extra_rows)
+            log.info("Save root mask file: " + root_mask_filename)
+            root_mask.to_pickle(get_cache_dir() + '/' + root_mask_filename)
+
+        return root_mask
 
     def run_pipeline(self, pipeline, start_date, end_date=None, chunksize=120, hooks=None):
         if end_date is None:
@@ -65,7 +65,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
         return super().run_chunked_pipeline(pipeline, start_date, end_date, chunksize, hooks)
 
     def compute_chunk(
-        self, graph, dates, sids, workspace, refcounts, execution_order, hooks
+            self, graph, dates, sids, workspace, refcounts, execution_order, hooks
     ):
         """
         Compute the Pipeline terms in the graph for the requested start and end
@@ -102,6 +102,29 @@ class BundlePipelineEngine(SimplePipelineEngine):
         """
         self._validate_compute_chunk_params(graph, dates, sids, workspace)
 
+        cached_out = {}
+        for name, term in graph.outputs.items():
+            # Check if a term is in the cache (addition to super class)
+            term_filename = create_term_filename(dates, graph, term)
+            term_filepath = get_cache_dir() + '/' + term_filename
+            if exists(term_filepath):
+                term_data = np.load(term_filepath, allow_pickle=True, fix_imports=True)
+                log.info("load " + term_filename + " from cache")
+                if isinstance(term, CustomClassifier):
+                    label_array = LabelArray(term_data, term.missing_value, categories=term.categories)
+                    cached_out[name] = label_array
+                    workspace[term] = label_array
+                elif isinstance(term, AdjustedArray):
+                    adjusted_array = AdjustedArray(term_data, term.adjustments, term.missing_value)
+                    cached_out[name] = adjusted_array
+                    workspace[term] = adjusted_array
+                else:
+                    cached_out[name] = term_data
+                    workspace[term] = term_data
+
+        if len(cached_out) == len(graph.outputs):
+            return cached_out
+
         get_loader = self._get_loader
 
         # Copy the supplied initial workspace so we don't mutate it in place.
@@ -136,24 +159,12 @@ class BundlePipelineEngine(SimplePipelineEngine):
             (t for t in execution_order if t in will_be_loaded),
         )
 
-
         for term in execution_order:
             # `term` may have been supplied in `initial_workspace`, or we may
             # have loaded `term` as part of a batch with another term coming
             # from the same loader (see note on loader_group_key above). In
             # either case, we already have the term computed, so don't
             # recompute.
-
-            # Check if a term is in the cache (addition to super class)
-            term_filename = get_cache_dir() + '/' + create_term_filename(dates, sids, term)
-            if exists(term_filename):
-                log.info("load %s from cache" % str(term))
-                if isinstance(term, CustomClassifier):
-                    term_labels = np.load(term_filename, allow_pickle=True, fix_imports=True)
-                    workspace[term] = LabelArray(term_labels, term.missing_value, categories=term.categories)
-                else:
-                    workspace[term] = np.load(term_filename, allow_pickle=True, fix_imports=True)
-            # ---------------------------------------
 
             if term in workspace:
                 continue
@@ -182,13 +193,13 @@ class BundlePipelineEngine(SimplePipelineEngine):
                         mask,
                     )
                 assert set(loaded) == set(to_load), (
-                    "loader did not return an AdjustedArray for each column\n"
-                    "expected: %r\n"
-                    "got:      %r"
-                    % (
-                        sorted(to_load, key=repr),
-                        sorted(loaded, key=repr),
-                    )
+                        "loader did not return an AdjustedArray for each column\n"
+                        "expected: %r\n"
+                        "got:      %r"
+                        % (
+                            sorted(to_load, key=repr),
+                            sorted(loaded, key=repr),
+                        )
                 )
                 workspace.update(loaded)
             else:
@@ -205,10 +216,10 @@ class BundlePipelineEngine(SimplePipelineEngine):
                         sids,
                         mask,
                     )
-                if term.ndim == 2:
-                    assert workspace[term].shape == mask.shape
-                else:
-                    assert workspace[term].shape == (mask.shape[0], 1)
+                mask_shape = mask.shape if term.ndim == 2 else (mask.shape[0], 1)
+                if workspace[term].shape != mask_shape:
+                    raise ValueError("The shape %s of term '%s' does not match with the shape (%s) of the mask" %
+                                     (str(workspace[term].shape), str(term), str(mask_shape)))
 
                 # Decref dependencies of ``term``, and clear any terms
                 # whose refcounts hit 0.
@@ -216,25 +227,44 @@ class BundlePipelineEngine(SimplePipelineEngine):
                     del workspace[garbage]
 
         # At this point, all the output terms are in the workspace.
-
-        # Save all terms to cache (addition to super class)
-        for term_key, term_values in workspace.items():
-            term_filename = get_cache_dir() + '/' + create_term_filename(dates, sids, term_key)
-            if not exists(term_filename):
-                log.info("save %s to cache" % str(term_key))
-                if isinstance(term_values, LabelArray):
-                    # missing_value is always NA
-                    np.save(term_filename, term_values.as_string_array(), allow_pickle=True, fix_imports=True)
-                else:
-                    np.save(term_filename, term_values, allow_pickle=True, fix_imports=True)
-        # --------------------------------------------------
-
         out = {}
         graph_extra_rows = graph.extra_rows
         for name, term in graph.outputs.items():
             # Truncate off extra rows from outputs.
-            out[name] = workspace[term][graph_extra_rows[term] :]
+            term_values = workspace[term][graph_extra_rows[term]:]
+            out[name] = term_values
+
+            # Save all terms to cache (addition to super class)
+            term_filename = create_term_filename(dates, graph, term)
+            term_filepath = get_cache_dir() + '/' + term_filename
+            if not exists(term_filepath):
+                log.info("save " + term_filename + " to cache")
+                if isinstance(term_values, LabelArray):
+                    np.save(term_filepath, term_values.as_string_array(), allow_pickle=True, fix_imports=True)
+                elif isinstance(term_values, AdjustedArray):
+                    np.save(term_filepath, term_values.data, allow_pickle=True, fix_imports=True)
+                elif type(term_values) == np.ndarray:
+                    np.save(term_filepath, term_values, allow_pickle=True, fix_imports=True)
+                else:
+                    log.warn("Cannot save unknown type: %s" % str(type(term_values)))
+
         return out
+
+
+def create_term_filename(dates, graph, term):
+    return "term-%s_%s_%s_%s.npy" % (
+        dates[0].strftime("%Y-%m-%d"),
+        dates[-1].strftime("%Y-%m-%d"),
+        graph.screen_name,
+        find_term_name(graph, term)
+    )
+
+
+def find_term_name(graph: TermGraph, term: Term):
+    for term_name, term_value in graph.outputs.items():
+        if term_value == term:
+            return term_name
+    raise ValueError("Term not in graph")
 
 
 class BundleLoader:
@@ -253,53 +283,61 @@ class BundleLoader:
 
         return self._bar_reader
 
+
 def daily_equity_path(bundle_name, timestr, environ=None):
     return pth.data_path(
         (bundle_name, timestr, 'prices.sqlite'),
         environ=environ,
     )
 
-@cached
+
+# @cached
 def load_sharadar_bundle(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return BundleData(
-        asset_finder = SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ),),
-        equity_minute_bar_reader = None,
-        equity_daily_bar_reader = SQLiteDailyBarReader(daily_equity_path(name, timestr, environ=environ),),
-        adjustment_reader = SQLiteAdjustmentReader(adjustment_db_path(name, timestr, environ=environ),),
+        asset_finder=SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ), ),
+        equity_minute_bar_reader=None,
+        equity_daily_bar_reader=SQLiteDailyBarReader(daily_equity_path(name, timestr, environ=environ), ),
+        adjustment_reader=SQLiteAdjustmentReader(adjustment_db_path(name, timestr, environ=environ), ),
     )
 
 
-@cached
+# @cached
 def _asset_finder(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ))
 
-@cached
+
+# @cached
 def _bar_reader(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
     return SQLiteDailyBarReader(daily_equity_path(name, timestr, environ=environ))
 
-@cached
+
+# @cached
 def symbol(ticker, as_of_date=None):
     return _asset_finder().lookup_symbol(ticker, as_of_date)
 
-@cached
+
+# @cached
 def symbols(tickers, as_of_date=None):
     return _asset_finder().lookup_symbols(tickers, as_of_date)
 
-@cached
+
+# @cached
 def sector(ticker, as_of_date=None):
     return _asset_finder().get_info(symbol(ticker).sid, 'sector')
 
-@cached
+
+# @cached
 def sectors(tickers, as_of_date=None):
     sids = [x.sid for x in symbols(tickers)]
     return _asset_finder().get_info(sids, 'sector')
 
-@cached
+
+# @cached
 def sid(sid):
     return sids((sid,))[0]
 
 
-@cached
+# @cached
 def sids(sids):
     return _asset_finder().retrieve_all(sids)
 
@@ -316,9 +354,8 @@ def make_pipeline_engine(bundle=None, start=None, end=None, live=False):
     if end is None:
         end = pd.to_datetime('today', utc=True)
 
-    #pipeline_loader = USEquityPricingLoader(bundle.equity_daily_bar_reader, bundle.adjustment_reader, SimpleFXRateReader())
+    # pipeline_loader = USEquityPricingLoader(bundle.equity_daily_bar_reader, bundle.adjustment_reader, SimpleFXRateReader())
     pipeline_loader = USEquityPricingLoader.without_fx(bundle.equity_daily_bar_reader, bundle.adjustment_reader)
-
 
     def choose_loader(column):
         if column in USEquityPricing.columns:
@@ -349,6 +386,7 @@ def to_sids(assets):
         return [x.sid for x in assets]
     return [assets.sid]
 
+
 def prices(assets, start, end, field='close', offset=0):
     """
     Get price data for assets between start and end.
@@ -371,17 +409,19 @@ def prices(assets, start, end, field='close', offset=0):
                              adjustment_reader=bundle.adjustment_reader)
 
     df = data_portal.get_history_window(assets=assets, end_dt=end, bar_count=bar_count,
-                                             frequency='1d',
-                                             field=field,
-                                             data_frequency='daily')
+                                        frequency='1d',
+                                        field=field,
+                                        data_frequency='daily')
 
     return df if len(assets) > 1 else df.squeeze()
+
 
 def history(assets, as_of_date, n, field='close'):
     as_of_date = trading_date(as_of_date)
     trading_calendar = load_sharadar_bundle().equity_daily_bar_reader.trading_calendar
     sessions = trading_calendar.sessions_window(as_of_date, -n + 1)
     return prices(assets, sessions[0], sessions[-1], field)
+
 
 def returns(assets, start, end, periods=1, field='close'):
     """
@@ -407,6 +447,7 @@ class LogProgressPublisher(object):
         except:
             log.error("Cannot publish progress state.")
 
+
 class CliProgressPublisher(object):
 
     def __init__(self):
@@ -420,4 +461,5 @@ class CliProgressPublisher(object):
         self.pbar.update(completed)
         self.pbar.label = "Pipeline from %s to %s" % (start, end)
         if model.state == "success":
-            log.info("Pipeline from %s to %s completed in %s." % (start, end, str(datetime.timedelta(seconds=int(model.execution_time)))))
+            log.info("Pipeline from %s to %s completed in %s." % (
+            start, end, str(datetime.timedelta(seconds=int(model.execution_time)))))

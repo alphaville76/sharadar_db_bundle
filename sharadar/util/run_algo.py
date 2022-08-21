@@ -229,13 +229,8 @@ def _run(handle_data,
                 backtest = create_algo_class(TradingAlgorithm, backtest_start, backtest_end, algofile, algotext, analyze, before_trading_start,
                           benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, backtest_data, 'daily',
                           emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar)
-
-                ctx_blacklist = ['trading_client']
-                ctx_whitelist = ['perf_tracker']
-                ctx_excludes = ctx_blacklist + [e for e in backtest.__dict__.keys() if e not in ctx_whitelist]
                 backtest.run()
-                checksum = getattr(algofile, 'name', '<algorithm>')
-                store_context(state_filename, context=backtest, checksum=checksum, exclude_list=ctx_excludes)
+                store_context(state_filename, context=backtest)
             else:
                 log.warn("State file already exists. Do not run the backtest.")
 

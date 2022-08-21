@@ -6,7 +6,7 @@ import click
 import numpy as np
 import pandas as pd
 from exchange_calendars import get_calendar
-from sharadar.util.cache import cached
+
 from sharadar.util.logger import log
 from sharadar.util.output_dir import get_output_dir
 from singleton_decorator import singleton
@@ -178,7 +178,7 @@ class SQLiteDailyBarReader(SessionBarReader):
     def _fmt_date(self, dt):
         return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00+00:00"
 
-    @cached
+    # @cached
     def get_value(self, sid, dt, field):
         day = self._fmt_date(dt)
         sql = "SELECT %s FROM prices WHERE sid = %d and date = '%s'" % (field, sid, day)
@@ -190,7 +190,7 @@ class SQLiteDailyBarReader(SessionBarReader):
                 raise KeyError(sid)
         return res[0][0]
 
-    @cached
+    # @cached
     def load_dataframe(self, field, start_dt, end_dt, sids):
         data = self.load_raw_arrays([field], start_dt, end_dt, sids)
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
@@ -198,13 +198,13 @@ class SQLiteDailyBarReader(SessionBarReader):
         df.columns = sids
         return df
 
-    @cached
+    # @cached
     def load_series(self, field, start_dt, end_dt, sid):
         data = self.load_raw_arrays([field], start_dt, end_dt, [sid])
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         return pd.Series(data[0][:, 0], index=sessions)
 
-    @cached
+    # @cached
     def load_raw_arrays(self, fields, start_dt, end_dt, sids):
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
