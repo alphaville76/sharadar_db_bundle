@@ -4,7 +4,7 @@ export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
 virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
 python -m pip install --upgrade pip
-export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
+export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
 
 # Install TA LIB
 cd $PYTHON_LIBS
