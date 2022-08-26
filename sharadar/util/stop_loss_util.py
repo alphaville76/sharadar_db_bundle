@@ -65,6 +65,8 @@ def close_all(context, data, exclude=[], log=None):
 
 
 def await_no_open_orders(timeout_sec=3600, log=None):
+    if log.arena != 'live':
+        return
     start_time = time.time()
     while len(get_open_orders()) > 0:
         if log:
