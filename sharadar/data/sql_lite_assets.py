@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from singleton_decorator import singleton
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
 from zipline.assets.asset_db_schema import (
@@ -18,7 +17,6 @@ from pandas.tseries.offsets import DateOffset
 from datetime import timedelta
 from sharadar.util.logger import log
 
-@singleton
 class SQLiteAssetFinder(AssetFinder):
 
     def __init__(self, engine):
@@ -207,8 +205,6 @@ class SQLiteAssetFinder(AssetFinder):
         return pd.Timestamp(res[0][0], tz='UTC')
 
 
-
-@singleton
 class SQLiteAssetDBWriter(AssetDBWriter):
 
     def init_db(self, txn=None):

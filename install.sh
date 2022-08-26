@@ -49,6 +49,10 @@ cd $PYTHON_LIBS/sharadar_db_bundle
 git clone git@github.com:alphaville76/algo.git
 pip install -r requirements.txt --no-deps
 pip uninstall -y tables trading-calendars
+
+# Workaround https://github.com/stefan-jansen/zipline-reloaded/issues/118
+pip install iso3166==2.0.2
+pip install exchange-calendars==3.6.3
 python setup.py install
 python test/basic_pipeline_sep_db.py
 

@@ -9,7 +9,6 @@ from exchange_calendars import get_calendar
 
 from sharadar.util.logger import log
 from sharadar.util.output_dir import get_output_dir
-from singleton_decorator import singleton
 from six import (
     iteritems,
 )
@@ -114,7 +113,6 @@ CREATE INDEX IF NOT EXISTS stock_dividends_payouts_ex_date ON stock_dividend_pay
 SQLITE_MAX_COLUMN = 2000
 
 
-@singleton
 class SQLiteDailyBarWriter(object):
     def __init__(self, filename, calendar):
         self._filename = filename
@@ -152,7 +150,7 @@ class SQLiteDailyBarWriter(object):
                     count += 1
                     pbar.update(count)
 
-@singleton
+
 class SQLiteDailyBarReader(SessionBarReader):
     """
     Reader for pricing data written by SQLiteDailyBarWriter.

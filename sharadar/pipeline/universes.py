@@ -11,7 +11,6 @@ from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, M
 from sharadar.util.logger import log
 from sharadar.util.output_dir import get_output_dir
 from zipline.pipeline import Pipeline, CustomFilter
-from singleton_decorator import singleton
 import os
 from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.factors import AverageDollarVolume
@@ -58,7 +57,7 @@ class UniverseWriter(object):
         stocks = self.engine.run_pipeline(pipe, pipe_start, pipe_end, chunksize=120)
         return stocks
 
-@singleton
+
 class UniverseReader(object):
     def __init__(self, db_path=os.path.join(get_output_dir(), "universes.sqlite")):
         db = sqlite3.connect(db_path, isolation_level=None)
