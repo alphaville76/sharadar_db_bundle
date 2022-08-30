@@ -30,9 +30,9 @@ python setup.py install
 
 # Install TWS api
 cd $PYTHON_LIBS
-wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1016.01.zip
-unzip twsapi_macunix.1016.01.zip -d twsapi
-rm unzip twsapi_macunix.1016.01.zip
+wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1017.01.zip
+unzip twsapi_macunix.1017.01.zip -d twsapi
+rm twsapi_macunix.1017.01.zip
 cd twsapi/IBJts/source/pythonclient
 python setup.py install
 

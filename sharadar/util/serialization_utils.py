@@ -11,6 +11,9 @@ def load_context(state_file_path, context):
 
 def store_context(state_file_path, context):
     state = {}
+    if not hasattr(context, 'whitelist'):
+        return
+
     for field in context.whitelist:
         state[field] = getattr(context, field)
 

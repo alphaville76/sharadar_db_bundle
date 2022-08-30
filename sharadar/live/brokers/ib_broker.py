@@ -39,7 +39,6 @@ import zipline.protocol as zp
 from zipline.protocol import MutableView
 from zipline.api import symbol as symbol_lookup
 from zipline.errors import SymbolNotFound
-from ibapi.tag_value import TagValue
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper, TickTypeEnum
 from ibapi.contract import Contract
@@ -132,7 +131,10 @@ class TWSConnection(EWrapper, EClient):
             sleep(_poll_frequency)
             timeout -= _poll_frequency
         else:
-            if not self.isConnected():
+            if self.isConnected():
+                log.info("Connected to TWS!")
+                sleep(_poll_frequency)
+            else:
                 raise SystemError("Connection timeout during TWS connection!")
 
         self._download_account_details()
@@ -145,6 +147,14 @@ class TWSConnection(EWrapper, EClient):
             sleep(_poll_frequency)
 
         log.info("Local-Broker Time Skew: {}".format(self.time_skew))
+
+    def logRequest(self, fnName, fnParams):
+        if 'self' in fnParams:
+            prms = dict(fnParams)
+            del prms['self']
+        else:
+            prms = fnParams
+        log.info("Sending request %s %s" % (fnName, prms))
 
     def bind(self):
         log.info("Connecting: {}:{}:{}".format(self._host, self._port, self.client_id))
@@ -160,7 +170,9 @@ class TWSConnection(EWrapper, EClient):
             sleep(_poll_frequency)
 
         for account in self.managed_accounts:
-            self.reqAccountUpdates(subscribe=True, acctCode=account)
+            if account:
+                self.reqAccountUpdates(subscribe=True, acctCode=account)
+
         while self.accounts_download_complete is False:
             sleep(_poll_frequency)
 
@@ -393,23 +405,21 @@ class TWSConnection(EWrapper, EClient):
         self.unrecoverable_error = True
         log.info("IB Connection closed")
 
-    def error(self, id_=None, error_code=None, error_msg=None):
-        if isinstance(id_, Exception):
-            log.exception(id_)
+    def error(self, reqId=None, error_code=None, error_msg=None, error_json=""):
+        if isinstance(reqId, Exception):
+            log.exception(reqId)
+            return
 
-        if isinstance(error_code, int):
-            if error_code in (502, 503, 326):
-                # 502: Couldn't connect to TWS.
-                # 503: The TWS is out of date and must be upgraded.
-                # 326: Unable connect as the client id is already in use.
-                self.unrecoverable_error = True
+        if error_code in (502, 503, 326):
+            # 502: Couldn't connect to TWS.
+            # 503: The TWS is out of date and must be upgraded.
+            # 326: Unable connect as the client id is already in use.
+            self.unrecoverable_error = True
 
-            if error_code < 1000:
-                log.error("[{}] {} ({})".format(error_code, error_msg, id_))
-            else:
-                log.info("[{}] {} ({})".format(error_code, error_msg, id_))
+        if error_code < 1000:
+            log.error("[{}] {} {} (reqId: {})".format(error_code, error_msg, error_json, reqId))
         else:
-            log.error("[{}] {} ({})".format(error_code, error_msg, id_))
+            log.info("[{}] {} {} (reqId: {})".format(error_code, error_msg, error_json, reqId))
 
     def updateMktDepth(self, ticker_id, position, operation, side, price,
                        size):
@@ -525,11 +535,11 @@ class IBBroker(Broker):
 
     @property
     def positions(self):
-        self._get_positions_from_broker()
+        self._update_positions_from_broker()
         # Filter out positions with amount == 0
         return {v : k for k, v in self.metrics_tracker.positions.items() if v.amount != 0}
 
-    def _get_positions_from_broker(self):
+    def _update_positions_from_broker(self):
         """
         get the positions from the broker and update zipline objects ( the ledger )
         should be used once at startup and once every time we want to refresh the positions array
@@ -567,12 +577,16 @@ class IBBroker(Broker):
 
     @property
     def portfolio(self):
-        self.positions  # update positions
+        self._update_positions_from_broker()
         return self.metrics_tracker.portfolio
 
-    def get_account_from_broker(self):
-        ib_account = self._tws.accounts[self.account_id][self.currency]
-        return ib_account
+    def get_account_ids(self):
+        return self._tws.accounts.keys()
+
+    def get_account_from_broker(self, account_id=None):
+        if account_id is None:
+            account_id = self.account_id
+        return self._tws.accounts[account_id][self.currency]
 
     def set_metrics_tracker(self, metrics_tracker):
         self.metrics_tracker = metrics_tracker
@@ -953,7 +967,7 @@ class IBBroker(Broker):
 
     def cancel_order(self, zp_order_id):
         ib_order_id = self.orders[zp_order_id].broker_order_id
-        self._tws.cancelOrder(ib_order_id)
+        self._tws.cancelOrder(ib_order_id, "")
 
     def get_spot_value(self, asset, field, dt, data_frequency):
         self.subscribe_to_market_data(asset)

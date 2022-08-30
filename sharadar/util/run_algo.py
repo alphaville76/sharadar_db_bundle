@@ -122,7 +122,7 @@ def _run(handle_data,
         )
 
     if broker:
-        log.info("Live Trading on %s." % start.date())
+        log.info("Live Trading from %s." % start.date())
         # No benchmark needed for live trading
         benchmark_symbol=None
     else:
