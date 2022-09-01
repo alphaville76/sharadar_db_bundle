@@ -30,6 +30,7 @@ def stop_loss_portfolio(context, data, log):
         log.warn("Monthly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * monthly_return))
         close_all(context, data)
         return True
+
     return False
 
 
