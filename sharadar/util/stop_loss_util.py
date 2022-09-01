@@ -22,9 +22,12 @@ def stop_loss_portfolio(context, data, log):
         initial_value += cost_basis * position.amount
         last_value += position.last_sale_price * position.amount
 
-    montly_return = last_value / initial_value - 1.0
-    if montly_return <= context.PARAM['loss_limit']:
-        log.warn("Montly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * montly_return))
+    if initial_value == 0:
+        return False
+
+    monthly_return = last_value / initial_value - 1.0
+    if monthly_return <= context.PARAM['loss_limit']:
+        log.warn("Monthly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * monthly_return))
         close_all(context, data)
         return True
     return False
