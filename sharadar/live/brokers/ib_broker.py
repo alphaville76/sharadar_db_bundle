@@ -733,8 +733,6 @@ class IBBroker(Broker):
             order.tif = style.get_time_in_force()
 
 
-
-
         order.orderRef = self._create_order_ref(order)
 
         ib_order_id = self._tws.next_order_id

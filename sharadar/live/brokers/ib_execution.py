@@ -31,7 +31,7 @@ class MarketToLimitOrder(TWSOrder):
         super().__init__("MTL", time_in_force, exchange)
 
 
-class MarketToLimitOrder(TWSOrder):
+class MidPriceOrder(TWSOrder):
     """
     A Midprice order is designed to split the difference between the bid and ask prices, and fill at the current
     midpoint of the NBBO or better. Set an optional price cap to define the highest price (for a buy order) or the
