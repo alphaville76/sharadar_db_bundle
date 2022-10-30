@@ -1,15 +1,12 @@
+import numpy as np
 from zipline.api import order_target, get_open_orders
 from sharadar.util.performance import print_portfolio
 import time
 
-def stop_loss_portfolio(context, data, log):
-    """
-    Close all positions when the whole portfolio loss exceeded the loss_limit
-    """
-
+def compute_portfolio_return(context):
     positions = context.portfolio.positions
     if len(positions) == 0:
-        return
+        return 0
 
     initial_value = 0
     last_value = 0
@@ -23,11 +20,18 @@ def stop_loss_portfolio(context, data, log):
         last_value += position.last_sale_price * position.amount
 
     if initial_value == 0:
-        return False
+        return 0
 
-    monthly_return = last_value / initial_value - 1.0
-    if monthly_return <= context.PARAM['loss_limit']:
-        log.warn("Monthly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * monthly_return))
+    return last_value / initial_value - 1.0
+
+def stop_loss_portfolio(context, data, log):
+    """
+    Close all positions when the whole portfolio loss exceeded the loss_limit
+    """
+    portfolio_return = compute_portfolio_return(context)
+
+    if portfolio_return <= context.PARAM['loss_limit']:
+        log.warn("Monthly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * portfolio_return))
         close_all(context, data)
         return True
 
