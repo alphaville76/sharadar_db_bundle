@@ -1,21 +1,13 @@
-import pytz
 from abc import ABCMeta
-import six
-import warnings
 
-import datetime
 import numpy as np
 import pandas as pd
-
+import six
+from zipline.utils.events import Always, NthTradingDayOfWeek, NDaysBeforeLastTradingDayOfWeek, AfterOpen, BeforeClose
+from zipline.utils.events import lossless_float_to_int, _out_of_range_error, MAX_MONTH_RANGE, StatelessRule
 from zipline.utils.input_validation import preprocess
 from zipline.utils.memoize import lazyval
-
-from zipline.utils.events import Always, NthTradingDayOfWeek, NDaysBeforeLastTradingDayOfWeek, AfterOpen, BeforeClose, \
-    EventRule
-from zipline.utils.events import lossless_float_to_int, _out_of_range_error, MAX_MONTH_RANGE, StatelessRule
-
-import pytz
-from datetime import datetime
+from zipline.utils.calendar_utils import get_calendar
 
 class OnceAtStart(StatelessRule):
 
@@ -84,6 +76,10 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
             self.td_delta = -n - 1
         else:
             self.td_delta = n
+
+        #TODO check why self.cal could be null
+        if self.cal is None:
+            self.cal = get_calendar("XNYS")
 
     def should_trigger(self, dt):
         if dt.month not in self.rebalance_months:
