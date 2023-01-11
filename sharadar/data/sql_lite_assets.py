@@ -1,8 +1,12 @@
-import math
+import numpy as np
+import warnings
+from datetime import timedelta
+
 import numpy as np
 import pandas as pd
-import warnings
-
+from exchange_calendars import get_calendar
+from pandas.tseries.offsets import DateOffset
+from sharadar.util.logger import log
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
 from zipline.assets.asset_db_schema import (
@@ -11,11 +15,8 @@ from zipline.assets.asset_db_schema import (
     equity_symbol_mappings,
     futures_contracts as futures_contracts_table,
 )
-from exchange_calendars import get_calendar
 from zipline.utils.memoize import lazyval
-from pandas.tseries.offsets import DateOffset
-from datetime import timedelta
-from sharadar.util.logger import log
+
 
 class SQLiteAssetFinder(AssetFinder):
 
@@ -36,19 +37,19 @@ class SQLiteAssetFinder(AssetFinder):
 
     @lazyval
     def equity_supplementary_map(self):
-        raise NotImplementedError()       
-        
+        raise NotImplementedError()
+
     @lazyval
     def equity_supplementary_map_by_sid(self):
         raise NotImplementedError()
 
     def lookup_by_supplementary_field(self, field_name, value, as_of_date):
         raise NotImplementedError()
-    
+
     def get_supplementary_field(self, sid, field_name, as_of_date=None):
-        warnings.warn("get_supplementary_field is deprecated",DeprecationWarning)
+        warnings.warn("get_supplementary_field is deprecated", DeprecationWarning)
         raise NotImplementedError()
-        
+
     def _get_inner_select(self):
         sql = ("SELECT sid, value, "
                "ROW_NUMBER() OVER (PARTITION BY sid "
@@ -58,35 +59,35 @@ class SQLiteAssetFinder(AssetFinder):
                "AND field = '%s' "
                "AND start_date <= %d "
                "AND (%d - start_date) <= %d "
-              )
+               )
         return sql
-    
+
     def _get_result(self, sids, field_name, as_of_date, n, enforce_date):
         """
         'enforce_date' is relevant for fundamentals to avoid delinquent SEC files.
         """
-        MAX_DELAY = 1.296e+16 # 5 months
-        sql = "SELECT sid, value FROM ("+self._get_inner_select()+ ") t WHERE rown = %d;"
+        MAX_DELAY = 1.296e+16  # 5 months
+        sql = "SELECT sid, value FROM (" + self._get_inner_select() + ") t WHERE rown = %d;"
 
         if as_of_date is None:
             as_of_date = pd.Timestamp.today()
 
         date_check = as_of_date.value if enforce_date else 0
-        cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, date_check, n*MAX_DELAY, n)
-        return self.engine.execute(cmd).fetchall()      
-    
+        cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, date_check, n * MAX_DELAY, n)
+        return self.engine.execute(cmd).fetchall()
+
     def _get_result_ttm(self, sids, field_name, as_of_date, k):
         """
         'enforce_date' is relevant for fundamentals to avoid delinquent SEC files.
         """
-        MAX_DELAY = 1.296e+16 # 5 months
-        sql = "SELECT sid, SUM(value) FROM ("+self._get_inner_select()+ ") t WHERE rown >= %d and rown <= %d GROUP BY sid;"
+        MAX_DELAY = 1.296e+16  # 5 months
+        sql = "SELECT sid, SUM(value) FROM (" + self._get_inner_select() + ") t WHERE rown >= %d and rown <= %d GROUP BY sid;"
 
-        m = k*4
-        n = m-3
-        cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, as_of_date.value, m*MAX_DELAY*4, n, m)
-        #print(cmd)
-        return self.engine.execute(cmd).fetchall()  
+        m = k * 4
+        n = m - 3
+        cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, as_of_date.value, m * MAX_DELAY * 4, n, m)
+        # print(cmd)
+        return self.engine.execute(cmd).fetchall()
 
     def get_datekey(self, sids, as_of_date, n):
         """
@@ -101,10 +102,10 @@ class SQLiteAssetFinder(AssetFinder):
                "AND field = 'revenue_arq' "
                "AND start_date <= %d "
                ") t WHERE rown = %d;"
-              )
+               )
 
         cmd = sql % (', '.join(map(str, sids)), as_of_date.value, n)
-        result =  self.engine.execute(cmd).fetchall()
+        result = self.engine.execute(cmd).fetchall()
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
 
     # @cached
@@ -116,12 +117,12 @@ class SQLiteAssetFinder(AssetFinder):
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
         if len(result) == 0:
             log.warn("No result: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
-                (sids, field_name, as_of_date, n)
-            )
+                     (sids, field_name, as_of_date, n)
+                     )
             return []
-        #shape: (windows lenghts=1, num of assets)
+        # shape: (windows lenghts=1, num of assets)
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
-    
+
     # @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):
         """
@@ -150,7 +151,7 @@ class SQLiteAssetFinder(AssetFinder):
         df = df.pivot(index='row_num', columns='sid', values='value')
         df = df.reindex(columns=sids)
         return df.values.astype('float64')
-        
+
     # @cached
     def get_fundamentals_ttm(self, sids, field_name, as_of_date=None, k=1):
         """
@@ -161,7 +162,7 @@ class SQLiteAssetFinder(AssetFinder):
         if len(result) == 0:
             return []
         return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
-    
+
     # @cached
     def get_info(self, sids, field_name, as_of_date=None):
         """
@@ -174,9 +175,9 @@ class SQLiteAssetFinder(AssetFinder):
         return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
 
     # @cached
-    def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar = get_calendar('XNYS')):
+    def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar=get_calendar('XNYS')):
         assert n > 0
-        sessions = calendar.sessions_window(as_of_date, -n+1)
+        sessions = calendar.sessions_window(as_of_date, -n + 1)
         query = "SELECT start_date, sid, value FROM equity_supplementary_mappings " \
                 "WHERE field ='%s' AND sid in (%s) AND start_date >= %s AND start_date <= %s" \
                 % (field_name, ",".join(map(str, sids)), sessions[0].value, sessions[-1].value)
@@ -209,8 +210,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
     def init_db(self, txn=None):
         super().init_db(txn)
-        txn.execute("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);")
-
+        txn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);")
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         if asset_type == 'future':
@@ -244,7 +245,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             asset_router.c.asset_type.name: asset_type,
         })
         self._write_df_to_table(asset_router, df, txn, chunk_size, idx=False)
-        #df.to_sql(asset_router.name, txn.connection, if_exists='append', index=False, chunksize=chunk_size)
+        # df.to_sql(asset_router.name, txn.connection, if_exists='append', index=False, chunksize=chunk_size)
 
     def escape(self, name):
         # See https://stackoverflow.com/questions/6514274/how-do-you-escape-strings\
@@ -318,16 +319,19 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         expected = ['ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
                     'ADR Preferred Stock', 'ADR Stock Warrant', 'CEF',
-                    'Canadian Common Stock', 'Canadian Common Stock Primary Class', 'Canadian Common Stock Secondary Class',
+                    'Canadian Common Stock', 'Canadian Common Stock Primary Class',
+                    'Canadian Common Stock Secondary Class',
                     'Canadian Preferred Stock', 'Canadian Stock Warrant',
-                    'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Secondary Class',
+                    'Domestic Common Stock', 'Domestic Common Stock Primary Class',
+                    'Domestic Common Stock Secondary Class',
                     'Domestic Preferred Stock', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
 
         if not self._check_field(field, expected):
             sane = False
 
         field = 'sector'
-        expected = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
+        expected = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy',
+                    'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
         if not self._check_field(field, expected):
             sane = False
 
