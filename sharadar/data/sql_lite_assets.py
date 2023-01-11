@@ -1,4 +1,3 @@
-import numpy as np
 import warnings
 from datetime import timedelta
 
@@ -319,10 +318,9 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         expected = ['ADR Common Stock', 'ADR Common Stock Primary Class', 'ADR Common Stock Secondary Class',
                     'ADR Preferred Stock', 'ADR Stock Warrant', 'CEF',
-                    'Canadian Common Stock', 'Canadian Common Stock Primary Class',
-                    'Canadian Common Stock Secondary Class',
+                    'Canadian Common Stock', 'Canadian Common Stock Primary Class', 'Canadian Common Stock Secondary Class',
                     'Canadian Preferred Stock', 'Canadian Stock Warrant',
-                    'Domestic Common Stock', 'Domestic Common Stock Primary Class',
+                    'Domestic Common Stock', 'Domestic Common Stock Primary Class', 'Domestic Common Stock Primary Class Secondary Class',
                     'Domestic Common Stock Secondary Class',
                     'Domestic Preferred Stock', 'Domestic Stock Warrant', 'ETD', 'ETF', 'ETN', 'IDX']
 
