@@ -79,7 +79,7 @@ def _method_params_to_dict(args):
 
 
 class TWSConnection(EWrapper, EClient):
-    def __init__(self, tws_uri):
+    def __init__(self, tws_uri, account_id):
         """
         :param tws_uri: host:listening_port:client_id
                         - host ip of running tws or ibgw
@@ -98,7 +98,8 @@ class TWSConnection(EWrapper, EClient):
         self._next_ticker_id = 0
         self._next_request_id = 0
         self._next_order_id = None
-        self.managed_accounts = None
+        self.account_id = account_id
+        self.managed_accounts = [self.account_id]
         self.symbol_to_ticker_id = {}
         self.ticker_id_to_symbol = {}
         self.last_tick = defaultdict(dict)
@@ -137,6 +138,8 @@ class TWSConnection(EWrapper, EClient):
             else:
                 raise SystemError("Connection timeout during TWS connection!")
 
+        # It's important to reset here the managed_accounts to the given account_id
+        self.managed_accounts = [self.account_id]
         self._download_account_details()
         log.info("Managed accounts: {}".format(self.managed_accounts))
 
@@ -160,14 +163,15 @@ class TWSConnection(EWrapper, EClient):
         log.info("Connecting: {}:{}:{}".format(self._host, self._port, self.client_id))
         self.connect(self._host, self._port, self.client_id)
 
+    def reqManagedAccts(self):
+        # disable requesting def managed accounts.
+        # On the set account will be used
+        pass
+
     def _download_account_details(self):
         exec_filter = ExecutionFilter()
         exec_filter.clientId = self.client_id
         self.reqExecutions(self.next_request_id, exec_filter)
-
-        self.reqManagedAccts()
-        while self.managed_accounts is None:
-            sleep(_poll_frequency)
 
         for account in self.managed_accounts:
             if account:
@@ -483,7 +487,7 @@ class TWSConnection(EWrapper, EClient):
 
 
 class IBBroker(Broker):
-    def __init__(self, tws_uri, account_id=None):
+    def __init__(self, tws_uri, account_id):
         """
         :param tws_uri: host:listening_port:client_id
                         - host ip of running tws or ibgw
@@ -494,11 +498,10 @@ class IBBroker(Broker):
         self._orders = {}
         self._transactions = {}
 
-        self._tws = TWSConnection(tws_uri)
+        self._tws = TWSConnection(tws_uri, account_id)
         self._tws.start()
 
-        self.account_id = (self._tws.managed_accounts[0] if account_id is None
-                           else account_id)
+        self.account_id = account_id
         self.currency = 'USD'
 
         self._subscribed_assets = []
