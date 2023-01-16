@@ -107,7 +107,7 @@ def _run(handle_data,
         start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else now
 
     if not trading_calendar.is_session(start.date()):
-        start = trading_calendar.next_open(start)
+        start = trading_calendar.next_open(start).normalize()
 
     if end is None:
         end = bundle_data.equity_daily_bar_reader.last_available_dt if not broker else start

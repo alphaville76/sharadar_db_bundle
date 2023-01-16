@@ -63,11 +63,12 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         super(self.__class__, self).__init__(*args, **kwargs)
 
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
-        values = date_rule.execution_period_values
-        now = int(int(time.time()) * 1e9)
-        filtered = sorted([x for x in values if x > now])
-        next_date = datetime.fromtimestamp(filtered[0] / 1e9).strftime("%A, %B %d")
-        log.info('Next execution of %s scheduled on %s' % (func.__name__, next_date))
+        if hasattr(date_rule, 'execution_period_values'):
+            values = date_rule.execution_period_values
+            now = int(int(time.time()) * 1e9)
+            filtered = sorted([x for x in values if x > now])
+            next_date = datetime.fromtimestamp(filtered[0] / 1e9).strftime("%A, %B %d")
+            log.info('Next execution of %s scheduled on %s' % (func.__name__, next_date))
 
         return super().schedule_function(func, date_rule, time_rule, half_days, calendar)
 
