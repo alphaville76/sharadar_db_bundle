@@ -52,7 +52,7 @@ Jinja2==3.1.2
 joblib==1.1.0
 json5==0.9.10
 jsonschema==4.14.0
-jupyter-core==4.11.1
+jupyter-core==4.11.2
 jupyter-server==1.18.1
 jupyter_client==7.3.5
 jupyterlab==3.4.5
