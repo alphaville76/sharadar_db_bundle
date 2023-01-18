@@ -56,8 +56,8 @@ IBPosition = namedtuple('IBPosition', ['contract', 'position', 'market_price',
                                        'account_name'])
 
 _max_wait_subscribe = 10  # how many cycles to wait
-_connection_timeout = 15  # Seconds
-_poll_frequency = 0.1
+_connection_timeout = 60  # Seconds
+_poll_frequency = 5
 
 
 def log_message(message, mapping):
@@ -127,16 +127,15 @@ class TWSConnection(EWrapper, EClient):
         setattr(self, "_thread", thread)
 
         timeout = _connection_timeout
-        while timeout and not self.isConnected():
-            log.info("Cannot connect to TWS. Retrying...")
+        while timeout > 0 and not self.isConnected():
+            log.info("Cannot connect to TWS. Retrying...", timeout)
             sleep(_poll_frequency)
             timeout -= _poll_frequency
+        
+        if self.isConnected():
+            log.info("Connected to TWS!")
         else:
-            if self.isConnected():
-                log.info("Connected to TWS!")
-                sleep(_poll_frequency)
-            else:
-                raise SystemError("Connection timeout during TWS connection!")
+            raise SystemError("Connection timeout during TWS connection!")
 
         # It's important to reset here the managed_accounts to the given account_id
         self.managed_accounts = [self.account_id]
