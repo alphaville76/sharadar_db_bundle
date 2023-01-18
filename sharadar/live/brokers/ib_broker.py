@@ -128,7 +128,7 @@ class TWSConnection(EWrapper, EClient):
 
         timeout = _connection_timeout
         while timeout > 0 and not self.isConnected():
-            log.info("Cannot connect to TWS. Retrying...", timeout)
+            log.info("Cannot connect to TWS. Retrying in %ds (timeout in %ds)..." % (_poll_frequency, timeout))
             sleep(_poll_frequency)
             timeout -= _poll_frequency
         
