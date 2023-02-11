@@ -22,7 +22,7 @@ from contextlib import closing
 import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
 from sharadar.util.nasdaqdatalink_util import last_available_date
-from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
+#from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
 nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
@@ -188,8 +188,8 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress=True)
 
     # Additional MACRO data
-    macro_equities_df = create_macro_equities_df()
-    equities_df = pd.concat([equities_df, macro_equities_df])
+    #macro_equities_df = create_macro_equities_df()
+    #equities_df = pd.concat([equities_df, macro_equities_df])
 
     # Write equity metadata
     log.info("Start writing equities...")
@@ -223,9 +223,9 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
     log.info("Start writing %d splits and %d dividends data..." % (len(splits_df), len(dividends_df)))
     adjustment_writer.write(splits=splits_df, dividends=dividends_df)
 
-    log.info("Adding macro data from %s ..." % (start_fetch_date))
-    macro_prices_df = create_macro_prices_df(start_fetch_date, calendar)
-    sql_daily_bar_writer.write(macro_prices_df)
+    #log.info("Adding macro data from %s ..." % (start_fetch_date))
+    #macro_prices_df = create_macro_prices_df(start_fetch_date, calendar)
+    #sql_daily_bar_writer.write(macro_prices_df)
 
     log.info("Start writing supplementary_mappings data...")
     # EQUITY SUPPLEMENTARY MAPPINGS are used for company name, sector, industry and fundamentals financial data.
