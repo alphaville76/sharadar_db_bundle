@@ -29,7 +29,7 @@ def _to_img(figure):
     return '<img width="60%" height="60%" src="data:image/png;base64, ' + pic_hash.decode("utf-8") + '" />'
 
 
-def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True, context=None):
+def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True, context=None, round_trips=False):
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -59,8 +59,9 @@ def serialise(perf, filename, now):
     # joblib.dump(perf, perf_dump_file)
     perf.to_pickle(perf_dump_file)
 
-
-def create_report(perf, filename, now, doc=None, duration=None, param=None, info=None, show_image=True):
+# round_trips is very time intensive.
+def create_report(perf, filename, now, doc=None, duration=None, param=None, info=None, show_image=True, round_trips=False):
+    log.info("create_report")
     if not hasattr(perf, 'returns'):
         perf['returns'] = perf['pnl'] / (perf['portfolio_value'] - perf['pnl'])
         perf['returns'] = perf['returns'].replace([np.nan, np.inf, -np.inf], 0.0)
@@ -70,6 +71,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         log.warn("No positions available")
         return
 
+    log.info("extract_rets_pos_txn_from_zipline")
     rets, positions, transactions = pf.utils.extract_rets_pos_txn_from_zipline(perf)
     date_rows = OrderedDict()
     if len(rets.index) > 0:
@@ -77,8 +79,10 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         date_rows['End date'] = rets.index[-1].strftime('%Y-%m-%d')
         date_rows['Total months'] = int(len(rets) / 21)
 
+    log.info("perf_stats portfolio")
     perf_stats_series = pf.timeseries.perf_stats(rets, positions=positions, transactions=transactions)
 
+    log.info("perf_stats benchmark")
     benchmark_rets = returns([symbol('SPY')], rets.index[0], rets.index[-1])
     benchmark_perf_stats = pf.timeseries.perf_stats(benchmark_rets)
 
@@ -87,14 +91,24 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
     perf_stats_df['Spread'] = perf_stats_df['Backtest'] - perf_stats_df['Benchmark']
     format_perf_stats(perf_stats_df)
 
+    log.info("drawdown_df")
     drawdown_df = pf.timeseries.gen_drawdown_table(rets, top=5)
+
+    log.info("rets_interesting")
     rets_interesting = pf.timeseries.extract_interesting_date_ranges(rets)
+
+    log.info("positions")
     positions = utils.check_intraday('infer', rets, positions, transactions)
+
+    log.info("transactions_closed")
     transactions_closed = rt.add_closing_transactions(positions, transactions)
-    trades = rt.extract_round_trips(
-        transactions_closed,
-        portfolio_value=positions.sum(axis="columns") / (1 + rets)
-    )
+
+    if round_trips:
+        log.info("trades")
+        trades = rt.extract_round_trips(
+            transactions_closed,
+            portfolio_value=positions.sum(axis="columns") / (1 + rets)
+        )
 
     if show_image:
         fig0 = None
@@ -109,32 +123,40 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
             log.warn(e)
 
         try:
+            log.info("create_returns_tear_sheet")
             fig1 = pf.create_returns_tear_sheet(rets, positions, transactions, benchmark_rets=benchmark_rets, return_fig=True)
         except Exception as e:
             log.warn(e)
 
         try:
+            log.info("create_position_tear_sheet")
             fig2 = pf.create_position_tear_sheet(rets, positions, return_fig=True)
         except Exception as e:
             log.warn(e)
 
         try:
+            log.info("create_txn_tear_sheet")
             fig3 = pf.create_txn_tear_sheet(rets, positions, transactions, return_fig=True)
         except Exception as e:
             log.warn(e)
 
         try:
+            log.info("create_interesting_times_tear_sheet")
             fig4 = pf.create_interesting_times_tear_sheet(rets, return_fig=True)
         except Exception as e:
             log.warn(e)
 
-        try:
-            fig5 = pf.create_round_trip_tear_sheet(rets, positions, transactions, return_fig=True)
-        except Exception as e:
-            log.warn(e)
+        if round_trips:
+            try:
+                log.info("create_round_trip_tear_sheet")
+                fig5 = pf.create_round_trip_tear_sheet(rets, positions, transactions, return_fig=True)
+            except Exception as e:
+                log.warn(e)
 
     report_suffix = "_%s_%.2f_report.htm" % (now.strftime(DATETIME_FMT), 100. * perf_stats_series['Annual return'])
     reportfile = change_extension(filename, report_suffix)
+
+    log.info("writing report to file...")
     with open(reportfile, 'w') as f:
         print("""<!DOCTYPE html>
 <html>
@@ -214,7 +236,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
                             name='Stress Events',
                             float_format='{0:.2f}%'.format), file=f)
         print("<br/>", file=f)
-        if len(trades) >= 5:
+        if round_trips and len(trades) >= 5:
             stats = rt.gen_round_trip_stats(trades)
             print(to_html_table(stats['summary'], float_format='{:.2f}'.format, name='Summary stats'), file=f)
             print("<br/>", file=f)
@@ -265,8 +287,10 @@ def format_perf_stats(perf_stats_df):
 
 def create_log_returns_chart(rets, benchmark_rets, perf):
     try:
+        log.info("create_log_returns_chart_with_vars")
         return create_log_returns_chart_with_vars(rets, benchmark_rets, perf)
     except:
+        log.info("create_log_returns_chart_no_vars")
         return create_log_returns_chart_no_vars(rets, benchmark_rets)
 
 
@@ -310,27 +334,6 @@ def create_log_returns_chart_with_vars(rets, benchmark_rets, perf):
 
     return fig
 
-
-
-def create_log_returns_chart_with_vars_old(rets, benchmark_rets, perf):
-    cum_log_returns = np.log1p(rets).cumsum()
-    cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
-
-    fig, ax = plt.subplots(2, gridspec_kw={'height_ratios': [2, 1]})
-    cum_log_returns.plot(ax=ax[0], figsize=(20, 10))
-    cum_log_benchmark_rets.plot(ax=ax[0])
-    ax[0].grid(True)
-    ax[0].axhline(y=0, linestyle='--', color='black')
-    ax[0].legend(['Backtest', 'Benchmark'])
-    plt.suptitle("Log returns")
-
-    recorded_vars = perf._metadata['recorded_vars']
-    perf[recorded_vars].plot(ax=ax[1])
-    ax[1].grid(True)
-    ax[1].axhline(y=0, linestyle='--', color='black')
-    ax[1].legend(recorded_vars)
-
-    return fig
 
 def change_extension(filename, new_ext):
     path, ext = os.path.splitext(filename)
@@ -434,8 +437,9 @@ def print_portfolio(log, context):
 if __name__ == "__main__":
     import warnings
     warnings.filterwarnings('ignore')
-    algo_file = '../../algo/haugen/haugen.py'
-    perf_dump_file = '../../algo/haugen/haugen_2021-10-12_0154_perf.dump'
+    algo_file = '../../algo/cluster/clusters13g.py'
+
+    perf_dump_file = '../../algo/cluster/clusters13g.py2_2023-02-11_2331_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
     now = datetime.datetime.now()
     create_report(perf, algo_file, now)

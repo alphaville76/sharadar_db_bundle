@@ -1,7 +1,8 @@
 import numpy as np
-from zipline.api import order_target, get_open_orders
-from sharadar.util.performance import print_portfolio
 import time
+from sharadar.util.performance import print_portfolio
+from zipline.api import order_target, get_open_orders
+
 
 def compute_portfolio_return(context):
     positions = context.portfolio.positions
@@ -24,6 +25,7 @@ def compute_portfolio_return(context):
 
     return last_value / initial_value - 1.0
 
+
 def stop_loss_portfolio(context, data, log):
     """
     Close all positions when the whole portfolio loss exceeded the loss_limit
@@ -31,12 +33,12 @@ def stop_loss_portfolio(context, data, log):
     portfolio_return = compute_portfolio_return(context)
 
     if portfolio_return <= context.PARAM['loss_limit']:
-        log.warn("Monthly loss (%.2f) exceeded the loss limit: close all positions." % (100.0 * portfolio_return))
+        log.warn("Monthly loss (%.2f) exceeded the loss limit (%.2f): close all positions." % (
+        100.0 * portfolio_return, 100.0 * context.PARAM['loss_limit']))
         close_all(context, data)
         return True
 
     return False
-
 
 
 def stop_loss_equities(context, data, log):
@@ -78,7 +80,8 @@ def await_no_open_orders(timeout_sec=3600, log=None):
     start_time = time.time()
     while len(get_open_orders()) > 0:
         if log:
-            log.info("Still %d open orders: %s" % (len(get_open_orders()), str([k.symbol for (k, v) in get_open_orders().items()]) ))
+            log.info("Still %d open orders: %s" % (
+            len(get_open_orders()), str([k.symbol for (k, v) in get_open_orders().items()])))
         if (time.time() - start_time) > timeout_sec:
             log.info("Open orders timeout (%d seconds) reached!" % timeout_sec)
             return
