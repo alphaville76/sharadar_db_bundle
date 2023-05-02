@@ -711,6 +711,7 @@ class IBBroker(Broker):
         contract.currency = self.currency
 
         order = Order()
+        order.account = self.account_id
         order.totalQuantity = int(fabs(amount))
         order.action = "BUY" if amount > 0 else "SELL"
 
