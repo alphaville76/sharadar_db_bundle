@@ -706,7 +706,7 @@ class IBBroker(Broker):
         contract = Contract()
         contract.symbol = ib_symbol
         contract.exchange = 'SMART'
-        primaryExchange = 'ISLAND'
+        contract.primaryExchange = 'ARCA'
         contract.secType = 'STK'
         contract.currency = self.currency
 
