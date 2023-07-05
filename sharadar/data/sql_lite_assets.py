@@ -317,26 +317,33 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         field = 'category'
 
         expected = [
-            'ADR Common Stock',
             'ADR Common Stock Primary Class',
             'ADR Common Stock Secondary Class',
+            'ADR Common Stock Warrant',
+            'ADR Common Stock',
             'ADR Preferred Stock',
             'ADR Stock Warrant',
-            'CEF',
-            'Canadian Common Stock',
             'Canadian Common Stock Primary Class',
             'Canadian Common Stock Secondary Class',
+            'Canadian Common Stock Warrant',
+            'Canadian Common Stock',
             'Canadian Preferred Stock',
             'Canadian Stock Warrant',
-            'Domestic Common Stock',
+            'CEF Preferred',
+            'CEF Warrant',
+            'CEF',
             'Domestic Common Stock Primary Class',
             'Domestic Common Stock Secondary Class',
+            'Domestic Common Stock Warrant',
+            'Domestic Common Stock',
             'Domestic Preferred Stock',
             'Domestic Stock Warrant',
             'ETD',
             'ETF',
+            'ETMF',
             'ETN',
-            'IDX'
+            'IDX',
+            'UNIT'
         ]
 
         if not self._check_field(field, expected):
@@ -350,7 +357,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         field = 'exchange'
         # TODO share constant with factors.py
-        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+        expected = ['BATDS', 'BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
 
         if not self._check_field(field, expected):
             sane = False
