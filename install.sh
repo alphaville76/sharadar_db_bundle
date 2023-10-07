@@ -1,4 +1,6 @@
 #!/bin/bash
+sudo dnf install -y systemd-devel python3.9
+
 export PYTHON_VERSION=3.9
 export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
 virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
@@ -14,45 +16,22 @@ rm ta-lib-0.4.0-src.tar.gz
 cd ta-lib
 ./configure
 make
-
-# Install zipline-reloaded with source code
-cd $PYTHON_LIBS
-git clone git@github.com:stefan-jansen/zipline-reloaded.git
-cd zipline-reloaded
-python setup.py build_ext --inplace
-python setup.py install
-
-# Install pyfolio-reloaded with source code
-cd $PYTHON_LIBS
-git clone git@github.com:stefan-jansen/pyfolio-reloaded
-cd pyfolio-reloaded
-python setup.py install
+sudo make install
 
 # Install TWS api
 cd $PYTHON_LIBS
-wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1017.01.zip
-unzip twsapi_macunix.1017.01.zip -d twsapi
-rm twsapi_macunix.1017.01.zip
+wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1025.01.zip
+unzip twsapi_macunix.1025.01.zip -d twsapi
+rm twsapi_macunix.1025.01.zip
 cd twsapi/IBJts/source/pythonclient
 python setup.py install
 
-sudo dnf install -y systemd-devel
-
-# Install requirements
+# Install sharadar_db_bundle and its requirements
 cd $PYTHON_LIBS
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
-
-
-pip install jupyterlab
-
 cd $PYTHON_LIBS/sharadar_db_bundle
 git clone git@github.com:alphaville76/algo.git
-pip install -r requirements.txt --no-deps
-pip uninstall -y tables trading-calendars
-
-# Workaround https://github.com/stefan-jansen/zipline-reloaded/issues/118
-pip install iso3166==2.0.2
-pip install exchange-calendars==3.6.3
+pip install -r requirements.txt
 python setup.py install
 python test/basic_pipeline_sep_db.py
 
