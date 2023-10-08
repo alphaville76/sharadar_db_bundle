@@ -102,7 +102,7 @@ def _run(handle_data,
         trading_calendar = get_calendar('XNYS')
 
     bundle_data = load_sharadar_bundle(bundle)
-    now = pd.Timestamp.utcnow().normalize()
+    now = pd.Timestamp.today().normalize()
     if start is None:
         start = bundle_data.equity_daily_bar_reader.first_trading_day if not broker else now
 
@@ -134,7 +134,7 @@ def _run(handle_data,
         benchmark_returns = returns([benchmark], start, end)
     else:
         benchmark_sid = None
-        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'),data=0.0)
+        benchmark_returns = pd.Series(index=pd.date_range(start, end), data=0.0)
 
 
     # emission_rate is a string representing the smallest frequency at which metrics should be reported.
@@ -207,7 +207,7 @@ def _run(handle_data,
 
         # No benchmark
         benchmark_sid = None
-        benchmark_returns = pd.Series(index=pd.date_range(start, end, tz='utc'), data=0.0)
+        benchmark_returns = pd.Series(index=pd.date_range(start, end), data=0.0)
 
         broker.daily_bar_reader = bundle_data.equity_daily_bar_reader
 
@@ -235,7 +235,7 @@ def _run(handle_data,
                 log.warn("State file already exists. Do not run the backtest.")
 
             # Change start and end to now for live trading
-            start = pd.Timestamp.utcnow().normalize()
+            start = pd.Timestamp.today().normalize()
             if not trading_calendar.is_session(start.date()):
                 start = trading_calendar.next_open(start)
             end = start

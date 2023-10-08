@@ -82,7 +82,7 @@ class UniverseReader(object):
         res = self.cursor.fetchall()
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0], tz='UTC')
+        return pd.Timestamp(res[0])
 
 def stocks_us(context):
     return (
@@ -134,7 +134,7 @@ class NamedUniverse(CustomFilter):
 
 
 def update_universe(name, screen):
-    universe_start = pd.to_datetime('1998-10-16', utc=True)
+    universe_start = pd.Timestamp('1998-10-16')
     universe_end = SQLiteDailyBarReader().last_available_dt
     universe_last_date = UniverseReader().get_last_date(name)
     if not pd.isnull(universe_last_date):

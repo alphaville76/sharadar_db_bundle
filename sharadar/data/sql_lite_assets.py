@@ -15,7 +15,7 @@ from zipline.assets.asset_db_schema import (
     futures_contracts as futures_contracts_table,
 )
 from zipline.utils.memoize import lazyval
-
+from sqlalchemy import text
 
 class SQLiteAssetFinder(AssetFinder):
 
@@ -73,7 +73,9 @@ class SQLiteAssetFinder(AssetFinder):
 
         date_check = as_of_date.value if enforce_date else 0
         cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, date_check, n * MAX_DELAY, n)
-        return self.engine.execute(cmd).fetchall()
+        with self.engine.connect() as conn:
+            return conn.execute(text(cmd)).fetchall()
+
 
     def _get_result_ttm(self, sids, field_name, as_of_date, k):
         """
@@ -85,8 +87,8 @@ class SQLiteAssetFinder(AssetFinder):
         m = k * 4
         n = m - 3
         cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, as_of_date.value, m * MAX_DELAY * 4, n, m)
-        # print(cmd)
-        return self.engine.execute(cmd).fetchall()
+        with self.engine.connect() as conn:
+            return conn.execute(text(cmd)).fetchall()
 
     def get_datekey(self, sids, as_of_date, n):
         """
@@ -104,8 +106,9 @@ class SQLiteAssetFinder(AssetFinder):
                )
 
         cmd = sql % (', '.join(map(str, sids)), as_of_date.value, n)
-        result = self.engine.execute(cmd).fetchall()
-        return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
+        with self.engine.connect() as conn:
+            result = conn.execute(text(cmd)).fetchall()
+        return pd.DataFrame(result).set_index('sid').reindex(sids).T.values.astype('float64')
 
     # @cached
     def get_fundamentals(self, sids, field_name, as_of_date=None, n=1):
@@ -120,7 +123,7 @@ class SQLiteAssetFinder(AssetFinder):
                      )
             return []
         # shape: (windows lenghts=1, num of assets)
-        return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
+        return pd.DataFrame(result).set_index('sid').reindex(sids).T.values.astype('float64')
 
     # @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):
@@ -160,7 +163,7 @@ class SQLiteAssetFinder(AssetFinder):
         result = self._get_result_ttm(sids, field_name + '_arq', as_of_date, k)
         if len(result) == 0:
             return []
-        return pd.DataFrame(result).set_index(0).reindex(sids).T.values.astype('float64')
+        return pd.DataFrame(result).set_index('sid').reindex(sids).T.values.astype('float64')
 
     # @cached
     def get_info(self, sids, field_name, as_of_date=None):
@@ -171,12 +174,17 @@ class SQLiteAssetFinder(AssetFinder):
         result = self._get_result(sids, field_name, as_of_date, n=1, enforce_date=False)
         if len(result) == 0:
             return []
-        return pd.DataFrame(result).set_index(0).reindex(sids, fill_value='NA').T.values
+        return pd.DataFrame(result).set_index('sid').reindex(sids, fill_value='NA').T.values
 
     # @cached
     def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar=get_calendar('XNYS')):
         assert n > 0
-        sessions = calendar.sessions_window(as_of_date, -n + 1)
+        count = -n + 1
+        if count == 0:
+            sessions = pd.DatetimeIndex([as_of_date])
+        else:
+            sessions = calendar.sessions_window(as_of_date, count)
+
         query = "SELECT start_date, sid, value FROM equity_supplementary_mappings " \
                 "WHERE field ='%s' AND sid in (%s) AND start_date >= %s AND start_date <= %s" \
                 % (field_name, ",".join(map(str, sids)), sessions[0].value, sessions[-1].value)
@@ -199,18 +207,19 @@ class SQLiteAssetFinder(AssetFinder):
 
     def last_available_dt(self, field):
         sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
-        res = self.engine.execute(sql).fetchall()
+        with self.engine.connect() as conn:
+            res = conn.execute(text(cmd)).fetchall()
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0], tz='UTC')
+        return pd.Timestamp(res[0][0])
 
 
 class SQLiteAssetDBWriter(AssetDBWriter):
 
     def init_db(self, txn=None):
         super().init_db(txn)
-        txn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);")
+        with txn.connect() as conn:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         if asset_type == 'future':
@@ -305,7 +314,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             values = row.values
             if idx:
                 values = np.insert(values, 0, str(index), axis=0)
-            engine.execute(cmd, tuple(values))
+            with self.engine.connect() as conn:
+                return conn.execute(text(cmd), tuple(values))
 
     def check_sanity(self):
         """
@@ -365,7 +375,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
     def _check_field(self, field, expected):
         sql = "SELECT DISTINCT(value) as r FROM equity_supplementary_mappings WHERE field = '%s' ORDER BY r;" % field
-        ret = [x[0] for x in self.engine.execute(sql).fetchall()]
+        with self.engine.connect() as conn:
+            ret = [x[0] for x in conn.execute(text(sql)).fetchall()]
         ok = np.array_equal(ret, expected)
         if not ok:
             sane = False

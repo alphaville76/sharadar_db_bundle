@@ -234,7 +234,7 @@ class SQLiteDailyBarReader(SessionBarReader):
             else:
                 raise KeyError(sid)
 
-        return pd.Timestamp(res[0][0], tz='UTC')
+        return pd.Timestamp(res[0][0])
 
     @property
     def last_available_dt(self):
@@ -242,7 +242,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0], tz='UTC')
+        return pd.Timestamp(res[0][0])
 
     @property
     def trading_calendar(self):
@@ -258,7 +258,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0], tz='UTC')
+        return pd.Timestamp(res[0][0])
 
     @property
     def sessions(self):
@@ -356,8 +356,8 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         input_sids = dividends.sid.values
         unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
         dates = pricing_reader.sessions.values
-        start = pd.Timestamp(dates[0], tz='UTC')
-        end = pd.Timestamp(dates[-1], tz='UTC')
+        start = pd.Timestamp(dates[0])
+        end = pd.Timestamp(dates[-1])
         calendar = self._equity_daily_bar_reader.trading_calendar
 
         data_portal = DataPortal(self._asset_finder,
@@ -389,7 +389,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         non_nan_ratio_mask = ~np.isnan(ratio)
         for ix in np.flatnonzero(~non_nan_ratio_mask):
-            ex_date = pd.Timestamp(input_dates[ix], tz='UTC')
+            ex_date = pd.Timestamp(input_dates[ix])
             start_date = self._asset_finder.retrieve_asset(input_sids[ix]).start_date
             if ex_date != start_date:
                 log.warn(

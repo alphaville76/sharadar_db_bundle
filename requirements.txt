@@ -24,3 +24,4 @@ TA_Lib==0.4.28
 toolz==0.12.0
 xgboost==2.0.0
 zipline_reloaded==3.0.3
+nasdaq-data-link==1.0.4

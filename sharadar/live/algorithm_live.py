@@ -25,7 +25,6 @@ from zipline.errors import ZiplineError
 from sharadar.live.realtimeclock import RealtimeClock
 from zipline.gens.tradesimulation import AlgorithmSimulator
 from zipline.utils.api_support import ZiplineAPI, api_method, require_initialized
-from zipline.utils.pandas_utils import normalize_date
 from sharadar.util.serialization_utils import load_context, store_context
 from zipline.finance.metrics import MetricsTracker
 
@@ -237,8 +236,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         is today
 
         """
-        today = normalize_date(self.get_datetime())
-        prev_session = normalize_date(self.trading_calendar.previous_open(today))
+        today = self.get_datetime().normalize()
+        prev_session = self.trading_calendar.previous_open(today).normalize()
 
         log.info('today in _pipeline_output : {}'.format(prev_session))
 

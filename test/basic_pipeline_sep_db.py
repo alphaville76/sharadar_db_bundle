@@ -32,8 +32,11 @@ assert syms[0].sid == 118691
 
 spe = make_pipeline_engine()
 
-pipe_start = pd.to_datetime('2020-02-05', utc=True)
-pipe_end = pd.to_datetime('2020-02-07', utc=True)
+#pipe_start = pd.to_datetime('2020-02-05', utc=True)
+#pipe_end = pd.to_datetime('2020-02-07', utc=True)
+
+pipe_start = pd.Timestamp('2020-02-05')
+pipe_end = pd.Timestamp('2020-02-07')
 
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
@@ -133,8 +136,8 @@ print("stocks.shape", stocks.shape)
 assert stocks.shape == (10, 3)
 
 
-pipe_start = pd.to_datetime('2020-02-03', utc=True)
-pipe_end = pd.to_datetime('2021-02-26', utc=True)
+pipe_start = pd.Timestamp('2020-02-03')
+pipe_end = pd.Timestamp('2021-02-26')
 macro = symbols(['TR3M', 'TR6M', 'TR1Y', 'TR2Y', 'TR3Y', 'TR5Y', 'TR7Y', 'TR10Y','TR20Y','CBOND', 'INDPRO', 'INDPROPCT', 'UNRATE', 'RATEINF'])
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
