@@ -208,7 +208,7 @@ class SQLiteAssetFinder(AssetFinder):
     def last_available_dt(self, field):
         sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
         with self.engine.connect() as conn:
-            res = conn.execute(text(cmd)).fetchall()
+            res = conn.execute(text(sql)).fetchall()
         if len(res) == 0:
             return pd.NaT
         return pd.Timestamp(res[0][0])
@@ -218,8 +218,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
     def init_db(self, txn=None):
         super().init_db(txn)
-        with txn.connect() as conn:
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
+        txn.execute(text("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         if asset_type == 'future':
@@ -275,7 +274,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             raise ValueError("SQLite identifier cannot contain NULs")
         return '"' + uname.replace('"', '""') + '"'
 
-    def insert_statement(self, df, table_name, index=True, index_label=None, wld='?'):
+    def insert_statement(self, df, table_name, index=True, index_label=None):
         num_rows = df.shape[0]
 
         names = list(map(str, df.columns))
@@ -295,9 +294,9 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         bracketed_names = [self.escape(column) for column in names]
         col_names = ",".join(bracketed_names)
 
-        wildcards = ",".join([wld] * len(names))
+        params = ",".join([":"+str(x) for x in range(0, len(names))])
         insert_statement = (
-            f"INSERT OR REPLACE INTO {self.escape(table_name)} ({col_names}) VALUES ({wildcards})"
+            f"INSERT OR REPLACE INTO {self.escape(table_name)} ({col_names}) VALUES ({params})"
         )
         return insert_statement
 
@@ -314,8 +313,10 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             values = row.values
             if idx:
                 values = np.insert(values, 0, str(index), axis=0)
+
+            params = dict(zip([str(x) for x in range(0, len(values))], values.flatten()))
             with self.engine.connect() as conn:
-                return conn.execute(text(cmd), tuple(values))
+                return conn.execute(text(cmd), params)
 
     def check_sanity(self):
         """

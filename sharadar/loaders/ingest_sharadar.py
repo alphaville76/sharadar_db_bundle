@@ -6,12 +6,11 @@ import nasdaqdatalink
 
 from exchange_calendars import get_calendar
 
-from sharadar.util import nasdaqdatalink_util
 from sharadar.util.output_dir import get_output_dir
-from sharadar.util.nasdaqdatalink_util import fetch_entire_table
+from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
+from sharadar.util.nasdaqdatalink_util import last_available_date
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
-from sharadar.util.nasdaqdatalink_util import fetch_table_by_date, fetch_sf1_table_date
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 from zipline.assets import ASSET_DB_VERSION
@@ -21,8 +20,6 @@ from sharadar.util.logger import log
 from contextlib import closing
 import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
-from sharadar.util.nasdaqdatalink_util import last_available_date
-#from sharadar.loaders.ingest_macro import create_macro_equities_df, create_macro_prices_df
 import traceback
 
 nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
@@ -48,7 +45,7 @@ def process_data_table(df):
 def must_fetch_entire_table(date):
     if pd.isnull(date):
         return True
-    return pd.to_datetime(date, utc=True) <= OLDEST_DATE_SEP
+    return pd.Timestamp(date) <= OLDEST_DATE_SEP
 
 
 def fetch_data(start, end):
@@ -82,7 +79,7 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
 
 def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    dividends_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte': start},
+    dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start},
                                                  action=['dividend', 'spinoffdividend'], paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
@@ -100,7 +97,7 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
 
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
-    splits_df = nasdaqdatalink_util.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
+    splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -159,7 +156,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
-    end_session = pd.to_datetime(last_available_date(), utc=True)
+    end_session = pd.Timestamp(last_available_date())
     # Check valid trading dates, according to the selected exchange calendar
     sessions = calendar.sessions_in_range(start_session, end_session)
 
@@ -271,7 +268,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
 
 def create_metadata():
-    sharadar_metadata_df = nasdaqdatalink_util.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+    sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
     # Add a space at the begin and end of relatedtickers, search for ' TICKER '

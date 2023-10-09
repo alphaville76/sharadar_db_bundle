@@ -69,7 +69,7 @@ def load_data_table(file, index_col=None, parse_dates=False):
             data_table = pd.read_csv(table_file, index_col=index_col,
                                      parse_dates=parse_dates, na_values=['NA'])
 
-    return datetime(data_table)
+    return data_table
 
 
 def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
@@ -107,9 +107,9 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     log.info(
         "Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    df = get_table(table_name,
-                   date={'gte': start, 'lte': end},
-                   paginate=True)
+    df = nasdaqdatalink.get_table(table_name,
+                                  date={'gte': start, 'lte': end},
+                                  paginate=True)
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
         df.set_index(index_col, inplace=True)
@@ -119,29 +119,10 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 def fetch_sf1_table_date(api_key, start, end=None):
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    df = get_table('SHARADAR/SF1',
-                   dimension=['ARQ', 'ART'],
-                   lastupdated={'gte': start, 'lte': end},
-                   paginate=True)
-
-    return df
+    return nasdaqdatalink.get_table('SHARADAR/SF1', dimension=['ARQ', 'ART'],
+                                    lastupdated={'gte': start, 'lte': end},
+                                    paginate=True)
 
 
 def last_available_date():
-    return get_table('SHARADAR/TICKERS', ticker='SPY')['lastpricedate'][0].strftime('%Y-%m-%d')
-
-
-def get(dataset, **kwargs):
-    return nasdaqdatalink.get(dataset, **kwargs)
-
-
-def get_table(datatable_code, **options):
-    df = nasdaqdatalink.get_table(datatable_code, **options)
-
-    return datetime(df);
-
-
-def datetime(df):
-    for col in df.select_dtypes(include=[np.datetime64]).columns:
-        df[col] = df[col].dt
-    return df
+    return nasdaqdatalink.get_table('SHARADAR/TICKERS', ticker='SPY')['lastpricedate'][0].strftime('%Y-%m-%d')
