@@ -174,6 +174,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         return res[0][0] == 1
 
     def _fmt_date(self, dt):
+        # FIXME +00:00?
         return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00+00:00"
 
     # @cached
@@ -234,7 +235,7 @@ class SQLiteDailyBarReader(SessionBarReader):
             else:
                 raise KeyError(sid)
 
-        return pd.Timestamp(res[0][0])
+        return pd.Timestamp(res[0][0]).tz_localize(None)
 
     @property
     def last_available_dt(self):
@@ -242,7 +243,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0])
+        return pd.Timestamp(res[0][0]).tz_localize(None)
 
     @property
     def trading_calendar(self):
@@ -254,11 +255,13 @@ class SQLiteDailyBarReader(SessionBarReader):
 
     @property
     def first_trading_day(self):
+        trading_calendar_first_session = self.trading_calendar.first_session
         sql = "SELECT MIN(date) FROM prices"
         res = self._query(sql)
         if len(res) == 0:
             return pd.NaT
-        return pd.Timestamp(res[0][0])
+        first_trading_day = pd.Timestamp(res[0][0]).tz_localize(None)
+        return max(first_trading_day, trading_calendar_first_session)
 
     @property
     def sessions(self):
@@ -356,8 +359,8 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         input_sids = dividends.sid.values
         unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
         dates = pricing_reader.sessions.values
-        start = pd.Timestamp(dates[0])
-        end = pd.Timestamp(dates[-1])
+        start = pd.Timestamp(dates[0]).tz_localize(None)
+        end = pd.Timestamp(dates[-1]).tz_localize(None)
         calendar = self._equity_daily_bar_reader.trading_calendar
 
         data_portal = DataPortal(self._asset_finder,
@@ -389,7 +392,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         non_nan_ratio_mask = ~np.isnan(ratio)
         for ix in np.flatnonzero(~non_nan_ratio_mask):
-            ex_date = pd.Timestamp(input_dates[ix])
+            ex_date = pd.Timestamp(input_dates[ix]).tz_localize(None)
             start_date = self._asset_finder.retrieve_asset(input_sids[ix]).start_date
             if ex_date != start_date:
                 log.warn(
@@ -407,7 +410,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                 "Dividend ratio <= 0 for dividend"
                 " sid={sid}, ex_date={ex_date:%Y-%m-%d}, amount={amount:.3f}",
                 sid=input_sids[ix],
-                ex_date=pd.Timestamp(input_dates[ix]),
+                ex_date=pd.Timestamp(input_dates[ix]).tz_localize(None),
                 amount=amount[ix],
             )
 

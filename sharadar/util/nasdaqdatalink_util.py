@@ -69,7 +69,7 @@ def load_data_table(file, index_col=None, parse_dates=False):
             data_table = pd.read_csv(table_file, index_col=index_col,
                                      parse_dates=parse_dates, na_values=['NA'])
 
-    return datetime_to_utc(data_table)
+    return datetime(data_table)
 
 
 def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
@@ -132,16 +132,16 @@ def last_available_date():
 
 
 def get(dataset, **kwargs):
-    return nasdaqdatalink.get(dataset, **kwargs).tz_localize('UTC')
+    return nasdaqdatalink.get(dataset, **kwargs)
 
 
 def get_table(datatable_code, **options):
     df = nasdaqdatalink.get_table(datatable_code, **options)
 
-    return datetime_to_utc(df);
+    return datetime(df);
 
 
-def datetime_to_utc(df):
+def datetime(df):
     for col in df.select_dtypes(include=[np.datetime64]).columns:
-        df[col] = df[col].dt.tz_localize('UTC')
+        df[col] = df[col].dt
     return df

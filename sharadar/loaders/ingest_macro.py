@@ -35,7 +35,7 @@ def _add_macro_def(df, sid, start_date, end_date, ticker, asset_name):
                    exchange)
 
 def _to_prices_df(df, sid):
-    df.index = df.index.tz_localize('UTC')
+    df.index = df.index
     df['sid'] = sid
     df.set_index('sid', append=True, inplace=True)
     df = _append_ohlc(df)
@@ -51,7 +51,7 @@ def _append_ohlc(df):
 
 
 def utc(s):
-    return pd.to_datetime(s, utc=True)
+    return pd.to_datetime(s)
 
 def create_macro_equities_df():
     # TR1M, TR2M and TR30Y excluded because of too many missing data

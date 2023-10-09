@@ -23,7 +23,8 @@ from zipline.pipeline.hooks.progress import ProgressHooks
 from zipline.pipeline.loaders.equity_pricing_loader import USEquityPricingLoader
 from zipline.pipeline.term import LoadableTerm, Term
 from zipline.utils import paths as pth
-
+from zipline.utils.date_utils import compute_date_range_chunks
+from functools import partial
 
 class BundlePipelineEngine(SimplePipelineEngine):
     def __init__(self, get_loader, asset_finder, default_domain=US_EQUITIES, populate_initial_workspace=None,
@@ -62,7 +63,87 @@ class BundlePipelineEngine(SimplePipelineEngine):
             log.info("Compute pipeline values without chunks.")
             return super().run_pipeline(pipeline, start_date, end_date, hooks)
 
-        return super().run_chunked_pipeline(pipeline, start_date, end_date, chunksize, hooks)
+        return self.run_chunked_pipeline(pipeline, start_date, end_date, chunksize, hooks)
+
+    def run_chunked_pipeline(
+            self, pipeline, start_date, end_date, chunksize, hooks=None
+    ):
+        """Compute values for ``pipeline`` from ``start_date`` to ``end_date``, in
+        date chunks of size ``chunksize``.
+
+        Chunked execution reduces memory consumption, and may reduce
+        computation time depending on the contents of your pipeline.
+
+        Parameters
+        ----------
+        pipeline : Pipeline
+            The pipeline to run.
+        start_date : pd.Timestamp
+            The start date to run the pipeline for.
+        end_date : pd.Timestamp
+            The end date to run the pipeline for.
+        chunksize : int
+            The number of days to execute at a time.
+        hooks : list[implements(PipelineHooks)], optional
+            Hooks for instrumenting Pipeline execution.
+
+        Returns
+        -------
+        result : pd.DataFrame
+            A frame of computed results.
+
+            The ``result`` columns correspond to the entries of
+            `pipeline.columns`, which should be a dictionary mapping strings to
+            instances of :class:`zipline.pipeline.Term`.
+
+            For each date between ``start_date`` and ``end_date``, ``result``
+            will contain a row for each asset that passed `pipeline.screen`.
+            A screen of ``None`` indicates that a row should be returned for
+            each asset that existed each day.
+
+        See Also
+        --------
+        :meth:`zipline.pipeline.engine.PipelineEngine.run_pipeline`
+        """
+        domain = self.resolve_domain(pipeline)
+        ranges = compute_date_range_chunks(
+            domain.sessions(),
+            start_date,
+            end_date,
+            chunksize,
+        )
+        hooks = self._resolve_hooks(hooks)
+
+        run_pipeline = partial(self._run_pipeline_impl, pipeline, hooks=hooks)
+        with hooks.running_pipeline(pipeline, start_date, end_date):
+            chunks = [run_pipeline(s, e) for s, e in ranges]
+
+        if len(chunks) == 1:
+            # OPTIMIZATION: Don't make an extra copy in `categorical_df_concat`
+            # if we don't have to.
+            return chunks[0]
+
+        # Filter out empty chunks. Empty dataframes lose dtype information,
+        # which makes concatenation fail.
+        df_list = [c for c in chunks if len(c)]
+
+        # Assert each dataframe has the same columns/dtypes
+        df = df_list[0]
+        if not all([(df.dtypes.equals(df_i.dtypes)) for df_i in df_list[1:]]):
+            raise ValueError("Input DataFrames must have the same columns/dtypes.")
+
+        categorical_columns = df.columns[df.dtypes == "category"]
+
+        for col in categorical_columns:
+            new_categories = _sort_set_none_first(
+                _union_all(frame[col].cat.categories for frame in df_list)
+            )
+
+            for df in df_list:
+                # https://stackoverflow.com/questions/70344193/pandas-dataframe-set-categories-the-inplace-parameter-in-pandas-categorical
+                df[col] = df[col].cat.set_categories(new_categories)
+
+        return pd.concat(df_list)
 
     def compute_chunk(
             self, graph, dates, sids, workspace, refcounts, execution_order, hooks
@@ -352,7 +433,7 @@ def make_pipeline_engine(bundle=None, start=None, end=None, live=False):
         start = bundle.equity_daily_bar_reader.first_trading_day
 
     if end is None:
-        end = pd.to_datetime('today', utc=True)
+        end = pd.Timestamp.today()
 
     # pipeline_loader = USEquityPricingLoader(bundle.equity_daily_bar_reader, bundle.adjustment_reader, SimpleFXRateReader())
     pipeline_loader = USEquityPricingLoader.without_fx(bundle.equity_daily_bar_reader, bundle.adjustment_reader)
@@ -372,12 +453,12 @@ def trading_date(date):
     Given a date, return the same date if a trading session or the next valid one
     """
     if isinstance(date, str):
-        date = pd.to_datetime(date, utc=True)
+        date = pd.Timestamp(date)
     cal = _bar_reader().trading_calendar
     if not cal.is_session(date):
         date = cal.next_close(date)
         # trick to fix the time (from 21:00 to 00:00)
-        date = pd.to_datetime(date.date(), utc=True)
+        date = pd.Timestamp(date.date())
     return date
 
 
@@ -462,4 +543,21 @@ class CliProgressPublisher(object):
         self.pbar.label = "Pipeline from %s to %s" % (start, end)
         if model.state == "success":
             log.info("Pipeline from %s to %s completed in %s." % (
-            start, end, str(datetime.timedelta(seconds=int(model.execution_time)))))
+                start, end, str(datetime.timedelta(seconds=int(model.execution_time)))))
+
+
+def _union_all(iterables):
+    """Union entries in ``iterables`` into a set."""
+    return set().union(*iterables)
+
+
+def _sort_set_none_first(set_):
+    """Sort a set, sorting ``None`` before other elements, if present."""
+    if None in set_:
+        set_.remove(None)
+        out = [None]
+        out.extend(sorted(set_))
+        set_.add(None)
+        return out
+    else:
+        return sorted(set_)

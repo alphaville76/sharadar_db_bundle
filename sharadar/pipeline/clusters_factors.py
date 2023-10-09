@@ -227,7 +227,7 @@ pipe_columns = columns = {
 
 if __name__ == '__main__':
     engine = make_pipeline_engine()
-    date = pd.to_datetime('2021-05-20', utc=True)
+    date = pd.Timestamp('2021-05-20')
 
     pipe = Pipeline(pipe_columns,
                     screen=StaticAssets(symbols(['IBM', 'F', 'AAPL']))

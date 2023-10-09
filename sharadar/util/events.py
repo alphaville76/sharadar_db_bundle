@@ -8,6 +8,7 @@ from zipline.utils.events import lossless_float_to_int, _out_of_range_error, MAX
 from zipline.utils.input_validation import preprocess
 from zipline.utils.memoize import lazyval
 from zipline.utils.calendar_utils import get_calendar
+from zipline.api import get_environment
 
 class OnceAtStart(StatelessRule):
 
@@ -82,10 +83,17 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
             self.cal = get_calendar("XNYS")
 
     def should_trigger(self, dt):
-        if dt.month not in self.rebalance_months:
+        dt_to_use = dt
+        if dt_to_use.month not in self.rebalance_months:
             return False
+
+        arena = get_environment(field='arena')
+        if arena == 'backtest':
+            dt_to_use = dt_to_use - pd.Timedelta(seconds=1)
+
+        value = self.cal.minute_to_session(dt_to_use, direction='none').value
+
         # is this market minute's period in the list of execution periods?
-        value = self.cal.minute_to_session_label(dt, direction="none").value
         return value in self.execution_period_values
 
     @lazyval

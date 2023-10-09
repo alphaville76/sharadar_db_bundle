@@ -8,7 +8,7 @@ from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set
 from sharadar.util.mail import send_mail
 from zipline.api import get_datetime
 
-# log in local time instead of UTC
+# log in local time
 set_datetime_format("local")
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
 LOG_LEVEL_MAP = {'CRITICAL': 2, 'ERROR': 3, 'WARNING': 4, 'NOTICE': 5, 'INFO': 6, 'DEBUG': 7, 'TRACE': 7}
