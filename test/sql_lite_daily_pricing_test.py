@@ -37,7 +37,7 @@ def create_data_list(df, sharadar_metadata_df):
 
 nasdaqdatalink.ApiConfig.api_key=env["NASDAQ_API_KEY"]
 
-sharadar_metadata_df = nasdaqdatalink_util.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
+sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
 sharadar_metadata_df.set_index('ticker', inplace=True)
 
 related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
@@ -52,7 +52,7 @@ end = dt('2019-04-22')
 
 # dataframe with sid insted of ticker
 #data = nasdaqdatalink.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, ticker=['AAPL', 'IBM', 'PINS'], paginate=True)
-data = nasdaqdatalink_util.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, paginate=True)
+data = nasdaqdatalink.get_table('SHARADAR/SEP', date={'gte':start,'lte':end}, paginate=True)
 #data['sid'] = data['ticker'].apply(lambda x: sharadar_metadata_df.loc[x]['permaticker'])
 data['sid'] = data['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
 data = process_data_table(data)
