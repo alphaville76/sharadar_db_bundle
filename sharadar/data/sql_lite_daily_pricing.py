@@ -174,8 +174,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         return res[0][0] == 1
 
     def _fmt_date(self, dt):
-        # FIXME +00:00?
-        return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00+00:00"
+        return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00"
 
     # @cached
     def get_value(self, sid, dt, field):

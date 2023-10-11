@@ -454,11 +454,13 @@ def trading_date(date):
     """
     if isinstance(date, str):
         date = pd.Timestamp(date)
+    if date.tz is not None:
+        date = date.tz_localize(None)
+    date = date.normalize()
     cal = _bar_reader().trading_calendar
     if not cal.is_session(date):
         date = cal.next_close(date)
-        # trick to fix the time (from 21:00 to 00:00)
-        date = pd.Timestamp(date.date())
+        date = date.tz_localize(None).normalize()
     return date
 
 

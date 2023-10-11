@@ -281,7 +281,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
 
 def format_perf_stats(perf_stats_df):
     for column in perf_stats_df.columns:
-        for stat, value in perf_stats_df[column].iteritems():
+        for stat, value in perf_stats_df[column].items():
             if stat in STAT_FUNCS_PCT:
                 perf_stats_df.loc[stat, column] = str(np.round(value * 100, 2)) + '%'
 
