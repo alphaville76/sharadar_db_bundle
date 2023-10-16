@@ -15,7 +15,6 @@ import time
 from datetime import datetime, timedelta
 from sharadar.util.logger import log
 import pandas as pd
-import pytz
 from dateutil.relativedelta import relativedelta
 
 from zipline.utils.math_utils import tolerant_equals, round_if_near_integer
@@ -27,6 +26,10 @@ from zipline.gens.tradesimulation import AlgorithmSimulator
 from zipline.utils.api_support import ZiplineAPI, api_method, require_initialized
 from sharadar.util.serialization_utils import load_context, store_context
 from zipline.finance.metrics import MetricsTracker
+
+MARKET_OPEN = 'open'
+MARKET_CLOSE = 'close'
+
 
 # how many minutes before Trading starts needs the function before_trading_starts
 # be launched
@@ -61,12 +64,32 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         super(self.__class__, self).__init__(*args, **kwargs)
 
+    @api_method
+    def get_datetime(self, tz=None):
+        """Returns the current simulation datetime.
+
+        Parameters
+        ----------
+        tz : tzinfo or str, optional
+            The timezone to return the datetime in.
+
+        Returns
+        -------
+        dt : datetime
+            The current simulation datetime converted to ``tz``.
+        """
+        dt = self.datetime
+
+        if tz is not None:
+            dt = dt.tz_localize(tz)
+        return dt
+
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
         if hasattr(date_rule, 'execution_period_values'):
             values = date_rule.execution_period_values
             now = int(int(time.time()) * 1e9)
             filtered = sorted([x for x in values if x > now])
-            next_date = datetime.fromtimestamp(filtered[0] / 1e9).strftime("%A, %B %d")
+            next_date = datetime.fromtimestamp(filtered[0] / 1e9).strftime("%A, %B %d %Y")
             log.info('Next execution of %s scheduled on %s' % (func.__name__, next_date))
 
         return super().schedule_function(func, date_rule, time_rule, half_days, calendar)
@@ -106,13 +129,9 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         assert self.sim_params.data_frequency == 'minute'
 
         minutely_emission = True
-        execution_opens = trading_o_and_c['market_open']
-        execution_closes = trading_o_and_c['market_close']
-
-        before_trading_start_minutes = ((pd.to_datetime(execution_opens.values)
-                                         .tz_localize('UTC').tz_convert('US/Eastern') -
-                                         timedelta(minutes=_minutes_before_trading_starts))
-                                        .tz_convert('UTC'))
+        execution_opens = trading_o_and_c[MARKET_OPEN].dt.tz_localize(None)
+        execution_closes = trading_o_and_c[MARKET_CLOSE].dt.tz_localize(None)
+        before_trading_start_minutes = execution_opens - timedelta(minutes=_minutes_before_trading_starts)
 
         return RealtimeClock(
             self.sim_params.sessions,
@@ -188,7 +207,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         asset = super(self.__class__, self).symbol(symbol_str)
         tradeable_asset = asset.to_dict()
-        end_date = pd.Timestamp((datetime.utcnow() + relativedelta(years=10)).date()).replace(tzinfo=pytz.UTC)
+        end_date = (pd.Timestamp.now() + relativedelta(years=10)).date()
         tradeable_asset['end_date'] = end_date
         tradeable_asset['auto_close_date'] = end_date
 
@@ -237,7 +256,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         """
         today = self.get_datetime().normalize()
-        prev_session = self.trading_calendar.previous_open(today).normalize()
+        prev_session = self.trading_calendar.previous_open(today).tz_localize(None).normalize()
 
         log.info('today in _pipeline_output : {}'.format(prev_session))
 

@@ -24,7 +24,10 @@ wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1025.01.zip
 unzip twsapi_macunix.1025.01.zip -d twsapi
 rm twsapi_macunix.1025.01.zip
 cd twsapi/IBJts/source/pythonclient
-python setup.py install
+pip install wheel
+python setup.py sdist
+python setup.py bdist_wheel
+pip install --upgrade dist/ibapi-10.25.1-py3-none-any.whl
 
 # Install sharadar_db_bundle and its requirements
 cd $PYTHON_LIBS
@@ -32,7 +35,9 @@ git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd $PYTHON_LIBS/sharadar_db_bundle
 git clone git@github.com:alphaville76/algo.git
 pip install -r requirements.txt
-python setup.py install
+python setup.py sdist
+python setup.py bdist_wheel
+pip install --upgrade dist/sharadar_db_bundle-2.0-py3-none-any.whl
 python test/basic_pipeline_sep_db.py
 
 if [ "$?" -eq 0 ]

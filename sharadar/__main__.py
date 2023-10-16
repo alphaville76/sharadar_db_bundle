@@ -172,7 +172,7 @@ def ipython_only(option):
 @click.option(
     '--bundle-timestamp',
     type=Timestamp(),
-    default=pd.Timestamp.utcnow(),
+    default=pd.Timestamp.today(),
     show_default=False,
     help='The date to lookup data on or before.\n'
          '[default: <current-time>]'

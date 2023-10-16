@@ -75,8 +75,8 @@ def handle_data(context, data):
     print(pdf)
 
 result = run_algorithm(
-    start=pd.Timestamp("2014-01-01", tz='utc'),
-    end=pd.Timestamp("2019-12-15", tz='utc'),
+    start=pd.Timestamp("2014-01-01"),
+    end=pd.Timestamp("2019-12-15"),
     initialize=initialize,  # Define startup function
     handle_data=handle_data,
     before_trading_start=before_trading_start,

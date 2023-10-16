@@ -48,7 +48,7 @@ def analyze(context, perf):
 
 def run_this_algorithm():
     run_algorithm(initialize=initialize,
-                  start=pd.Timestamp('2001-02-01', tz='utc'),
+                  start=pd.Timestamp('2005-01-03'),
                   analyze=analyze
                   )
 

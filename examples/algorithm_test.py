@@ -89,8 +89,8 @@ def handle_data(context, data):
 
 def run_this_algorithm():
     run_algorithm(initialize=initialize,
-                  start=pd.Timestamp('2020-08-26', tz='utc'),
-                  end=pd.Timestamp('2020-09-02', tz='utc')
+                  start=pd.Timestamp('2020-08-26'),
+                  end=pd.Timestamp('2020-09-02')
                   )
 
 

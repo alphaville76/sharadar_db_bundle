@@ -33,9 +33,7 @@ class time_rules(object):
     def market_close(offset=None, hours=None, minutes=None):
         return BeforeClose(offset=offset, hours=hours, minutes=minutes)
 
-    @staticmethod
-    def live_algo_start():
-        return OnceAtStart()
+    live_algo_start = OnceAtStart
 
 
 class date_rules(object):

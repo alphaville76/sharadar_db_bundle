@@ -5,7 +5,6 @@ import numpy as np
 import nasdaqdatalink
 
 from exchange_calendars import get_calendar
-
 from sharadar.util.output_dir import get_output_dir
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
 from sharadar.util.nasdaqdatalink_util import last_available_date
@@ -147,8 +146,21 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
         # and replace if with the new one with all the dates.
         df.append(df_ticker_synch)
 
+def trading_date(date, cal):
+    """
+    Given a date, return the same date if a trading session or the next valid one
+    """
+    if isinstance(date, str):
+        date = pd.Timestamp(date)
+    if date.tz is not None:
+        date = date.tz_localize(None)
+    date = date.normalize()
+    if not cal.is_session(date):
+        date = cal.next_close(date)
+        date = date.tz_localize(None).normalize()
+    return date
 
-def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_dir(),
+def _ingest(start, calendar=get_calendar('XNYS'), output_dir=get_output_dir(),
             universe=False, sanity_check=True, use_last_available_dt=True):
     os.makedirs(output_dir, exist_ok=True)
 
@@ -156,6 +168,7 @@ def _ingest(start_session, calendar=get_calendar('XNYS'), output_dir=get_output_
 
     log.info("Start ingesting SEP, SFP and SF1 data into %s ..." % output_dir)
 
+    start_session = trading_date(start, calendar)
     end_session = pd.Timestamp(last_available_date())
     # Check valid trading dates, according to the selected exchange calendar
     sessions = calendar.sessions_in_range(start_session, end_session)
