@@ -4,7 +4,11 @@ from mailjet_rest import Client
 
 
 def send_mail(subject, message):
-    api_key = env["MJ_APIKEY_PUBLIC"]
+    try:
+        api_key = env["MJ_APIKEY_PUBLIC"]
+    except KeyError:
+        print("Mail Jet not configured!")
+        return
     api_secret = env["MJ_APIKEY_PRIVATE"]
     mailjet = Client(auth=(api_key, api_secret), version='v3.1')
     data = {

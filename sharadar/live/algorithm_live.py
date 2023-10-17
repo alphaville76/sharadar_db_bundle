@@ -64,26 +64,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         super(self.__class__, self).__init__(*args, **kwargs)
 
-    @api_method
-    def get_datetime(self, tz=None):
-        """Returns the current simulation datetime.
-
-        Parameters
-        ----------
-        tz : tzinfo or str, optional
-            The timezone to return the datetime in.
-
-        Returns
-        -------
-        dt : datetime
-            The current simulation datetime converted to ``tz``.
-        """
-        dt = self.datetime
-
-        if tz is not None:
-            dt = dt.tz_localize(tz)
-        return dt
-
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
         if hasattr(date_rule, 'execution_period_values'):
             values = date_rule.execution_period_values
