@@ -21,10 +21,12 @@ try:
         print(date)
 
     prices_db_cursor.execute("commit")
+
+    prices_db_cursor.execute("VACUUM")
 except:
     print("failed: " + sys.exc_info()[0])
     prices_db_cursor.execute("rollback")
 
-#prices_db_cursor.execute("VACUUM")
+
 
 prices_db.close()
