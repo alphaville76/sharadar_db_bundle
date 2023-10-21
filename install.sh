@@ -31,9 +31,9 @@ pip install --upgrade dist/ibapi-10.25.1-py3-none-any.whl
 
 # Install sharadar_db_bundle and its requirements
 cd $PYTHON_LIBS
+git clone git@github.com:alphaville76/algo.git
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd $PYTHON_LIBS/sharadar_db_bundle
-git clone git@github.com:alphaville76/algo.git
 pip install -r requirements.txt
 python setup.py sdist
 python setup.py bdist_wheel
