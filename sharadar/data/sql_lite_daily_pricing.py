@@ -8,7 +8,7 @@ import pandas as pd
 from exchange_calendars import get_calendar
 
 from sharadar.util.logger import log
-from sharadar.util.output_dir import get_output_dir
+from sharadar.util.output_dir import get_data_dir
 from six import (
     iteritems,
 )
@@ -160,7 +160,7 @@ class SQLiteDailyBarReader(SessionBarReader):
     --------
     zipline.data.us_equity_pricing.BcolzDailyBarReader
     """
-    def __init__(self, filename=os.path.join(get_output_dir(), "prices.sqlite")):
+    def __init__(self, filename=os.path.join(get_data_dir(), "prices.sqlite")):
         self._filename = filename
 
     def _query(self, sql):

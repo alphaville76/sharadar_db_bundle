@@ -9,7 +9,7 @@ from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarReader
 from sharadar.pipeline.engine import make_pipeline_engine
 from sharadar.pipeline.factors import Exchange, Sector, IsDomesticCommonStock, MarketCap, Fundamentals, EV
 from sharadar.util.logger import log
-from sharadar.util.output_dir import get_output_dir
+from sharadar.util.output_dir import get_data_dir
 from zipline.pipeline import Pipeline, CustomFilter
 import os
 from zipline.pipeline.data import USEquityPricing
@@ -29,7 +29,7 @@ CREATE INDEX "ix_date_%s" ON "%s" ("date");
 
 
 class UniverseWriter(object):
-    def __init__(self, universes_db_path=os.path.join(get_output_dir(), "universes.sqlite")):
+    def __init__(self, universes_db_path=os.path.join(get_data_dir(), "universes.sqlite")):
         self.engine = make_pipeline_engine()
         self.universes_db_path = universes_db_path
 
@@ -59,7 +59,7 @@ class UniverseWriter(object):
 
 
 class UniverseReader(object):
-    def __init__(self, db_path=os.path.join(get_output_dir(), "universes.sqlite")):
+    def __init__(self, db_path=os.path.join(get_data_dir(), "universes.sqlite")):
         db = sqlite3.connect(db_path, isolation_level=None)
         db.row_factory = lambda cursor, row: row[0]
         self.cursor = db.cursor()
@@ -124,7 +124,7 @@ class NamedUniverse(CustomFilter):
     def __new__(self, universe_name):
         self.universe_name = universe_name
 
-        universes_db_path = os.path.join(get_output_dir(), "universes.sqlite")
+        universes_db_path = os.path.join(get_data_dir(), "universes.sqlite")
         self.universe_reader = UniverseReader(universes_db_path)
         return super(NamedUniverse, self).__new__(self)
 

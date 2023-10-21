@@ -5,7 +5,7 @@ import numpy as np
 import nasdaqdatalink
 
 from exchange_calendars import get_calendar
-from sharadar.util.output_dir import get_output_dir
+from sharadar.util.output_dir import get_data_dir
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
 from sharadar.util.nasdaqdatalink_util import last_available_date
 from sharadar.util.equity_supplementary_util import lookup_sid
@@ -160,7 +160,7 @@ def trading_date(date, cal):
         date = date.tz_localize(None).normalize()
     return date
 
-def _ingest(start, calendar=get_calendar('XNYS'), output_dir=get_output_dir(),
+def _ingest(start, calendar=get_calendar('XNYS'), output_dir=get_data_dir(),
             universe=False, sanity_check=True, use_last_available_dt=True):
     os.makedirs(output_dir, exist_ok=True)
 
