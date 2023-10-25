@@ -89,7 +89,7 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
         if arena == 'backtest':
             dt_to_use = dt_to_use - pd.Timedelta(seconds=1)
 
-        value = self.cal.minute_to_session(dt_to_use, direction='none').value
+        value = self.cal.minute_to_session(dt_to_use).value
 
         # is this market minute's period in the list of execution periods?
         return value in self.execution_period_values
