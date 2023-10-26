@@ -35,9 +35,10 @@ spe = make_pipeline_engine()
 #pipe_start = pd.to_datetime('2020-02-05', utc=True)
 #pipe_end = pd.to_datetime('2020-02-07', utc=True)
 
-pipe_start = pd.Timestamp('2020-02-05')
-pipe_end = pd.Timestamp('2020-02-07')
-
+#pipe_start = pd.Timestamp('2020-02-05')
+#pipe_end = pd.Timestamp('2020-02-07')
+pipe_start = pd.Timestamp('2023-10-20')
+pipe_end = pd.Timestamp('2023-10-20')
 pipe = Pipeline(columns={
     'Close': USEquityPricing.close.latest,
 },

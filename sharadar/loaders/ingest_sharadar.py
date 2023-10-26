@@ -303,10 +303,10 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             asset_name = sharadar_metadata.loc['name']
 
-            # The date when this asset was created (tzinfo=UTC).
+            # The date when this asset was created.
             start_date = sharadar_metadata.loc['firstpricedate']
 
-            # The last date we have trade data for this asset (tzinfo=UTC)..
+            # The last date we have trade data for this asset..
             end_date = sharadar_metadata.loc['lastpricedate']
 
             # The first date we have trade data for this asset.
@@ -322,8 +322,8 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             # Synch to the official exchange calendar, if necessary
             date_index = df_ticker.index.get_level_values('date')
-            start_date_df = date_index[0]  # (tzinfo=UTC)
-            end_date_df = date_index[-1]  # (tzinfo=UTC)
+            start_date_df = date_index[0]
+            end_date_df = date_index[-1]
             synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
 
             # Add a row to the metadata DataFrame.

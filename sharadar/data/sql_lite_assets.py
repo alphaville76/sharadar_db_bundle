@@ -17,6 +17,7 @@ from zipline.assets.asset_db_schema import (
 from zipline.utils.memoize import lazyval
 from sqlalchemy import text
 
+
 class SQLiteAssetFinder(AssetFinder):
 
     def __init__(self, engine):
@@ -27,7 +28,7 @@ class SQLiteAssetFinder(AssetFinder):
         rows = list(super()._retrieve_asset_dicts(sids, asset_tbl, querying_equities))
         if self.is_live_trading:
             for row in rows:
-                # when we use pipeline live the end date is always yesterday so we add 5 days to still keep this condition
+                # when we use pipeline live the end date is always yesterday, so we add 5 days to keep this condition
                 # but also allowing to use pipeline live as well. 5 is a good number for weekends/holidays
                 row['end_date'] = row['end_date'] + timedelta(days=5)
                 row['auto_close_date'] = row['auto_close_date'] + timedelta(days=5)
@@ -75,7 +76,6 @@ class SQLiteAssetFinder(AssetFinder):
         cmd = sql % (', '.join(map(str, sids)), field_name, as_of_date.value, date_check, n * MAX_DELAY, n)
         with self.engine.connect() as conn:
             return conn.execute(text(cmd)).fetchall()
-
 
     def _get_result_ttm(self, sids, field_name, as_of_date, k):
         """
@@ -169,7 +169,7 @@ class SQLiteAssetFinder(AssetFinder):
     def get_info(self, sids, field_name, as_of_date=None):
         """
         Unlike get_fundamentals(.), it use the string 'NA' for unknown values, 
-        because np.nan isn't supported in LabelArray
+        because np nan isn't supported in LabelArray
         """
         result = self._get_result(sids, field_name, as_of_date, n=1, enforce_date=False)
         if len(result) == 0:
@@ -218,7 +218,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
     def init_db(self, txn=None):
         super().init_db(txn)
-        txn.execute(text("CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
+        txn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         if asset_type == 'future':
@@ -275,8 +276,6 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         return '"' + uname.replace('"', '""') + '"'
 
     def insert_statement(self, df, table_name, index=True, index_label=None):
-        num_rows = df.shape[0]
-
         names = list(map(str, df.columns))
 
         if index:
@@ -294,14 +293,13 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         bracketed_names = [self.escape(column) for column in names]
         col_names = ",".join(bracketed_names)
 
-        params = ",".join([":"+str(x) for x in range(0, len(names))])
+        params = ",".join([":" + str(x) for x in range(0, len(names))])
         insert_statement = (
             f"INSERT OR REPLACE INTO {self.escape(table_name)} ({col_names}) VALUES ({params})"
         )
         return insert_statement
 
     def _write_df_to_table(self, tbl, df, txn, chunk_size=None, idx=True, idx_label=None):
-        engine = txn.connection
         index_label = (
             idx_label
             if idx_label is not None else
@@ -316,7 +314,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
             params = dict(zip([str(x) for x in range(0, len(values))], values.flatten()))
             with self.engine.connect() as conn:
-                return conn.execute(text(cmd), params)
+                conn.execute(text(cmd), params)
+                conn.commit()
 
     def check_sanity(self):
         """
@@ -354,7 +353,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             'ETN',
             'IDX',
             'UNIT'
-            ]
+        ]
 
         if not self._check_field(field, expected):
             sane = False
@@ -380,7 +379,6 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             ret = [x[0] for x in conn.execute(text(sql)).fetchall()]
         ok = np.array_equal(ret, expected)
         if not ok:
-            sane = False
             from sharadar.util.logger import log
             log.error("Field '%s' changed!\nActual:\n  %s\nExpected:\n  %s" % (field, ret, expected))
             return False

@@ -37,7 +37,7 @@ cd $PYTHON_LIBS/sharadar_db_bundle
 pip install -r requirements.txt
 python setup.py sdist
 python setup.py bdist_wheel
-pip install --upgrade dist/sharadar_db_bundle-2.0-py3-none-any.whl
+pip install --upgrade --force-reinstall dist/sharadar_db_bundle-2.0-py3-none-any.whl
 python test/basic_pipeline_sep_db.py
 
 if [ "$?" -eq 0 ]
