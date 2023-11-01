@@ -109,9 +109,13 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         assert self.sim_params.data_frequency == 'minute'
 
         minutely_emission = True
+        # All datetime in UTC without offset
         execution_opens = trading_o_and_c[MARKET_OPEN].dt.tz_localize(None)
         execution_closes = trading_o_and_c[MARKET_CLOSE].dt.tz_localize(None)
         before_trading_start_minutes = execution_opens - timedelta(minutes=_minutes_before_trading_starts)
+
+        # open/close for NYSE:
+        # 9:30 am EDT (13:30 UTC) 4:00 pm EDT (20:00 UTC)
 
         return RealtimeClock(
             self.sim_params.sessions,
