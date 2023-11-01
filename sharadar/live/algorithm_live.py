@@ -64,6 +64,10 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         super(self.__class__, self).__init__(*args, **kwargs)
 
+    def on_dt_changed(self, dt):
+        log.info('on_dt_changed: {}'.format(dt))
+        super().on_dt_changed(dt)
+
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
         if hasattr(date_rule, 'execution_period_values'):
             values = date_rule.execution_period_values
@@ -95,6 +99,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         log.info("initialization done")
 
     def handle_data(self, data):
+        log.info('current_dt: {}'.format(data.current_dt))
         super(self.__class__, self).handle_data(data)
         store_context(self.state_filename, context=self)
 
@@ -242,7 +247,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         today = self.get_datetime().normalize()
         prev_session = self.trading_calendar.previous_open(today).tz_localize(None).normalize()
 
-        log.info('today in _pipeline_output : {}'.format(prev_session))
+        log.info('Today: {}'.format(prev_session))
+        log.info('Pipeline output date (previous session) : {}'.format(prev_session))
 
         try:
             data = self._pipeline_cache.get(name, prev_session)
