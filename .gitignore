@@ -99,3 +99,4 @@ algo/
 *.dump
 /notebook/Haugen Regressions*
 /notebook/sandbox/*
+*.state

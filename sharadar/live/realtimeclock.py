@@ -94,6 +94,7 @@ class RealtimeClock(object):
                         break
                 current_time_utc = pd.Timestamp.utcnow().tz_convert(None)
                 server_time_utc = (current_time_utc + self.time_skew).floor('1 min')
+                server_time_utc_offset = make_utc_aware(server_time_utc)
 
                 if (server_time_utc >= self.before_trading_start_minutes_utc[index] and
                         not self._before_trading_start_bar_yielded):

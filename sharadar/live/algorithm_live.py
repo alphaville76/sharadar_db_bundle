@@ -65,16 +65,16 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         super(self.__class__, self).__init__(*args, **kwargs)
 
     def on_dt_changed(self, dt):
-        log.info('on_dt_changed: {}'.format(dt))
+        # log.info('on_dt_changed: {}'.format(dt))
         super().on_dt_changed(dt)
 
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
         if hasattr(date_rule, 'execution_period_values'):
             values = date_rule.execution_period_values
-            now = int(int(time.time()) * 1e9)
-            filtered = sorted([x for x in values if x > now])
-            next_date = datetime.fromtimestamp(filtered[0] / 1e9).strftime("%A, %B %d %Y")
-            log.info('Next execution of %s scheduled on %s' % (func.__name__, next_date))
+            now = pd.Timestamp.utcnow().normalize().value
+            filtered = sorted([x for x in values if x >= now])
+            next_date = pd.to_datetime(filtered[0], unit='ns', origin='unix').date()
+            log.info('Next execution of %s scheduled on %s' % (func.__name__, str(next_date)))
 
         return super().schedule_function(func, date_rule, time_rule, half_days, calendar)
 
@@ -85,6 +85,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         return super(self.__class__, self).get_environment(field)
 
     def initialize(self, *args, **kwargs):
+        if self.state_filename is None:
+            raise ValueError("State filename cannot be none in live trading.")
         if os.path.isfile(self.state_filename):
             log.info("Loading state from {}".format(self.state_filename))
             load_context(self.state_filename, context=self)
@@ -99,7 +101,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         log.info("initialization done")
 
     def handle_data(self, data):
-        log.info('current_dt: {}'.format(data.current_dt))
+        # log.info('current_dt: {}'.format(data.current_dt))
         super(self.__class__, self).handle_data(data)
         store_context(self.state_filename, context=self)
 
@@ -196,7 +198,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         asset = super(self.__class__, self).symbol(symbol_str)
         tradeable_asset = asset.to_dict()
-        end_date = (pd.Timestamp.now() + relativedelta(years=10)).date()
+        end_date = (pd.Timestamp.utcnow() + relativedelta(years=10)).normalize().tz_localize(None)
         tradeable_asset['end_date'] = end_date
         tradeable_asset['auto_close_date'] = end_date
 

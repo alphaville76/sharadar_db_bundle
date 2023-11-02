@@ -57,7 +57,7 @@ class DataPortalLive(DataPortal):
         data_frequency = "daily"
 
         # the ingested data are up to the previous trading day
-        end_dt = self.trading_calendar.sessions_window(end_dt.normalize(), -1)[0]
+        end_dt = self.trading_calendar.sessions_window(end_dt.tz_localize(None).normalize(), -1)[0]
         try:
             historical_bars = super(DataPortalLive, self).get_history_window(assets, end_dt, bar_count, frequency,
                                                                              field, data_frequency, ffill=False)
@@ -74,6 +74,7 @@ class DataPortalLive(DataPortal):
         # open, high, low, close, volume returned as level 1 columns.
         # To filter for field the levels needs to be swapped
         realtime_bars = realtime_bars.swaplevel(0, 1, axis=1)
+        realtime_bars.index = realtime_bars.index.tz_localize(None).normalize()
 
         ohlcv_field = 'close' if field == 'price' else field
 

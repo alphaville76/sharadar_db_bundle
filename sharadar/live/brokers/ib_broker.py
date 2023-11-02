@@ -131,7 +131,7 @@ class TWSConnection(EWrapper, EClient):
             log.info("Cannot connect to TWS. Retrying in %ds (timeout in %ds)..." % (_poll_frequency, timeout))
             sleep(_poll_frequency)
             timeout -= _poll_frequency
-        
+
         if self.isConnected():
             log.info("Connected to TWS!")
         else:
@@ -197,7 +197,8 @@ class TWSConnection(EWrapper, EClient):
         self._next_order_id += 1
         return order_id
 
-    def subscribe_to_market_data(self, ib_symbol, exchange='SMART', primaryExchange='ISLAND', secType='STK', currency='USD'):
+    def subscribe_to_market_data(self, ib_symbol, exchange='SMART', primaryExchange='ISLAND', secType='STK',
+                                 currency='USD'):
         if ib_symbol in self.symbol_to_ticker_id:
             # Already subscribed to market data
             return
@@ -370,7 +371,7 @@ class TWSConnection(EWrapper, EClient):
             "total: {cum_qty} @ ${avg_price} "
             "exec_id: {exec_id} by client-{client_id}".format(
                 order_id=order_id, exec_id=exec_id,
-                exec_time=pd.to_datetime(exec_detail.time),
+                exec_time=pd.to_datetime(exec_detail.time.replace('US/Eastern', '-0400'), utc=True),
                 symbol=contract.symbol,
                 shares=exec_detail.shares,
                 price=exec_detail.price,
@@ -539,7 +540,7 @@ class IBBroker(Broker):
     def positions(self):
         self._update_positions_from_broker()
         # Filter out positions with amount == 0
-        return {v : k for k, v in self.metrics_tracker.positions.items() if v.amount != 0}
+        return {v: k for k, v in self.metrics_tracker.positions.items() if v.amount != 0}
 
     def _update_positions_from_broker(self):
         """
@@ -549,10 +550,11 @@ class IBBroker(Broker):
         cur_pos_in_tracker = self.metrics_tracker.positions
         for ib_symbol in self._tws.ib_positions:
             ib_position = self._tws.ib_positions[ib_symbol]
- 
+
             equity = self._safe_symbol_lookup(ib_symbol)
             if not equity:
-                log.warning('Wanted to subscribe to %s, but this asset is probably not ingested' % ib_symbol)
+                if not ib_symbol.endswith('.CVR'):
+                    log.warning('Wanted to subscribe to %s, but this asset is probably not ingested' % ib_symbol)
                 continue
 
             zp_position = zp.Position(zp.InnerPosition(equity))
@@ -734,7 +736,6 @@ class IBBroker(Broker):
         elif isinstance(style, TWSOrder):
             order.orderType = style.get_order_type()
             order.tif = style.get_time_in_force()
-
 
         order.orderRef = self._create_order_ref(order)
 
@@ -959,7 +960,7 @@ class IBBroker(Broker):
                 tx = Transaction(
                     asset=order.asset,
                     amount=float(amount),
-                    dt=pd.to_datetime(exec_detail.time, utc=True),
+                    dt=pd.to_datetime(exec_detail.time.replace('US/Eastern', '-0400'), utc=True),
                     price=float(exec_detail.price),
                     order_id=order.id
                 )
@@ -1038,8 +1039,3 @@ class IBBroker(Broker):
             df = pd.concat([df, ohlcv], axis=1)
 
         return df
-
-
-
-
-
