@@ -23,6 +23,9 @@ class NeuralNetwork(object):
         self.alpha = alpha
         self.bias_k = bias_k
 
+    #def __repr__(self):
+    #    return str(self.parameters)
+
     def unravel_parameters(self, params_flat):
         W1_start = 0
         W1_end = self.n_h * self.n_x
