@@ -370,8 +370,9 @@ class TWSConnection(EWrapper, EClient):
             "{symbol} current: {shares} @ ${price} "
             "total: {cum_qty} @ ${avg_price} "
             "exec_id: {exec_id} by client-{client_id}".format(
-                order_id=order_id, exec_id=exec_id,
-                exec_time=pd.to_datetime(exec_detail.time.replace('US/Eastern', '-0400'), utc=True),
+                order_id=order_id,
+                exec_id=exec_id,
+                exec_time=exec_detail.time,
                 symbol=contract.symbol,
                 shares=exec_detail.shares,
                 price=exec_detail.price,
@@ -960,7 +961,8 @@ class IBBroker(Broker):
                 tx = Transaction(
                     asset=order.asset,
                     amount=float(amount),
-                    dt=pd.to_datetime(exec_detail.time.replace('US/Eastern', '-0400'), utc=True),
+                    # FIXME what if we do not trade in New York based stocks?
+                    dt=pd.Timestamp(exec_detail.time[0:17], tz='US/Eastern').tz_convert('utc'),
                     price=float(exec_detail.price),
                     order_id=order.id
                 )
