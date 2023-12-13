@@ -99,7 +99,6 @@ class TWSConnection(EWrapper, EClient):
         self._next_request_id = 0
         self._next_order_id = None
         self.account_id = account_id
-        self.managed_accounts = [self.account_id]
         self.symbol_to_ticker_id = {}
         self.ticker_id_to_symbol = {}
         self.last_tick = defaultdict(dict)
@@ -137,10 +136,8 @@ class TWSConnection(EWrapper, EClient):
         else:
             raise SystemError("Connection timeout during TWS connection!")
 
-        # It's important to reset here the managed_accounts to the given account_id
-        self.managed_accounts = [self.account_id]
         self._download_account_details()
-        log.info("Managed accounts: {}".format(self.managed_accounts))
+        log.info("Current account: {}".format(self.account_id))
 
         self.reqCurrentTime()
         self.reqIds(1)
@@ -163,18 +160,14 @@ class TWSConnection(EWrapper, EClient):
         self.connect(self._host, self._port, self.client_id)
 
     def reqManagedAccts(self):
-        # disable requesting def managed accounts.
-        # On the set account will be used
+        # disable requesting managed accounts. We set the account explicitly.
         pass
 
     def _download_account_details(self):
         exec_filter = ExecutionFilter()
         exec_filter.clientId = self.client_id
         self.reqExecutions(self.next_request_id, exec_filter)
-
-        for account in self.managed_accounts:
-            if account:
-                self.reqAccountUpdates(subscribe=True, acctCode=account)
+        self.reqAccountUpdates(subscribe=True, acctCode=self.account_id)
 
         while self.accounts_download_complete is False:
             sleep(_poll_frequency)
@@ -437,7 +430,7 @@ class TWSConnection(EWrapper, EClient):
         log_message('updateNewsBulletin', vars())
 
     def managedAccounts(self, accounts_list):
-        self.managed_accounts = accounts_list.split(',')
+        log.debug(('Managed accounts: %s; Current account: %s' % (str(accounts_list), self.account_id)))
 
     def receiveFA(self, fa_data_type, xml):
         log_message('receiveFA', vars())
