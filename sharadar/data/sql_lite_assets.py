@@ -359,15 +359,15 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             sane = False
 
         field = 'sector'
-        expected = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy',
-                    'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
+        from sharadar.pipeline.factors import Sector
+        expected = Sector.categories
         if not self._check_field(field, expected):
             sane = False
 
         field = 'exchange'
-        # TODO share constant with factors.py
-        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
-
+        from sharadar.pipeline.factors import Exchange
+        # Bug in sharadar, only one stock for AMEX: Thomas Equipment delisted in 2006
+        expected = Exchange.categories.copy().insert(0, 'AMEX')
         if not self._check_field(field, expected):
             sane = False
 
