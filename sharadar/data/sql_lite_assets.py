@@ -360,14 +360,15 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         field = 'sector'
         from sharadar.pipeline.factors import Sector
-        expected = Sector.categories
+        expected = Sector().categories.copy()
         if not self._check_field(field, expected):
             sane = False
 
         field = 'exchange'
         from sharadar.pipeline.factors import Exchange
         # Bug in sharadar, only one stock for AMEX: Thomas Equipment delisted in 2006
-        expected = Exchange.categories.copy().insert(0, 'AMEX')
+        expected = Exchange().categories.copy()
+        expected.insert(0, 'AMEX')
         if not self._check_field(field, expected):
             sane = False
 
