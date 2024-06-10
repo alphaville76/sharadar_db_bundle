@@ -119,7 +119,7 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
     return splits_df
 
 
-def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
+def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, df: pd.DataFrame):
     this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
 
     missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
@@ -143,8 +143,8 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker, df):
 
         # drop the existing sub dataframe
         df.drop(df_ticker.index, inplace=True)
-        # and replace if with the new one with all the dates.
-        df.append(df_ticker_synch)
+        # and concat with the new one with all the dates.
+        pd.concat([df, df_ticker_synch])
 
 def trading_date(date, cal):
     """
@@ -284,7 +284,7 @@ def create_metadata():
     sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
-    # Add a space at the begin and end of relatedtickers, search for ' TICKER '
+    # Add a space at the start and end of relatedtickers, search for ' TICKER '
     related_tickers = ' ' + related_tickers.astype(str) + ' '
     return related_tickers, sharadar_metadata_df
 
@@ -306,7 +306,7 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             # The date when this asset was created.
             start_date = sharadar_metadata.loc['firstpricedate']
 
-            # The last date we have trade data for this asset..
+            # The last date we have trade data for this asset.
             end_date = sharadar_metadata.loc['lastpricedate']
 
             # The first date we have trade data for this asset.
@@ -357,7 +357,7 @@ def from_nasdaqdatalink():
 
         try:
             _ingest(start_date, calendar)
-        except Exception as e:
+        except Exception:
             log.error(traceback.format_exc())
 
     return ingest

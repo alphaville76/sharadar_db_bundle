@@ -78,9 +78,8 @@ class Exchange(AbstractClassifier):
 
 class Sector(AbstractClassifier):
     def __init__(self):
-        categories = ['Healthcare', 'Basic Materials', 'Financial Services', 'Consumer Cyclical', 'Technology',
-                      'Consumer Defensive', 'Industrials', 'Real Estate', 'Energy', 'Communication Services',
-                      'Utilities']
+        categories = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy',
+                      'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
         field = 'sector'
         super().__init__(categories, field)
 
