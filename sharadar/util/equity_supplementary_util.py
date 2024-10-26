@@ -71,10 +71,12 @@ def insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True
 
             for datekey, row in df_ticker.iterrows():
                 for column in row.index:
-                    if column in ['fiscalperiod''dimension', 'ev', 'evebit', 'evebitda', 'marketcap', 'pb', 'pe', 'ps']:
+                    if column in ['fiscalperiod', 'siccode', 'dimension', 'ev', 'evebit', 'evebitda', 'marketcap', 'pb', 'pe', 'ps']:
                         continue
                     value = row[column]
                     if type(value) == float and np.isnan(value):
+                        continue
+                    if value is None:
                         continue
                     field = column + '_' + row['dimension'].lower()
                     date = datekey + pd.Timedelta(days=1)
