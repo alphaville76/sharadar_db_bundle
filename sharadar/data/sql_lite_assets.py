@@ -366,9 +366,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
 
         field = 'exchange'
         from sharadar.pipeline.factors import Exchange
-        # Bug in sharadar, only one stock for AMEX: Thomas Equipment delisted in 2006
         expected = Exchange().categories.copy()
-        expected.insert(0, 'AMEX')
         if not self._check_field(field, expected):
             sane = False
 
