@@ -123,7 +123,16 @@ class SQLiteAssetFinder(AssetFinder):
                      )
             return []
         # shape: (windows lenghts=1, num of assets)
-        return pd.DataFrame(result).set_index('sid').reindex(sids).T.values.astype('float64')
+        values = pd.DataFrame(result).set_index('sid').reindex(sids).T.values
+        try:
+            values_float = values.astype('float64')
+        except ValueError as err:
+            #FIXME use logger
+            print(f"ValueError {err=}, {type(err)=}")
+            print(values)
+            raise
+            
+        return values_float
 
     # @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):
