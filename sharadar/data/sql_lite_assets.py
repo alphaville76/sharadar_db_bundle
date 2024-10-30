@@ -123,13 +123,16 @@ class SQLiteAssetFinder(AssetFinder):
                      )
             return []
         # shape: (windows lenghts=1, num of assets)
-        values = pd.DataFrame(result).set_index('sid').reindex(sids).T.values
+        df = pd.DataFrame(result).set_index('sid').reindex(sids).T
+        values = df.values
         try:
             values_float = values.astype('float64')
         except ValueError as err:
-            #FIXME use logger
+            log.error("Error on: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
+                     (sids, field_name, as_of_date, n)
+                     )
             print(f"ValueError {err=}, {type(err)=}")
-            print(values)
+            print(df.to_string())
             raise
             
         return values_float
