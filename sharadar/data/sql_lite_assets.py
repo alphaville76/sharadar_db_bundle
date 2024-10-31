@@ -124,18 +124,9 @@ class SQLiteAssetFinder(AssetFinder):
             return []
         # shape: (windows lenghts=1, num of assets)
         df = pd.DataFrame(result).set_index('sid').reindex(sids).T
-        values = df.values
-        try:
-            values_float = values.astype('float64')
-        except ValueError as err:
-            log.error("Error on: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
-                     (sids, field_name, as_of_date, n)
-                     )
-            print(f"ValueError {err=}, {type(err)=}")
-            print(df.to_string())
-            raise
-            
-        return values_float
+        values = df.replace('None', np.nan).values
+        # shape: (num of assets, windows lenghts=1)
+        return values.astype('float64')
 
     # @cached
     def get_fundamentals_df_window_length(self, sids, field_name, as_of_date=None, window_length=1):

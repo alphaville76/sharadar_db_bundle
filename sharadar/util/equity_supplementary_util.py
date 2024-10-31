@@ -76,7 +76,7 @@ def insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True
                     value = row[column]
                     if type(value) == float and np.isnan(value):
                         continue
-                    if value is None:
+                    if value is None or value == 'None':
                         continue
                     field = column + '_' + row['dimension'].lower()
                     date = datekey + pd.Timedelta(days=1)
