@@ -17,7 +17,7 @@ def choose_loader(column):
     return pricing_loader
 
 # Set the trading calendar
-trading_calendar = get_calendar('NYSE')
+trading_calendar = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
 
 start_date = pd.to_datetime('2020-08-26', utc=True)
 end_date = pd.to_datetime('2020-09-02', utc=True)

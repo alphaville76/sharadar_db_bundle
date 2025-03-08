@@ -26,7 +26,7 @@ screen = StaticAssets(symbols(['AAPL']))
 )
 
 pipe_start = pd.to_datetime('Today', utc=True)
-calendar = get_calendar('XNYS')
+calendar = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
 if not calendar.is_session(pipe_start):
     pipe_start = calendar.previous_open(pipe_start).normalize()
 

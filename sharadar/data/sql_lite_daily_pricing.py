@@ -250,7 +250,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         res = self._query(sql)
         if len(res) == 0:
             raise ValueError("No trading calendar defined.")
-        return get_calendar(res[0][0])
+        return get_calendar(res[0][0], start=pd.Timestamp('2000-01-01 00:00:00'))
 
     @property
     def first_trading_day(self):

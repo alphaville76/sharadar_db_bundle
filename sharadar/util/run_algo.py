@@ -7,6 +7,8 @@ import click
 import pandas as pd
 import warnings
 from functools import partial
+
+from exchange_calendars.exchange_calendar_xnys import XNYSExchangeCalendar
 from sharadar.pipeline.engine import *
 from sharadar.util.logger import log
 
@@ -99,7 +101,8 @@ def _run(handle_data,
     log.info("Using bundle '%s'." % bundle)
 
     if trading_calendar is None:
-        trading_calendar = get_calendar('XNYS')
+        trading_calendar = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
+    log.info("Using trading calendar '%s'." % trading_calendar.default_start())
 
     bundle_data = load_sharadar_bundle(bundle)
     now = pd.Timestamp.today().normalize()

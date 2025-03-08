@@ -63,7 +63,7 @@ data.set_index(['date', 'sid'], inplace=True)
 print(data)
 
 #data_list = create_data_list(data, sharadar_metadata_df)
-calendar = get_calendar("NYSE")
+calendar = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
 #path = '/tmp/test.bcolz'
 #writer = BcolzDailyBarWriter(path,calendar,start,end)
 #ctable = writer.write(data_list)

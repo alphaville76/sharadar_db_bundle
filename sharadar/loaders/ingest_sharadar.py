@@ -160,7 +160,7 @@ def trading_date(date, cal):
         date = date.tz_localize(None).normalize()
     return date
 
-def _ingest(start, calendar=get_calendar('XNYS'), output_dir=get_data_dir(),
+def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00')), output_dir=get_data_dir(),
             universe=False, sanity_check=True, use_last_available_dt=True):
     os.makedirs(output_dir, exist_ok=True)
 
