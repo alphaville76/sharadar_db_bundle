@@ -319,6 +319,8 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             exchange = sharadar_metadata.loc['exchange']
             if (exchange is None) or (exchange == 'None'):
                 exchange = 'OTC'
+            if exchange == 'NYSEAERCA':
+                exchange = 'NYSEARCA'
 
             # Synch to the official exchange calendar, if necessary
             date_index = df_ticker.index.get_level_values('date')
