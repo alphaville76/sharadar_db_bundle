@@ -16,17 +16,17 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Setup virtual env
+    - name: Main
       run: |
+        echo "Setup virtual env"
         export PYTHON_VERSION=${{ matrix.python-version }}
         export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
         python -m venv ~/$VENV_NAME
         source ~/$VENV_NAME/bin/activate
         python -m pip install --upgrade pip
         export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
-    - name: Install TA lib
-      run: |
-        source ~/$VENV_NAME/bin/activate
+        
+        echo "Install TA lib"
         cd $PYTHON_LIBS
         wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
         tar xvfz ta-lib-0.4.0-src.tar.gz
@@ -35,9 +35,8 @@ jobs:
         ./configure
         make
         sudo make install
-    - name: Install TWS api
-      run: |
-        source ~/$VENV_NAME/bin/activate
+        
+        echo "Install TWS api"
         cd $PYTHON_LIBS
         wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1045.01.zip
         unzip twsapi_macunix.1045.01.zip -d twsapi
@@ -47,9 +46,8 @@ jobs:
         python setup.py sdist
         python setup.py bdist_wheel
         pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
-    - name: Install main package and run tests
-      run: |
-        source ~/$VENV_NAME/bin/activate
+    
+        echo "Install main package and run tests"      
         cd $HOME
         git clone git@github.com:alphaville76/sharadar_db_bundle.git
         cd $HOME/sharadar_db_bundle
