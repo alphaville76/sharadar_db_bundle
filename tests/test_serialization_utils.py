@@ -1,6 +1,5 @@
 import os
 import tempfile
-import pytest
 from sharadar.util.serialization_utils import load_context, store_context
 
 

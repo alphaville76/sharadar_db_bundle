@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from sharadar.statistic.ann import NeuralNetwork
 
 

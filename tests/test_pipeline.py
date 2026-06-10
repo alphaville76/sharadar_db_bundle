@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, patch
-from sharadar.pipeline.pipeline import Pipeline, ExecutionPlan
+from unittest.mock import MagicMock
+from sharadar.pipeline.pipeline import Pipeline
 
 
 class TestPipeline:

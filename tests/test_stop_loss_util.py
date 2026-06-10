@@ -1,6 +1,4 @@
-import pytest
-import numpy as np
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from sharadar.util.stop_loss_util import compute_portfolio_return
 
 

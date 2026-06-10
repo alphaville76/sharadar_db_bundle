@@ -1,7 +1,6 @@
 import pytest
 import numpy as np
-import pandas as pd
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from zipline.assets.asset_db_schema import metadata as asset_metadata
 from zipline.assets import ASSET_DB_VERSION

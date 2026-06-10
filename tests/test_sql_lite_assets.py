@@ -1,9 +1,6 @@
 import pytest
 import pandas as pd
 from sharadar.data.sql_lite_assets import SQLiteAssetFinder
-from zipline.assets.asset_db_schema import metadata
-from zipline.assets import ASSET_DB_VERSION
-from sqlalchemy import create_engine
 
 
 @pytest.fixture

@@ -1,4 +1,3 @@
-import pytest
 from sharadar.util.calendar_util import last_trading_date
 
 

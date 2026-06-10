@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 from sharadar.statistic.preprocess import normalize, winsorize_iqr
 
 

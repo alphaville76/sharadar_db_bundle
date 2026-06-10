@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from sharadar.statistic.hurst import (
     _get_RS, get_RS, get_window_sizes, compute_hurst
 )
