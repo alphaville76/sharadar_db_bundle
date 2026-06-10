@@ -1,10 +1,15 @@
+# Patch before any other imports
+import warnings
+
+# Suppress the co_lnotab deprecation warning from zipline.utils.preprocess
+warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*co_lnotab.*')
+
 import pytest
 import numpy as np
 from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from zipline.assets.asset_db_schema import metadata as asset_metadata
 from zipline.assets import ASSET_DB_VERSION
-
 
 @pytest.fixture
 def asset_db_engine():
@@ -17,7 +22,6 @@ def asset_db_engine():
         )
         conn.commit()
     return engine
-
 
 @pytest.fixture
 def mock_asset_finder():

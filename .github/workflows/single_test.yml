@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9.16]
+        python-version: [3.13]
 
     steps:
     - uses: actions/checkout@v2
@@ -16,15 +16,14 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Setup env
+    - name: Setup virtual env
       run: |
+        export PYTHON_VERSION=${{ matrix.python-version }}
+        export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
+        virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
+        source ~/$VENV_NAME/bin/activate
         python -m pip install --upgrade pip
-        export INSTALL_DIR="~/dev/sharadar_db_bundle"
-        mkdir -p $INSTALL_DIR
-        cd $INSTALL_DIR
-        python -m pip install --upgrade pip
-        pip install pytest
-        export PYTHON_LIBS=$(python -c "import sys;print(sys.path[-1])")
+        export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
     - name: Install TA lib
       run: |
         cd $PYTHON_LIBS
@@ -35,39 +34,24 @@ jobs:
         ./configure
         make
         sudo make install
-        sudo ldconfig
-    - name: Install zipline-trader and deps
-      run: |
-        cd $PYTHON_LIBS
-        git clone https://github.com/shlomikushchi/zipline-trader.git
-        cd zipline-trader
-        pip install wheel
-        pip install -r etc/requirements_build.in
-        export DISABLE_BCOLZ_AVX2=true
-        pip install --no-binary=bcolz -e .[all] -r etc/requirements_blaze.in
     - name: Install TWS api
       run: |
         cd $PYTHON_LIBS
-        wget https://interactivebrokers.github.io/downloads/twsapi_macunix.976.01.zip
-        unzip twsapi_macunix.976.01.zip -d twsapi
+        wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1045.01.zip
+        unzip twsapi_macunix.1045.01.zip -d twsapi
+        rm twsapi_macunix.1045.01.zip
         cd twsapi/IBJts/source/pythonclient
-        python setup.py install
-    - name: Install main package
-      env:
-        NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
+        pip install wheel
+        python setup.py sdist
+        python setup.py bdist_wheel
+        pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
+    - name: Install main package and run tests
       run: |
-        pip install memoization singleton_decorator nasdaqdatalink pyfolio mailjet_rest
-        pip install pandas==0.22.0
-        mkdir ~/log
-        cd $PYTHON_LIBS
-        git clone https://github.com/alphaville76/sharadar_db_bundle.git
-        cd sharadar_db_bundle
-        python setup.py install
-        cp -r .zipline ~
-        #python sharadar/loaders/ingest_sharadar.py 2020-01-01 2020-01-10
-        #python test/basic_pipeline_test.py
-    #- name: Unit-tests
-    #  env:
-    #    NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
-    #  run: |
-    #    pytest
+        cd $HOME
+        git clone git@github.com:alphaville76/sharadar_db_bundle.git
+        cd $HOME/sharadar_db_bundle
+        pip install -r requirements.txt
+        python setup.py sdist
+        python setup.py bdist_wheel
+        pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
+        python -m pytest -q
