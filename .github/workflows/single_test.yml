@@ -43,15 +43,13 @@ jobs:
         unzip twsapi_macunix.1045.01.zip -d twsapi
         rm twsapi_macunix.1045.01.zip
         cd twsapi/IBJts/source/pythonclient
-        pip install wheel setuptools
-        python setup.py sdist
-        python setup.py bdist_wheel
+        pip install wheel setuptools build
+        python -m build
         pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
     
         echo "Install main package and run tests"     
         cd $PROJECT_HOME
         pip install -r requirements.txt
-        python setup.py sdist
-        python setup.py bdist_wheel
+        python -m build
         pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
         python -m pytest -q
