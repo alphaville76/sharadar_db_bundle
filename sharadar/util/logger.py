@@ -7,6 +7,7 @@ from os import environ as env
 from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
 from sharadar.util.mail import send_mail
 from zipline.api import get_datetime
+from pathlib import Path
 
 # log in local time
 set_datetime_format("local")
@@ -19,9 +20,9 @@ class SharadarDbBundleLogger(Logger):
         super().__init__(logname, level)
 
         now = datetime.datetime.now()
+
         log_dir = os.path.join(env["HOME"], "log")
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
 
         self.filename = os.path.join(env["HOME"], "log",
                                    "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
