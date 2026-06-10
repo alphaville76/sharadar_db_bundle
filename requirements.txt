@@ -85,7 +85,6 @@ scipy==1.14.1
 seaborn==0.13.2
 setuptools==82.0.1
 setuptools-scm==10.0.5
-sharadar_db_bundle @ file:///home/ccerbo/sharadar_db_bundle/dist/sharadar_db_bundle-3.0-py3-none-any.whl#sha256=575a403746ab424ffef44501d8531d3b0506b42cfbd5eb6fb26defd17e390163
 six==1.16.0
 sortedcontainers==2.4.0
 soupsieve==2.5
