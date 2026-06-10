@@ -19,6 +19,10 @@ class SharadarDbBundleLogger(Logger):
         super().__init__(logname, level)
 
         now = datetime.datetime.now()
+        log_dir = os.path.join(env["HOME"], "log")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
         self.filename = os.path.join(env["HOME"], "log",
                                    "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
 
