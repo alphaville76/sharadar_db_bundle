@@ -44,7 +44,7 @@ def lookup_related_tickers(sharadar_metadata_df, related, ticker):
     related_metadata = sharadar_metadata_df.loc[related_index]
     # only in 'Domestic', 'Domestic Primary'
     result = related_metadata[related_metadata['category'].isin(['Domestic', 'Domestic Primary'])]['permaticker']
-    return int(result[0]) if len(result) > 0 else -1
+    return int(result.iloc[0]) if len(result) > 0 else -1
 
 
 def lookup_sid(sharadar_metadata_df, related, ticker):
