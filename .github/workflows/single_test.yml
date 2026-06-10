@@ -26,6 +26,7 @@ jobs:
         export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
     - name: Install TA lib
       run: |
+        source ~/$VENV_NAME/bin/activate
         cd $PYTHON_LIBS
         wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
         tar xvfz ta-lib-0.4.0-src.tar.gz
@@ -36,17 +37,19 @@ jobs:
         sudo make install
     - name: Install TWS api
       run: |
+        source ~/$VENV_NAME/bin/activate
         cd $PYTHON_LIBS
         wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1045.01.zip
         unzip twsapi_macunix.1045.01.zip -d twsapi
         rm twsapi_macunix.1045.01.zip
         cd twsapi/IBJts/source/pythonclient
-        pip install wheel
+        pip install wheel setuptools
         python setup.py sdist
         python setup.py bdist_wheel
         pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
     - name: Install main package and run tests
       run: |
+        source ~/$VENV_NAME/bin/activate
         cd $HOME
         git clone git@github.com:alphaville76/sharadar_db_bundle.git
         cd $HOME/sharadar_db_bundle
