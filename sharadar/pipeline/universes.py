@@ -1,5 +1,4 @@
 import sqlite3
-from collections import namedtuple
 from contextlib import closing
 
 import numpy as np

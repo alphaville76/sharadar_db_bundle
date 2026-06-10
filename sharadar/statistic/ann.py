@@ -1,9 +1,5 @@
 import numpy as np
-import time
-import numpy as np
-import pandas as pd
 from scipy import optimize
-from sharadar.util.logger import log
 
 
 class NeuralNetwork(object):

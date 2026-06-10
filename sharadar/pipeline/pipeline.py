@@ -2,7 +2,6 @@ from zipline.pipeline import Pipeline as ZiplinePipeline
 from zipline.pipeline import Filter
 from zipline.pipeline import ExecutionPlan as ZiplineExecutionPlan
 from zipline.pipeline.domain import GENERIC, Domain
-from collections import namedtuple
 
 from zipline.utils.input_validation import expect_types, optional
 

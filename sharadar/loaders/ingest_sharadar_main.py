@@ -1,3 +1,4 @@
+import pandas as pd
 from sharadar.loaders.ingest_sharadar import _ingest
 from exchange_calendars import get_calendar
 

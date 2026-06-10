@@ -525,7 +525,7 @@ class IBBroker(Broker):
                     lambda: ib_symbol in self._tws.bars,
                     timeout=_max_wait_subscribe,
                     step=_poll_frequency)
-            except polling.TimeoutException as te:
+            except polling.TimeoutException:
                 log.warning('Cannot subscribe market data for %s.' % ib_symbol)
             else:
                 log.debug("Subscription completed")
@@ -942,11 +942,11 @@ class IBBroker(Broker):
                     continue
 
                 try:
-                    commission = self._tws.commissions[ib_order_id][exec_id].commission
+                    _commission = self._tws.commissions[ib_order_id][exec_id].commission
                 except KeyError:
                     log.warning(
                         "Commission not found for execution: {}".format(exec_id))
-                    commission = 0
+                    _commission = 0
 
                 exec_detail = execution['exec_detail']
                 is_buy = order.amount > 0

@@ -8,7 +8,6 @@ import pandas as pd
 import warnings
 from functools import partial
 
-from exchange_calendars.exchange_calendar_xnys import XNYSExchangeCalendar
 from sharadar.pipeline.engine import *
 from sharadar.util.logger import log
 

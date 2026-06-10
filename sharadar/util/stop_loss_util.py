@@ -1,4 +1,3 @@
-import numpy as np
 import time
 from sharadar.util.performance import print_portfolio
 from zipline.api import order_target, get_open_orders

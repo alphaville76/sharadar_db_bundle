@@ -15,7 +15,7 @@ import time
 import gc
 import psutil
 import datetime
-from sharadar.pipeline.engine import symbol, symbols, returns
+from sharadar.pipeline.engine import symbol, returns
 import warnings
 
 DATETIME_FMT = '%Y-%m-%d_%H%M'
@@ -435,7 +435,6 @@ def print_portfolio(log, context):
         log.info('Portfolio value: %.2f' % context.portfolio.portfolio_value)
 
 if __name__ == "__main__":
-    import warnings
     warnings.filterwarnings('ignore')
     algo_file = '../../algo/cluster/clusters13g.py'
 

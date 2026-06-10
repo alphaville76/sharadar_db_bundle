@@ -11,8 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os.path
-import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from sharadar.util.logger import log
 import pandas as pd
 from dateutil.relativedelta import relativedelta

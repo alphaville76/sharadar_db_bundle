@@ -23,7 +23,6 @@ from zipline.utils.run_algo import BenchmarkSpec
 from sharadar.util.run_algo import _run, load_extensions
 from zipline.extensions import create_args
 from sharadar.live import brokers
-from importlib import import_module
 
 try:
     # noinspection PyUnresolvedReferences
@@ -370,7 +369,7 @@ def run(ctx,
 
     trading_calendar = get_calendar(trading_calendar, start=pd.Timestamp('2000-01-01 00:00:00'))
 
-    benchmark_spec = BenchmarkSpec.from_cli_params(
+    _benchmark_spec = BenchmarkSpec.from_cli_params(
         no_benchmark=no_benchmark,
         benchmark_sid=benchmark_sid,
         benchmark_symbol=benchmark_symbol,

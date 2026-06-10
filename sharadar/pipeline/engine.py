@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import os
 from os.path import exists
 

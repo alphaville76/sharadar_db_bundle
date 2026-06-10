@@ -1,4 +1,3 @@
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.factors import CustomFactor, DailyReturns
 from zipline.utils.numpy_utils import object_dtype
 from zipline.pipeline.factors import AverageDollarVolume
-from sharadar.pipeline.engine import history, returns
+from sharadar.pipeline.engine import returns
 from sharadar.util.logger import log
 
 

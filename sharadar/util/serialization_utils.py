@@ -1,5 +1,4 @@
 import pickle
-import json
 
 def load_context(state_file_path, context):
     with open(state_file_path, 'rb') as f:
@@ -22,7 +21,6 @@ def store_context(state_file_path, context):
 
 
 if __name__ == '__main__':
-    import sys
 
     print("Enter file path:")
     #context_file_path = str(input())

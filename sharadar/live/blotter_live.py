@@ -11,15 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict
-from copy import copy
 
-from six import itervalues, iteritems
+from six import itervalues
 
 from zipline.assets import Equity, Future, Asset
 from zipline.finance.blotter.blotter import Blotter
-from zipline.extensions import register
-from zipline.finance.order import Order
 from zipline.finance.slippage import (
     DEFAULT_FUTURE_VOLUME_SLIPPAGE_BAR_LIMIT,
     VolatilityVolumeShare,
@@ -32,7 +28,6 @@ from zipline.finance.commission import (
     PerShare,
 )
 from zipline.utils.input_validation import expect_types
-import pandas as pd
 from sharadar.util.logger import log
 
 class BlotterLive(Blotter):

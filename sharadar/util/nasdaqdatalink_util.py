@@ -1,7 +1,6 @@
 from io import BytesIO
 from zipfile import ZipFile
 
-import numpy as np
 import pandas as pd
 import nasdaqdatalink
 import requests

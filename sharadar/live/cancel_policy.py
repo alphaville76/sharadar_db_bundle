@@ -20,13 +20,13 @@ def cancel_orders_eod(context, data):
         context.canceled_orders.clear()
 
     for security, open_orders in list(get_open_orders().items()):
-        for order in open_orders:
-            if order.sid in context.canceled_orders:
-                context.canceled_orders[order.sid] += order.amount - order.filled
+        for o in open_orders:
+            if o.sid in context.canceled_orders:
+                context.canceled_orders[o.sid] += o.amount - o.filled
             else:
-                context.canceled_orders[order.sid] = order.amount - order.filled
+                context.canceled_orders[o.sid] = o.amount - o.filled
 
-            cancel_order(order)
+            cancel_order(o)
 
 
 def resubmit_canceled_orders(context, data):

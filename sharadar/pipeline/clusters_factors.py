@@ -1,12 +1,9 @@
 import pandas as pd
 from zipline.pipeline import Pipeline, CustomFactor
 from zipline.pipeline.data import USEquityPricing
-from sharadar.pipeline.engine import load_sharadar_bundle, symbol, symbols, make_pipeline_engine
+from sharadar.pipeline.engine import symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
-import time
-import datetime
-from zipline.pipeline.factors import Latest
-from sharadar.pipeline.factors import MarketCap, EV, Fundamentals, FundamentalsTTM, Previous, StdDev, Beta, Sector
+from sharadar.pipeline.factors import MarketCap, Fundamentals, FundamentalsTTM, Previous, StdDev, Beta, Sector
 import numpy as np
 from zipline.pipeline.factors import Returns, DailyReturns
 from zipline.pipeline.factors import AverageDollarVolume
