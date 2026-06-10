@@ -14,7 +14,6 @@ import os.path
 from datetime import timedelta
 from sharadar.util.logger import log
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 
 from zipline.utils.math_utils import tolerant_equals, round_if_near_integer
 from sharadar.live.blotter_live import BlotterLive
@@ -197,7 +196,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         asset = super(self.__class__, self).symbol(symbol_str)
         tradeable_asset = asset.to_dict()
-        end_date = (pd.Timestamp.utcnow() + relativedelta(years=10)).normalize().tz_localize(None)
+        end_date = (pd.Timestamp.utcnow() + timedelta(days=365*10)).normalize().tz_localize(None)
         tradeable_asset['end_date'] = end_date
         tradeable_asset['auto_close_date'] = end_date
 

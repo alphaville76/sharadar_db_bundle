@@ -5,11 +5,20 @@ def normalize(data_nostd):
     """
     Transform features by scaling each feature to a [0, 1] range
     """
-    data = data_nostd / np.nanstd(data_nostd, axis=0)
+    std = np.nanstd(data_nostd, axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        data = data_nostd / std
+    data = np.where(np.isfinite(data), data, 0)
+    
     min = data.min(axis=0)
     max = data.max(axis=0)
-
-    return (data - min) / (max - min)
+    
+    range_vals = max - min
+    with np.errstate(divide="ignore", invalid="ignore"):
+        result = (data - min) / range_vals
+    result = np.where(np.isfinite(result), result, 0)
+    
+    return result
 
 
 def winsorize_iqr(df, mult=1.5):
