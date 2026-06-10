@@ -34,9 +34,9 @@ class TestIBBroker(WithSimParams,
     @staticmethod
     def _tws_bars():
         with patch('sharadar.live.brokers.ib_broker.TWSConnection.start'):
-            tws = TWSConnection("localhost:9999:1111")
+            tws = TWSConnection("localhost:9999:1111", "TEST-123")
+            tws.start()
 
-        tws.start()
 
         tws._add_bar('SPY', 12.4, 10, pd.to_datetime('2017-09-27 10:30:00', utc=True))
         tws._add_bar('SPY', 12.41, 10, pd.to_datetime('2017-09-27 10:30:40', utc=True))
@@ -101,7 +101,7 @@ class TestIBBroker(WithSimParams,
                             pd.to_datetime('2017-06-16 10:30:30', utc=True),
                             pd.to_datetime('2017-06-17 10:31:9', utc=True)]
         index = pd.DatetimeIndex(last_trade_times)
-        broker = IBBroker(sentinel.tws_uri)
+        broker = IBBroker(sentinel.tws_uri, account_id="TEST-123")
         tws.return_value.bars = {asset.symbol: pd.DataFrame(
             index=index, data=bars)}
 
@@ -127,7 +127,7 @@ class TestIBBroker(WithSimParams,
         bars = self._tws_bars()
 
         with patch('sharadar.live.brokers.ib_broker.TWSConnection'):
-            broker = IBBroker(sentinel.tws_uri)
+            broker = IBBroker(sentinel.tws_uri, account_id="TEST-123")
             broker._tws.bars = bars
 
         assets = (self.asset_finder.retrieve_asset(1),
@@ -299,7 +299,7 @@ class TestIBBroker(WithSimParams,
         broker._tws.orderStatus(ib_order_id,
                                 status, filled, remaining, avg_fill_price,
                                 perm_id, parent_id, last_fill_price, client_id,
-                                why_held)
+                                why_held, mkt_cap=0.0)
 
         assert len(broker.orders) == 1
         zp_order = list(broker.orders.values())[-1]
@@ -380,7 +380,7 @@ class TestIBBroker(WithSimParams,
         broker._tws.orderStatus(ib_order_id, status='Cancelled', filled=0,
                                 remaining=4, avg_fill_price=0.0, perm_id=4,
                                 parent_id=4, last_fill_price=0.0, client_id=32,
-                                why_held='')
+                                why_held='', mkt_cap=0.0)
         assert not broker.transactions
         assert len(broker.orders) == 1
         assert not broker.orders[order.id].open
@@ -388,7 +388,7 @@ class TestIBBroker(WithSimParams,
         broker._tws.orderStatus(ib_order_id, status='Inactive', filled=0,
                                 remaining=4, avg_fill_price=0.0, perm_id=4,
                                 parent_id=4, last_fill_price=0.0,
-                                client_id=1111, why_held='')
+                                client_id=1111, why_held='', mkt_cap=0.0)
         assert not broker.transactions
         assert len(broker.orders) == 1
         assert not broker.orders[order.id].open
@@ -413,11 +413,11 @@ class TestIBBroker(WithSimParams,
                                     filled=int(fabs(amount)), remaining=0,
                                     avg_fill_price=111, perm_id=0, parent_id=1,
                                     last_fill_price=112, client_id=1111,
-                                    why_held='')
+                                    why_held='', mkt_cap=0.0)
             contract = self._create_contract(str(asset.symbol))
             (shares, cum_qty, price, avg_price, exec_time, exec_id) = \
                 (int(fabs(amount)), int(fabs(amount)), 12.3, 12.31,
-                 pd.to_datetime('now', utc=True), order_count)
+                 '20210315 14:20:00', order_count)
             exec_detail = self._create_exec_detail(
                 order.broker_order_id, shares, cum_qty,
                 price, avg_price, exec_time, exec_id)

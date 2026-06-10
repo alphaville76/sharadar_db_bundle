@@ -251,7 +251,7 @@ class TWSConnection(EWrapper, EClient):
         if symbol not in self.bars:
             self.bars[symbol] = bar
         else:
-            self.bars[symbol] = self.bars[symbol].append(bar)
+            self.bars[symbol] = pd.concat([self.bars[symbol], bar])
 
     def tickPrice(self, ticker_id, field, price, can_auto_execute):
         self._process_tick(ticker_id, tick_type=field, value=price)
@@ -985,7 +985,7 @@ class IBBroker(Broker):
                 return last_event_time or pd.NaT
 
             minute_df = bars.between_time(minute_start, minute_end,
-                                          include_start=True, include_end=True)
+                                          inclusive="both")
             if minute_df.empty:
                 return np.NaN
             else:

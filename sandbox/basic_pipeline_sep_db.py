@@ -96,7 +96,6 @@ assert stocks.iloc[0]['ev']              == 1475010300000
 assert stocks.iloc[0]['mkt_cap']         == 1406489300000
 assert stocks.iloc[0]['sharefactor_arq'] == 1.00
 
-#TODO check the factor 17501920000/4375480000=4
 #assert stocks.iloc[0]['sharesbas_arq']   == 4375480000
 
 

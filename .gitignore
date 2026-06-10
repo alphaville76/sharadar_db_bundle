@@ -100,3 +100,4 @@ algo/
 /notebook/Haugen Regressions*
 /notebook/sandbox/*
 *.state
+*.iml
