@@ -20,6 +20,7 @@ jobs:
       run: |
         echo "Setup virtual env"
         pwd
+        echo $HOME
         ls -la
         export PYTHON_VERSION=${{ matrix.python-version }}
         export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
@@ -49,7 +50,8 @@ jobs:
         python setup.py bdist_wheel
         pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
     
-        echo "Install main package and run tests"      
+        echo "Install main package and run tests"     
+        ch $HOME
         pip install -r requirements.txt
         python setup.py sdist
         python setup.py bdist_wheel
