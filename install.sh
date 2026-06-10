@@ -3,7 +3,7 @@ sudo dnf install -y systemd-devel python3.13
 
 export PYTHON_VERSION=3.13
 export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
-virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
+python -m venv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
 python -m pip install --upgrade pip
 export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
