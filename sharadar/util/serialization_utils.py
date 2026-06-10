@@ -23,8 +23,7 @@ def store_context(state_file_path, context):
 if __name__ == '__main__':
 
     print("Enter file path:")
-    #context_file_path = str(input())
-    context_file_path = '/home/c.cerbo/zipline-reloaded-venv3.9/lib/python3.9/site-packages/sharadar_db_bundle/algo/cluster/clusters13g.state'
+    context_file_path = str(input())
     with open(context_file_path, 'rb') as f:
         context = pickle.load(f)
 

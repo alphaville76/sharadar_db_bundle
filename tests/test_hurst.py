@@ -41,12 +41,12 @@ class TestGetRSMultiple:
 
 class TestGetWindowSizes:
     def test_returns_array(self):
-        sizes = get_window_sizes()
+        sizes = get_window_sizes(np.random.randn(256))
         assert len(sizes) > 0
         assert all(s > 0 for s in sizes)
 
     def test_sizes_increasing(self):
-        sizes = get_window_sizes()
+        sizes = get_window_sizes(np.random.randn(256))
         for i in range(1, len(sizes)):
             assert sizes[i] > sizes[i-1]
 

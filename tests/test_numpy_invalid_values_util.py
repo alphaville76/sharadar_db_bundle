@@ -27,7 +27,7 @@ class TestNansubtract:
 
     def test_negative_inf_in_b_gives_nan(self):
         a = np.array([5.0, 10.0])
-        b = np.array([np.NINF, 2.0])
+        b = np.array([-np.inf, 2.0])
         result = nansubtract(a, b)
         assert np.isnan(result[0])
         assert result[1] == 8.0

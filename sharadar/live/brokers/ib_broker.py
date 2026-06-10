@@ -22,7 +22,6 @@ from time import sleep
 from math import fabs
 
 from sharadar.live.brokers.ib_execution import TWSOrder
-from six import iteritems
 import polling
 import pandas as pd
 import numpy as np
@@ -40,9 +39,11 @@ from zipline.protocol import MutableView
 from zipline.api import symbol as symbol_lookup
 from zipline.errors import SymbolNotFound
 from ibapi.client import EClient
-from ibapi.wrapper import EWrapper, TickTypeEnum
+from ibapi.wrapper import EWrapper
+from ibapi.ticktype import TickTypeEnum
 from ibapi.contract import Contract
 from ibapi.order import Order
+from ibapi.client import OrderCancel
 from ibapi.execution import ExecutionFilter
 
 from sharadar.util.logger import log
@@ -74,7 +75,7 @@ def log_message(message, mapping):
 
 def _method_params_to_dict(args):
     return {k: v
-            for k, v in iteritems(args)
+            for k, v in args.items()
             if k != 'self'}
 
 
@@ -105,7 +106,7 @@ class TWSConnection(EWrapper, EClient):
         self.bars = {}
         # accounts structure: accounts[account_id][currency][value]
         self.accounts = defaultdict(
-            lambda: defaultdict(lambda: defaultdict(lambda: np.NaN)))
+            lambda: defaultdict(lambda: defaultdict(lambda: np.nan)))
         self.accounts_download_complete = False
         self.ib_positions = {}
         self.open_orders = {}
@@ -403,21 +404,22 @@ class TWSConnection(EWrapper, EClient):
         self.unrecoverable_error = True
         log.info("IB Connection closed")
 
-    def error(self, reqId=None, error_code=None, error_msg=None, error_json=""):
-        if isinstance(reqId, Exception):
-            log.exception(reqId)
+
+    def error(self, req_id=None, error_time =None, error_code=None, error_msg=None, error_json=""):
+        if isinstance(req_id, Exception):
+            log.exception(req_id)
             return
 
         if error_code in (502, 503, 326):
             # 502: Couldn't connect to TWS.
             # 503: The TWS is out of date and must be upgraded.
-            # 326: Unable connect as the client id is already in use.
+            # 326: Unable to connect as the client id is already in use.
             self.unrecoverable_error = True
 
         if error_code < 1000:
-            log.error("[{}] {} {} (reqId: {})".format(error_code, error_msg, error_json, reqId))
+            log.error("[{}] {} {} (req_id: {})".format(error_code, error_msg, error_json, req_id))
         else:
-            log.info("[{}] {} {} (reqId: {})".format(error_code, error_msg, error_json, reqId))
+            log.info("[{}] {} {} (req_id: {})".format(error_code, error_msg, error_json, req_id))
 
     def updateMktDepth(self, ticker_id, position, operation, side, price,
                        size):
@@ -641,7 +643,10 @@ class IBBroker(Broker):
         return self._to_ib_symbol(str(asset.symbol))
 
     @staticmethod
-    def _safe_symbol_lookup(ib_symbol):
+    def _safe_symbol_lookup(ib_symbol: str):
+        if not ib_symbol:
+            return None
+
         try:
             symbol = ib_symbol.replace(' ', '.')
             return symbol_lookup(symbol)
@@ -925,7 +930,7 @@ class IBBroker(Broker):
     def _update_transactions(self):
         all_orders = list(self.orders.values())
 
-        for ib_order_id, executions in iteritems(self._tws.executions):
+        for ib_order_id, executions in self._tws.executions.items():
             orders = [order
                       for order in all_orders
                       if order.broker_order_id == ib_order_id]
@@ -937,16 +942,9 @@ class IBBroker(Broker):
             assert len(orders) == 1
             order = orders[0]
 
-            for exec_id, execution in iteritems(executions):
+            for exec_id, execution in executions.items():
                 if exec_id in self._transactions:
                     continue
-
-                try:
-                    _commission = self._tws.commissions[ib_order_id][exec_id].commission
-                except KeyError:
-                    log.warning(
-                        "Commission not found for execution: {}".format(exec_id))
-                    _commission = 0
 
                 exec_detail = execution['exec_detail']
                 is_buy = order.amount > 0
@@ -963,7 +961,7 @@ class IBBroker(Broker):
 
     def cancel_order(self, zp_order_id):
         ib_order_id = self.orders[zp_order_id].broker_order_id
-        self._tws.cancelOrder(ib_order_id, "")
+        self._tws.cancelOrder(ib_order_id, OrderCancel())
 
     def get_spot_value(self, asset, field, dt, data_frequency):
         self.subscribe_to_market_data(asset)
@@ -977,7 +975,7 @@ class IBBroker(Broker):
         minute_end = last_event_time.time()
 
         if bars.empty:
-            return pd.NaT if field == 'last_traded' else np.NaN
+            return pd.NaT if field == 'last_traded' else np.nan
         else:
             if field == 'price':
                 return bars.last_trade_price.iloc[-1]
@@ -987,7 +985,7 @@ class IBBroker(Broker):
             minute_df = bars.between_time(minute_start, minute_end,
                                           inclusive="both")
             if minute_df.empty:
-                return np.NaN
+                return np.nan
             else:
                 if field == 'open':
                     return minute_df.last_trade_price.iloc[0]

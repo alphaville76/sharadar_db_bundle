@@ -38,7 +38,7 @@ pip install -r requirements.txt
 python setup.py sdist
 python setup.py bdist_wheel
 pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
-
+python -m pytest -q
 
 if [ "$?" -eq 0 ]
 then

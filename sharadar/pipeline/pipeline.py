@@ -3,11 +3,10 @@ from zipline.pipeline import Filter
 from zipline.pipeline import ExecutionPlan as ZiplineExecutionPlan
 from zipline.pipeline.domain import GENERIC, Domain
 
-from zipline.utils.input_validation import expect_types, optional
 
 class ExecutionPlan(ZiplineExecutionPlan):
 
-    def __init__(self, domain, terms, start_date, end_date, screen_name, min_extra_rows=0):
+    def __init__(self, domain: Domain, terms, start_date, end_date, screen_name, min_extra_rows=0):
         super().__init__(domain, terms, start_date, end_date, min_extra_rows)
         self._screen_name = screen_name
 
@@ -18,12 +17,20 @@ class ExecutionPlan(ZiplineExecutionPlan):
 
 class Pipeline(ZiplinePipeline):
 
-    @expect_types(columns=optional(dict), screen=optional(tuple), domain=Domain)
     def __init__(self, columns=None, screen=None, domain=GENERIC):
-        if not (isinstance(screen[0], str) and isinstance(screen[1], Filter)):
-            raise TypeError("screen must be a (str, Filter) tuple")
-        super().__init__(columns, screen[1], domain)
-        self.screen_name = "screen_default" if screen is None else screen[0]
+        if screen is None:
+            super().__init__(columns, None, domain)
+            self.screen_name = "screen_default"
+        elif isinstance(screen, tuple):
+            if not (isinstance(screen[0], str) and isinstance(screen[1], Filter)):
+                raise TypeError("screen must be a (str, Filter) tuple")
+            super().__init__(columns, screen[1], domain)
+            self.screen_name = screen[0]
+        elif isinstance(screen, Filter):
+            super().__init__(columns, screen, domain)
+            self.screen_name = "screen_default"
+        else:
+            raise TypeError("screen must be a (str, Filter) tuple or a Filter instance")
 
     def _prepare_graph_terms(self, default_screen):
         columns = self.columns.copy()

@@ -30,7 +30,7 @@ class DataPortalLive(DataPortal):
             return self.broker.get_spot_value(assets, field, dt, data_frequency)
         except:
             log.warn("Cannot get %s value for %s at %s" % (field, assets, dt.date()))
-            return pd.NaT if field == 'last_traded' else np.NaN
+            return pd.NaT if field == 'last_traded' else np.nan
 
 
     def get_history_window(self,
