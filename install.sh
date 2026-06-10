@@ -1,7 +1,7 @@
 #!/bin/bash
-sudo dnf install -y systemd-devel python3.9
+sudo dnf install -y systemd-devel python3.13
 
-export PYTHON_VERSION=3.9
+export PYTHON_VERSION=3.13
 export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
 virtualenv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
@@ -20,20 +20,20 @@ sudo make install
 
 # Install TWS api
 cd $PYTHON_LIBS
-wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1025.01.zip
-unzip twsapi_macunix.1025.01.zip -d twsapi
-rm twsapi_macunix.1025.01.zip
+wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1045.01.zip
+unzip twsapi_macunix.1045.01.zip -d twsapi
+rm twsapi_macunix.1045.01.zip
 cd twsapi/IBJts/source/pythonclient
 pip install wheel
 python setup.py sdist
 python setup.py bdist_wheel
-pip install --upgrade dist/ibapi-10.25.1-py3-none-any.whl
+pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
 
 # Install sharadar_db_bundle and its requirements
-cd $PYTHON_LIBS
+cd $HOME
 git clone git@github.com:alphaville76/algo.git
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
-cd $PYTHON_LIBS/sharadar_db_bundle
+cd $HOME/sharadar_db_bundle
 pip install -r requirements.txt
 python setup.py sdist
 python setup.py bdist_wheel
