@@ -8,10 +8,6 @@ from sharadar.pipeline.pipeline import ExecutionPlan, Pipeline
 
 class TestExecutionPlan:
     def test_screen_name_property(self):
-        _domain = GENERIC
-        _terms = {}
-        _start_date = "2023-01-01"
-        _end_date = "2023-12-31"
         screen_name = "my_screen"
 
         with patch.object(ExecutionPlan.__bases__[0], '__init__', return_value=None):
