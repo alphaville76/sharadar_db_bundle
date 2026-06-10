@@ -48,10 +48,7 @@ jobs:
         pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
     
         echo "Install main package and run tests"      
-        cd $HOME
-        git clone git@github.com:alphaville76/sharadar_db_bundle.git
-        cd $HOME/sharadar_db_bundle
-        pip install -r requirements.txt
+                pip install -r requirements.txt
         python setup.py sdist
         python setup.py bdist_wheel
         pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
