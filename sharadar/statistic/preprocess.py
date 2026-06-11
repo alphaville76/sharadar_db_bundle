@@ -5,18 +5,26 @@ def normalize(data_nostd):
     """
     Transform features by scaling each feature to a [0, 1] range
     """
+    # Preserve DataFrame index and columns if input is a DataFrame
+    is_df = isinstance(data_nostd, pd.DataFrame)
+    if is_df:
+        data_nostd = data_nostd.values
+
     std = np.nanstd(data_nostd, axis=0)
     with np.errstate(divide="ignore", invalid="ignore"):
         data = data_nostd / std
     data = np.where(np.isfinite(data), data, 0)
     
-    min = data.min(axis=0)
-    max = data.max(axis=0)
+    min_vals = data.min(axis=0)
+    max_vals = data.max(axis=0)
     
-    range_vals = max - min
+    range_vals = max_vals - min_vals
     with np.errstate(divide="ignore", invalid="ignore"):
-        result = (data - min) / range_vals
+        result = (data - min_vals) / range_vals
     result = np.where(np.isfinite(result), result, 0)
+    
+    if is_df:
+        result = pd.DataFrame(result, index=data_nostd.index, columns=data_nostd.columns)
     
     return result
 

@@ -6,7 +6,6 @@ from sharadar.util.output_dir import (
     SHARADAR_BUNDLE_DIR,
     SHARADAR_BUNDLE_NAME,
     create_data_dir,
-    get_cache_dir,
     get_data_dir,
 )
 
@@ -54,14 +53,3 @@ class TestGetDataDir:
         assert "sharadar" in result
         assert result.endswith(SHARADAR_BUNDLE_DIR)
 
-
-class TestGetCacheDir:
-    @patch("sharadar.util.output_dir.create_data_dir")
-    def test_path_includes_cache(self, mock_create_data_dir):
-        mock_create_data_dir.return_value = "/fake/path/sharadar"
-
-        result = get_cache_dir()
-
-        mock_create_data_dir.assert_called_once_with(SHARADAR_BUNDLE_NAME)
-        assert "cache" in result
-        assert result.endswith("cache")
