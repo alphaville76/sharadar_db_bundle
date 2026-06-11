@@ -84,6 +84,11 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
 
     log.info("perf_stats benchmark")
     benchmark_rets = returns([symbol('SPY')], rets.index[0], rets.index[-1])
+    # Ensure benchmark_rets has the same timezone as rets to avoid comparison warnings
+    if rets.index.tz is not None and benchmark_rets.index.tz is None:
+        benchmark_rets.index = benchmark_rets.index.tz_localize(rets.index.tz)
+    elif rets.index.tz is None and benchmark_rets.index.tz is not None:
+        benchmark_rets.index = benchmark_rets.index.tz_localize(None)
     benchmark_perf_stats = pf.timeseries.perf_stats(benchmark_rets)
 
     perf_stats_df = pd.DataFrame(perf_stats_series, columns=['Backtest'])

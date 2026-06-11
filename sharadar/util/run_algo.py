@@ -3,10 +3,8 @@ Created on the basis of ~/zipline/lib/python3.6/site-packages/zipline-trader/zip
 """
 import sys
 
-import click
 import pandas as pd
 import warnings
-from functools import partial
 
 from sharadar.pipeline.engine import *
 from sharadar.util.logger import log
@@ -239,7 +237,7 @@ def _run(handle_data,
             # Change start and end to now for live trading
             start = pd.Timestamp.today().normalize()
             if not trading_calendar.is_session(start.date()):
-                start = trading_calendar.next_open(start)
+                start = trading_calendar.next_open(start).normalize().tz_localize(None)
             end = start
 
 

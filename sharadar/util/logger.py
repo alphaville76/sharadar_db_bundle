@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 import os
 import subprocess
 import sys
@@ -10,9 +10,15 @@ from zipline.api import get_datetime
 from pathlib import Path
 
 # log in local time
-set_datetime_format("local")
+set_datetime_format('local')
 LOG_ENTRY_FMT = '[{record.time:%Y-%m-%d %H:%M:%S}] {record.level_name}: {record.message}'
 LOG_LEVEL_MAP = {'CRITICAL': 2, 'ERROR': 3, 'WARNING': 4, 'NOTICE': 5, 'INFO': 6, 'DEBUG': 7, 'TRACE': 7}
+
+
+def _get_log_dir():
+    '''Get the log directory, defaulting to current directory if HOME is not set.'''
+    home = env.get('HOME', env.get('USERPROFILE', '.'))
+    return os.path.join(home, 'log')
 
 
 class SharadarDbBundleLogger(Logger):
@@ -21,11 +27,11 @@ class SharadarDbBundleLogger(Logger):
 
         now = datetime.datetime.now()
 
-        log_dir = os.path.join(env["HOME"], "log")
+        log_dir = _get_log_dir()
         Path(log_dir).mkdir(parents=True, exist_ok=True)
 
-        self.filename = os.path.join(env["HOME"], "log",
-                                   "sharadar-zipline" + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log")
+        self.filename = os.path.join(log_dir,
+                                     'sharadar-zipline' + '_' + now.strftime('%Y-%m-%d_%H%M') + '.log')
 
         log_file_handler = FileHandler(self.filename, level=DEBUG, bubble=True)
         log_file_handler.format_string = LOG_ENTRY_FMT
@@ -38,23 +44,29 @@ class SharadarDbBundleLogger(Logger):
     def process_record(self, record):
         super().process_record(record)
         if os.name == 'posix':
-            msg = str(record.message).encode("unicode_escape").decode("utf-8")
-            msg = msg.replace('\n', ' ')
-            msg = msg.replace('"', "'")
-            cmd = 'echo "%s" | systemd-cat -t sharadar_db_bundle -p %d' % (msg, LOG_LEVEL_MAP[record.level_name])
-            subprocess.run(cmd, shell=True)
+            try:
+                msg = str(record.message).encode('unicode_escape').decode('utf-8')
+                msg = msg.replace('\n', ' ')
+                msg = msg.replace('"', "'")
+                cmd = ['systemd-cat', '-t', 'sharadar_db_bundle', '-p', str(LOG_LEVEL_MAP[record.level_name])]
+                subprocess.run(cmd, input=msg.encode(), capture_output=True)
+            except Exception:
+                pass  # Don't fail logging if systemd-cat is unavailable
 
 
 log = SharadarDbBundleLogger()
 
 
 class BacktestLogger(Logger):
-    def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET, record_time=get_datetime):
+    def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET, record_time=None):
         super().__init__(logname, level)
+
+        if record_time is None:
+            record_time = get_datetime
 
         path, ext = os.path.splitext(filename)
         now = datetime.datetime.now()
-        log_filename = path + '_' + now.strftime('%Y-%m-%d_%H%M') + ".log"
+        log_filename = path + '_' + now.strftime('%Y-%m-%d_%H%M') + '.log'
         file_handler = FileHandler(log_filename, level=DEBUG, bubble=True)
         file_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(file_handler)
@@ -67,24 +79,20 @@ class BacktestLogger(Logger):
         self.record_time = record_time
 
     def process_record(self, record):
-        """
-        use the date of the trading day for log purposes
-        """
+        '''Use the date of the trading day for log purposes.'''
         super().process_record(record)
         if self.arena == 'live' and record.level >= INFO:
-            send_mail(record.channel + " " + record.level_name, record.message)
+            send_mail(record.channel + ' ' + record.level_name, record.message)
         record.time = self.record_time()
 
 
 if __name__ == '__main__':
-    log = SharadarDbBundleLogger()
-    log.info("Hello World!")
-    log.error("ciao")
-    log.warning("ciao\nbello")
-
+    test_log = SharadarDbBundleLogger()
+    test_log.info('Hello World!')
+    test_log.error('ciao')
+    test_log.warning('ciao\nbello')
 
     import pandas as pd
     def log_time():
-        return pd.to_datetime("today")
-    BacktestLogger(__file__, arena='live', logname="Myname", record_time=log_time).warn("Hello World!")
-
+        return pd.to_datetime('today')
+    BacktestLogger(__file__, arena='live', logname='Myname', record_time=log_time).warn('Hello World!')

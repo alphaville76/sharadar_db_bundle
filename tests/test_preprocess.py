@@ -1,5 +1,6 @@
-import numpy as np
+﻿import numpy as np
 import pandas as pd
+import pytest
 from sharadar.statistic.preprocess import normalize, winsorize_iqr
 
 
@@ -29,6 +30,26 @@ class TestNormalize:
         result = normalize(data)
         assert result.shape == data.shape
 
+    def test_dataframe_preserves_structure(self):
+        df = pd.DataFrame({'a': [0.0, 5.0, 10.0], 'b': [10.0, 20.0, 30.0]}, 
+                          index=['x', 'y', 'z'])
+        result = normalize(df)
+        assert isinstance(result, pd.DataFrame)
+        assert list(result.columns) == ['a', 'b']
+        assert list(result.index) == ['x', 'y', 'z']
+
+    def test_with_nan_values(self):
+        data = np.array([0.0, np.nan, 10.0])
+        result = normalize(data)
+        assert not np.any(np.isinf(result))
+        # NaN handling should not cause infinite values
+
+    def test_dataframe_with_nan(self):
+        df = pd.DataFrame({'a': [1.0, np.nan, 3.0], 'b': [np.nan, 2.0, 3.0]})
+        result = normalize(df)
+        assert isinstance(result, pd.DataFrame)
+        assert result.shape == df.shape
+
 
 class TestWinsorizeIQR:
     def test_no_outliers(self):
@@ -53,3 +74,31 @@ class TestWinsorizeIQR:
         df = pd.DataFrame({'a': range(100), 'b': range(100)})
         result = winsorize_iqr(df)
         assert result.shape == df.shape
+
+    def test_with_nan_values(self):
+        df = pd.DataFrame({'a': [1.0, 2.0, np.nan, 4.0, 100.0]})
+        result = winsorize_iqr(df)
+        assert result.shape == df.shape
+        # Should not fail with NaN
+
+    def test_empty_dataframe(self):
+        df = pd.DataFrame({'a': []})
+        result = winsorize_iqr(df)
+        assert result.empty
+
+    def test_rejects_non_dataframe(self):
+        with pytest.raises(TypeError):
+            winsorize_iqr([1, 2, 3, 4, 5])
+
+    def test_rejects_numpy_array(self):
+        with pytest.raises(TypeError):
+            winsorize_iqr(np.array([1, 2, 3, 4, 5]))
+
+    def test_multiple_columns_with_different_outliers(self):
+        df = pd.DataFrame({
+            'a': [1, 2, 3, 4, 5, 6, 7, 8, 9, 100],
+            'b': [-50, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        })
+        result = winsorize_iqr(df)
+        assert result['a'].max() < 100
+        assert result['b'].min() > -50
