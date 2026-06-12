@@ -21,7 +21,7 @@ import sqlite3
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
 import traceback
 
-nasdaqdatalink.ApiConfig.api_key = env["NASDAQ_API_KEY"]
+nasdaqdatalink.ApiConfig.api_key = env.get("NASDAQ_API_KEY", "")
 
 
 def process_data_table(df):

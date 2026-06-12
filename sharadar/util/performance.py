@@ -441,7 +441,7 @@ def print_portfolio(log, context):
 
 if __name__ == "__main__":
     warnings.filterwarnings('ignore')
-    algo_file = '../../algo/cluster/clusters13g.py'
+    algo_file = '../../algo/cluster/clusters13g_ai.py'
 
     perf_dump_file = '../../algo/cluster/clusters13g.py2_2023-02-11_2331_perf.dump'
     perf = pd.read_pickle(perf_dump_file)
