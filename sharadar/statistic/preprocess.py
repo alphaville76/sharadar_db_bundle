@@ -1,12 +1,24 @@
-﻿import numpy as np
+"""Data preprocessing utilities for feature normalization and outlier handling.
+
+Provides functions for scaling features to [0, 1] range and winsorizing
+outliers using the interquartile range (IQR) method.
+"""
+import numpy as np
 import pandas as pd
 
 
 def normalize(data_nostd):
-    '''
-    Transform features by scaling each feature to a [0, 1] range.
+    """Transform features by scaling each feature to a [0, 1] range.
+
+    First divides by standard deviation, then applies min-max scaling.
     Handles NaN values by ignoring them during computation.
-    '''
+
+    Args:
+        data_nostd: Input data as a numpy array or pandas DataFrame.
+
+    Returns:
+        Normalized data scaled to [0, 1] range, same type as input.
+    """
     # Preserve DataFrame index and columns if input is a DataFrame
     is_df = isinstance(data_nostd, pd.DataFrame)
     if is_df:
@@ -34,10 +46,20 @@ def normalize(data_nostd):
 
 
 def winsorize_iqr(df, mult=1.5):
-    '''
-    Cap the outliers to the IQR theoretical lower/upper bounds.
-    Univariate winsorization that handles NaN values.
-    '''
+    """Cap outliers to the IQR theoretical lower/upper bounds.
+
+    Performs univariate winsorization column-wise, handling NaN values.
+
+    Args:
+        df: Input pandas DataFrame.
+        mult: IQR multiplier for computing bounds. Default is 1.5.
+
+    Returns:
+        DataFrame with outliers clipped to [Q1 - mult*IQR, Q3 + mult*IQR].
+
+    Raises:
+        TypeError: If input is not a pandas DataFrame.
+    """
     if not isinstance(df, pd.DataFrame):
         raise TypeError('Input must be a pandas DataFrame')
     

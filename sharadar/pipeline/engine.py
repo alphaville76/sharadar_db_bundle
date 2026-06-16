@@ -1,3 +1,9 @@
+"""Pipeline engine module for the Sharadar database bundle.
+
+Provides a caching pipeline engine, bundle loading utilities, asset lookup
+functions, and price/returns data retrieval for use with the Zipline pipeline API.
+"""
+
 import datetime
 import os
 from os.path import exists
@@ -26,12 +32,39 @@ from zipline.utils.date_utils import compute_date_range_chunks
 from functools import partial
 
 class BundlePipelineEngine(SimplePipelineEngine):
+    """Pipeline engine with filesystem caching for root masks and computed terms.
+    
+        Extends SimplePipelineEngine to add caching of intermediate pipeline
+        computations and root masks to disk, improving performance on repeated
+        pipeline runs over the same date ranges.
+        """
+    
     def __init__(self, get_loader, asset_finder, default_domain=US_EQUITIES, populate_initial_workspace=None,
                  default_hooks=None):
+        """Initialize the BundlePipelineEngine.
+        
+                Args:
+                    get_loader: Callable that returns a PipelineLoader for a given column.
+                    asset_finder: An AssetFinder instance for resolving assets.
+                    default_domain: The default pipeline domain. Defaults to US_EQUITIES.
+                    populate_initial_workspace: Optional callable to pre-populate workspace.
+                    default_hooks: Optional default pipeline hooks.
+                """
         super().__init__(get_loader, asset_finder, default_domain, populate_initial_workspace, default_hooks)
 
     def _compute_root_mask(self, domain, start_date, end_date, extra_rows):
 
+        """Compute the root mask with filesystem caching.
+        
+                Args:
+                    domain: The pipeline domain.
+                    start_date: Start date for the mask.
+                    end_date: End date for the mask.
+                    extra_rows: Number of extra rows needed for windowed computations.
+        
+                Returns:
+                    pd.DataFrame: Boolean mask of valid assets for each date.
+                """
         root_mask_filename = "root-%s_%s_%s_%s_%d.pkl" % (
             start_date.strftime("%Y-%m-%d"),
             end_date.strftime("%Y-%m-%d"),
@@ -52,6 +85,18 @@ class BundlePipelineEngine(SimplePipelineEngine):
         return root_mask
 
     def run_pipeline(self, pipeline, start_date, end_date=None, chunksize=120, hooks=None):
+        """Run a pipeline, optionally splitting execution into chunks.
+        
+                Args:
+                    pipeline: The Pipeline to run.
+                    start_date: Start date for the pipeline computation.
+                    end_date: End date. Defaults to start_date.
+                    chunksize: Number of days per chunk. If <= 1, no chunking is used.
+                    hooks: Optional list of pipeline hooks for progress reporting.
+        
+                Returns:
+                    pd.DataFrame: Computed pipeline results.
+                """
         if end_date is None:
             end_date = start_date
 
@@ -332,6 +377,16 @@ class BundlePipelineEngine(SimplePipelineEngine):
 
 
 def create_term_filename(dates, graph, term):
+    """Create a cache filename for a pipeline term.
+    
+        Args:
+            dates: DatetimeIndex of the computation dates.
+            graph: The pipeline execution graph.
+            term: The pipeline term to create a filename for.
+    
+        Returns:
+            str: A filename string for the cached term data.
+        """
     return "term-%s_%s_%s_%s.npy" % (
         dates[0].strftime("%Y-%m-%d"),
         dates[-1].strftime("%Y-%m-%d"),
@@ -341,6 +396,18 @@ def create_term_filename(dates, graph, term):
 
 
 def find_term_name(graph: TermGraph, term: Term):
+    """Find the output name of a term in the execution graph.
+    
+        Args:
+            graph: The pipeline TermGraph containing output mappings.
+            term: The Term to look up.
+    
+        Returns:
+            str: The name associated with the term in the graph outputs.
+    
+        Raises:
+            ValueError: If the term is not found in the graph outputs.
+        """
     for term_name, term_value in graph.outputs.items():
         if term_value == term:
             return term_name
@@ -348,16 +415,32 @@ def find_term_name(graph: TermGraph, term: Term):
 
 
 class BundleLoader:
+    """Mixin providing lazy-loaded access to the asset finder and bar reader.
+    
+        Caches the SQLiteAssetFinder and SQLiteDailyBarReader instances after
+        first access to avoid repeated initialization.
+        """
+    
     _asset_finder = None
     _bar_reader = None
 
     def asset_finder(self):
+        """Get the SQLiteAssetFinder instance, creating it if necessary.
+        
+                Returns:
+                    SQLiteAssetFinder: The asset finder for the Sharadar bundle.
+                """
         if self._asset_finder is None:
             self._asset_finder = _asset_finder()
 
         return self._asset_finder
 
     def bar_reader(self):
+        """Get the SQLiteDailyBarReader instance, creating it if necessary.
+        
+                Returns:
+                    SQLiteDailyBarReader: The daily bar reader for the Sharadar bundle.
+                """
         if self._bar_reader is None:
             self._bar_reader = _bar_reader()
 
@@ -365,6 +448,16 @@ class BundleLoader:
 
 
 def daily_equity_path(bundle_name, timestr, environ=None):
+    """Construct the filesystem path to the daily equity SQLite database.
+    
+        Args:
+            bundle_name: Name of the data bundle.
+            timestr: Timestamp directory string for the bundle version.
+            environ: Optional environment dict for path resolution.
+    
+        Returns:
+            str: Absolute path to the prices.sqlite file.
+        """
     return pth.data_path(
         (bundle_name, timestr, 'prices.sqlite'),
         environ=environ,
@@ -373,6 +466,16 @@ def daily_equity_path(bundle_name, timestr, environ=None):
 
 # @cached
 def load_sharadar_bundle(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
+    """Load the Sharadar data bundle as a BundleData instance.
+    
+        Args:
+            name: Bundle name. Defaults to SHARADAR_BUNDLE_NAME.
+            timestr: Bundle directory timestamp. Defaults to SHARADAR_BUNDLE_DIR.
+            environ: Environment dict for path resolution. Defaults to os.environ.
+    
+        Returns:
+            BundleData: Object containing asset finder, bar reader, and adjustment reader.
+        """
     return BundleData(
         asset_finder=SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ), ),
         equity_minute_bar_reader=None,
@@ -383,42 +486,114 @@ def load_sharadar_bundle(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR,
 
 # @cached
 def _asset_finder(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
+    """Create a SQLiteAssetFinder for the Sharadar bundle.
+    
+        Args:
+            name: Bundle name. Defaults to SHARADAR_BUNDLE_NAME.
+            timestr: Bundle directory timestamp. Defaults to SHARADAR_BUNDLE_DIR.
+            environ: Environment dict for path resolution. Defaults to os.environ.
+    
+        Returns:
+            SQLiteAssetFinder: Asset finder connected to the bundle database.
+        """
     return SQLiteAssetFinder(asset_db_path(name, timestr, environ=environ))
 
 
 # @cached
 def _bar_reader(name=SHARADAR_BUNDLE_NAME, timestr=SHARADAR_BUNDLE_DIR, environ=os.environ):
+    """Create a SQLiteDailyBarReader for the Sharadar bundle.
+    
+        Args:
+            name: Bundle name. Defaults to SHARADAR_BUNDLE_NAME.
+            timestr: Bundle directory timestamp. Defaults to SHARADAR_BUNDLE_DIR.
+            environ: Environment dict for path resolution. Defaults to os.environ.
+    
+        Returns:
+            SQLiteDailyBarReader: Daily bar reader connected to the bundle database.
+        """
     return SQLiteDailyBarReader(daily_equity_path(name, timestr, environ=environ))
 
 
 # @cached
 def symbol(ticker, as_of_date=None):
+    """Look up a single asset by ticker symbol.
+    
+        Args:
+            ticker: The ticker string to look up.
+            as_of_date: Optional date for point-in-time lookup.
+    
+        Returns:
+            Asset: The asset corresponding to the ticker.
+        """
     return _asset_finder().lookup_symbol(ticker, as_of_date)
 
 
 # @cached
 def symbols(tickers, as_of_date=None):
+    """Look up multiple assets by ticker symbols.
+    
+        Args:
+            tickers: Iterable of ticker strings to look up.
+            as_of_date: Optional date for point-in-time lookup.
+    
+        Returns:
+            list[Asset]: List of assets corresponding to the tickers.
+        """
     return _asset_finder().lookup_symbols(tickers, as_of_date)
 
 
 # @cached
 def sector(ticker, as_of_date=None):
+    """Get the sector classification for a single ticker.
+    
+        Args:
+            ticker: The ticker string to look up.
+            as_of_date: Optional date for point-in-time lookup.
+    
+        Returns:
+            str: The sector name for the given ticker.
+        """
     return _asset_finder().get_info(symbol(ticker).sid, 'sector')
 
 
 # @cached
 def sectors(tickers, as_of_date=None):
+    """Get the sector classifications for multiple tickers.
+    
+        Args:
+            tickers: Iterable of ticker strings to look up.
+            as_of_date: Optional date for point-in-time lookup.
+    
+        Returns:
+            Sector information for the given tickers.
+        """
     sids = [x.sid for x in symbols(tickers)]
     return _asset_finder().get_info(sids, 'sector')
 
 
 # @cached
 def sid(sid):
+    """Retrieve a single asset by its security identifier.
+    
+        Args:
+            sid: The integer security identifier.
+    
+        Returns:
+            Asset: The asset corresponding to the given sid.
+        """
     return sids((sid,))[0]
 
 
 # @cached
 def sids(sids):
+    """Retrieve multiple assets by their security identifiers.
+    
+        Args:
+            sids: Iterable of integer security identifiers.
+    
+        Returns:
+            list[Asset]: List of assets corresponding to the given sids.
+        """
     return _asset_finder().retrieve_all(sids)
 
 
@@ -464,6 +639,14 @@ def trading_date(date):
 
 
 def to_sids(assets):
+    """Convert asset objects to a list of security identifiers.
+    
+        Args:
+            assets: A single asset or iterable of assets.
+    
+        Returns:
+            list[int]: List of sid integers extracted from the assets.
+        """
     if hasattr(assets, '__iter__'):
         return [x.sid for x in assets]
     return [assets.sid]
@@ -499,6 +682,17 @@ def prices(assets, start, end, field='close', offset=0):
 
 
 def history(assets, as_of_date, n, field='close'):
+    """Get historical price data for a fixed number of trading days.
+    
+        Args:
+            assets: Asset or list of assets to get history for.
+            as_of_date: The reference date (end of the window).
+            n: Number of trading days of history to retrieve.
+            field: Price field to retrieve. Defaults to 'close'.
+    
+        Returns:
+            pd.DataFrame or pd.Series: Historical price data.
+        """
     as_of_date = trading_date(as_of_date)
     trading_calendar = load_sharadar_bundle().equity_daily_bar_reader.trading_calendar
     sessions = trading_calendar.sessions_window(as_of_date, -n + 1)
@@ -516,7 +710,15 @@ def returns(assets, start, end, periods=1, field='close'):
 
 class LogProgressPublisher(object):
 
+    """Pipeline progress publisher that logs progress to the application logger."""
+    
     def publish(self, model):
+        """Publish pipeline progress by logging completion percentage.
+        
+                Args:
+                    model: Progress model with current_chunk_bounds, percent_complete,
+                        and current_work attributes.
+                """
         try:
             start = str(model.current_chunk_bounds[0].date())
             end = str(model.current_chunk_bounds[1].date())
@@ -532,10 +734,18 @@ class LogProgressPublisher(object):
 
 class CliProgressPublisher(object):
 
+    """Pipeline progress publisher that displays a CLI progress bar using click."""
+    
     def __init__(self):
         self.pbar = click.progressbar(length=100, label="Analyzing Pipeline...")
 
     def publish(self, model):
+        """Update the CLI progress bar with current pipeline execution state.
+        
+                Args:
+                    model: Progress model with current_chunk_bounds, percent_complete,
+                        state, and execution_time attributes.
+                """
         start = str(model.current_chunk_bounds[0].date())
         end = str(model.current_chunk_bounds[1].date())
         completed = model.percent_complete

@@ -1,3 +1,8 @@
+"""SQLite-based daily pricing store for the Sharadar zipline bundle.
+
+Provides readers and writers for daily OHLCV price data and adjustment
+data (splits, dividends, mergers) stored in SQLite databases.
+"""
 import os
 import sqlite3
 from contextlib import closing
@@ -114,6 +119,15 @@ SQLITE_MAX_COLUMN = 2000
 
 
 class SQLiteDailyBarWriter(object):
+    """Writes daily OHLCV bar data to a SQLite database.
+
+    Creates the prices schema on first use and supports incremental writes
+    with INSERT OR REPLACE semantics.
+
+    Attributes:
+        _filename: Path to the SQLite database file.
+        _calendar: Trading calendar used for session alignment.
+    """
     def __init__(self, filename, calendar):
         self._filename = filename
         self._calendar = calendar
@@ -125,12 +139,28 @@ class SQLiteDailyBarWriter(object):
                 c.executescript(SCHEMA)
 
     def _validate(self, data):
+        """Validate that input data has the expected format.
+
+        Args:
+            data: DataFrame to validate.
+
+        Raises:
+            ValueError: If data is not a DataFrame or lacks ['date', 'sid'] index.
+        """
         if not isinstance(data, pd.DataFrame):
             raise ValueError("data must be an instance of DataFrame.")
         if data.index.names != ['date', 'sid']:
             raise ValueError("data indexes must be ['date', 'sid'].")
 
     def write(self, data):
+        """Write splits, mergers, and dividend data to the database.
+
+        Args:
+            splits: DataFrame of split records.
+            mergers: DataFrame of merger records.
+            dividends: DataFrame of dividend payout records.
+            stock_dividends: DataFrame of stock dividend records.
+        """
         self._validate(data)
 
         df = data[['open', 'high', 'low', 'close', 'volume']]
@@ -164,20 +194,58 @@ class SQLiteDailyBarReader(SessionBarReader):
         self._filename = filename
 
     def _query(self, sql):
+        """Execute a SQL query and return all results.
+
+        Args:
+            sql: SQL query string.
+
+        Returns:
+            List of result tuples.
+        """
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute(sql)
             return c.fetchall()
 
     def _exist_sid(self, sid):
+        """Check if a security ID exists in the prices table.
+
+        Args:
+            sid: Security identifier.
+
+        Returns:
+            bool: True if the sid has price data.
+        """
         sql = "SELECT COUNT(DISTINCT(sid)) FROM prices WHERE sid = %d" % sid
         res = self._query(sql)
         return res[0][0] == 1
 
     def _fmt_date(self, dt):
+        """Format a datetime to the string format used in the database.
+
+        Args:
+            dt: Datetime-like object.
+
+        Returns:
+            str: Date formatted as 'YYYY-MM-DD 00:00:00'.
+        """
         return pd.to_datetime(dt).strftime('%Y-%m-%d') + " 00:00:00"
 
     # @cached
     def get_value(self, sid, dt, field):
+        """Get a single field value for a sid on a specific date.
+
+        Args:
+            sid: Security identifier.
+            dt: Date to query.
+            field: Column name (e.g., 'close', 'volume').
+
+        Returns:
+            The scalar value for the requested field.
+
+        Raises:
+            NoDataBeforeDate: If no data exists on or before the date.
+            KeyError: If the sid does not exist.
+        """
         day = self._fmt_date(dt)
         sql = "SELECT %s FROM prices WHERE sid = %d and date = '%s'" % (field, sid, day)
         res = self._query(sql)
@@ -190,6 +258,17 @@ class SQLiteDailyBarReader(SessionBarReader):
 
     # @cached
     def load_dataframe(self, field, start_dt, end_dt, sids):
+        """Load price data as a DataFrame with sessions as index.
+
+        Args:
+            field: Column name to load.
+            start_dt: Start date (inclusive).
+            end_dt: End date (inclusive).
+            sids: List of security identifiers.
+
+        Returns:
+            pd.DataFrame: With trading sessions as index and sids as columns.
+        """
         data = self.load_raw_arrays([field], start_dt, end_dt, sids)
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         df = pd.DataFrame(data[0], index=sessions)
@@ -198,12 +277,35 @@ class SQLiteDailyBarReader(SessionBarReader):
 
     # @cached
     def load_series(self, field, start_dt, end_dt, sid):
+        """Load price data for a single sid as a Series.
+
+        Args:
+            field: Column name to load.
+            start_dt: Start date (inclusive).
+            end_dt: End date (inclusive).
+            sid: Single security identifier.
+
+        Returns:
+            pd.Series: With trading sessions as index.
+        """
         data = self.load_raw_arrays([field], start_dt, end_dt, [sid])
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
         return pd.Series(data[0][:, 0], index=sessions)
 
     # @cached
     def load_raw_arrays(self, fields, start_dt, end_dt, sids):
+        """Load raw numpy arrays for pipeline computation.
+
+        Args:
+            fields: List of column names to load.
+            start_dt: Start date (inclusive).
+            end_dt: End date (inclusive).
+            sids: List of security identifiers.
+
+        Returns:
+            List of numpy arrays, one per field, each of shape
+            (num_sessions, num_sids).
+        """
         start_day = self._fmt_date(start_dt)
         end_day = self._fmt_date(end_dt)
         sessions = self.trading_calendar.sessions_in_range(start_dt, end_dt)
@@ -225,6 +327,18 @@ class SQLiteDailyBarReader(SessionBarReader):
         return raw_arrays
 
     def get_last_traded_dt(self, sid, dt):
+        """Get the last traded datetime for a sid on or before dt.
+
+        Args:
+            sid: Security identifier.
+            dt: Date to query.
+
+        Returns:
+            pd.Timestamp or pd.NaT if no data found.
+
+        Raises:
+            KeyError: If the sid does not exist.
+        """
         day = self._fmt_date(dt)
         sql = "SELECT date FROM prices WHERE sid = %d and date = '%s'" % (sid, day)
         res = self._query(sql)
@@ -270,6 +384,17 @@ class SQLiteDailyBarReader(SessionBarReader):
 
 class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
+    """Writes adjustment data (splits, dividends, mergers) to SQLite.
+
+    Extends zipline's SQLiteAdjustmentWriter with custom schema creation
+    and dividend ratio calculation logic.
+
+    Attributes:
+        _filename: Path to the adjustments SQLite database.
+        _equity_daily_bar_reader: Reader for price data used in ratio calculation.
+        _calendar: Trading calendar.
+        _asset_finder: Asset finder for looking up asset metadata.
+    """
     def __init__(self, adjustment_dbpath, equity_daily_bar_reader, asset_finder, calendar):
         self._filename = adjustment_dbpath
         self._equity_daily_bar_reader = equity_daily_bar_reader
@@ -326,6 +451,14 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                     pbar.update(count)
 
     def write(self, splits=None, mergers=None, dividends=None, stock_dividends=None):
+        """Write splits, mergers, and dividend data to the database.
+
+        Args:
+            splits: DataFrame of split records.
+            mergers: DataFrame of merger records.
+            dividends: DataFrame of dividend payout records.
+            stock_dividends: DataFrame of stock dividend records.
+        """
         self.write_frame('splits', splits)
         self.write_frame('mergers', mergers)
         self.write_dividend_data(dividends, stock_dividends)

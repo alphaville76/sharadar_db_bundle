@@ -1,3 +1,12 @@
+"""Data ingestion exploratory script for FinancialModelingPrep API.
+
+Demonstrates fetching stock lists, delisted companies, historical prices,
+dividends, splits, market cap, enterprise values, and income statements
+from the FinancialModelingPrep (FMP) API.
+
+Note:
+    This is a development/exploration script, not a production ingestion module.
+"""
 from os import environ as env
 from urllib.request import urlopen
 import urllib.parse
@@ -8,6 +17,12 @@ import json
 APIKEY = env["FINMODPREP_API_KEY"]
 
 def head(entries, n=10):
+    """Print the first n entries from a collection.
+
+    Args:
+        entries: Iterable of items to print.
+        n: Maximum number of items to print. Defaults to 10.
+    """
     count = 0
     for entry in entries:
         print(entry)
@@ -17,6 +32,15 @@ def head(entries, n=10):
     print(len(entries))
 
 def to_dict_array(url, params={}):
+    """Fetch JSON data from a FinancialModelingPrep API endpoint.
+
+    Args:
+        url: The FMP API endpoint URL.
+        params: Optional query parameters dict (API key added automatically).
+
+    Returns:
+        list: Parsed JSON response as a list of dictionaries.
+    """
     params['apikey']=APIKEY
     query_string = urllib.parse.urlencode(params)
     response = urlopen(url + "?" + query_string )

@@ -1,3 +1,9 @@
+"""OTC stock deletion utility for the Sharadar bundle databases.
+
+Removes all OTC (Over-The-Counter) exchange equities and their
+associated data from the assets, prices, and adjustments SQLite
+databases. Useful for creating a bundle excluding illiquid OTC stocks.
+"""
 import sqlite3
 import sys
 

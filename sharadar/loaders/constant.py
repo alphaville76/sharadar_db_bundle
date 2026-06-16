@@ -1,3 +1,8 @@
+"""Constants used by the Sharadar data ingestion loaders.
+
+Defines metadata column headers, date thresholds, exchange definitions,
+and user agent strings for HTTP requests.
+"""
 import pandas as pd
 
 # 'sid' will be used as index

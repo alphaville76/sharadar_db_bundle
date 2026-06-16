@@ -1,4 +1,4 @@
-﻿"""
+"""
 Enhanced Neural Network implementations for time-series financial prediction.
 
 Improvements over base ann.py:

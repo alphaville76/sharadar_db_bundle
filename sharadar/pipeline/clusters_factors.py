@@ -1,3 +1,14 @@
+"""Pipeline factors based on academic finance anomalies (Jensen, Kelly, Pedersen style).
+
+This module defines Zipline pipeline factor instances for various cross-sectional
+equity anomalies organized by category: Accruals, Debt Issuance, Investment,
+Leverage, Low Risk, Momentum, Profit Growth, Profitability, Quality, Size,
+Skewness, and Value. These factors are used to construct composite signals
+for systematic equity strategies.
+
+The pipe_columns dictionary at the end aggregates all factors into a single
+pipeline-compatible mapping suitable for use with zipline Pipeline API.
+"""
 import pandas as pd
 from zipline.pipeline import Pipeline, CustomFactor
 from zipline.pipeline.data import USEquityPricing

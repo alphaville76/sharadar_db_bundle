@@ -1,3 +1,9 @@
+"""Extended scheduling rules for zipline trading algorithms.
+
+Provides custom date and time rules beyond zipline's built-in scheduling,
+including quarterly rebalancing, configurable month start/end triggers,
+and a one-time trigger for live algorithm startup.
+"""
 from abc import ABCMeta
 
 import numpy as np
@@ -11,6 +17,10 @@ from zipline.utils.calendar_utils import get_calendar
 from zipline.api import get_environment
 
 class OnceAtStart(StatelessRule):
+    """Scheduling rule that triggers exactly once on the first evaluation.
+
+    Useful for running initialization logic at live algorithm start.
+    """
 
     def __init__(self):
         self.already_trigged = False
@@ -23,6 +33,12 @@ class OnceAtStart(StatelessRule):
 
 
 class time_rules(object):
+    """Collection of intraday time-based scheduling rules.
+
+    Provides static methods for market open/close offsets and an
+    every-minute trigger.
+    """
+
     every_minute = Always
 
     @staticmethod
@@ -37,6 +53,12 @@ class time_rules(object):
 
 
 class date_rules(object):
+    """Collection of date-based scheduling rules.
+
+    Provides static methods for daily, weekly, monthly, and quarterly
+    scheduling with configurable offsets.
+    """
+
     every_day = Always
 
     @staticmethod
@@ -65,6 +87,15 @@ class date_rules(object):
         return NDaysBeforeLastTradingDayOfWeek(n=days_offset)
 
 class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
+    """Rule that triggers on the Nth trading day of specified months.
+
+    Supports both start-of-month and end-of-month offsets, with
+    configurable rebalance months for quarterly strategies.
+
+    Attributes:
+        rebalance_months: List of month numbers (1-12) when rule is active.
+        td_delta: Trading day offset (positive from start, negative from end).
+    """
 
     @preprocess(n=lossless_float_to_int('TradingDayOfMonthRule'))
     def __init__(self, n, invert, rebalance_months=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]):

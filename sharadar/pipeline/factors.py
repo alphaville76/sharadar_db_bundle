@@ -1,3 +1,10 @@
+"""Pipeline factors for Sharadar fundamental data.
+
+This module provides CustomFactor and CustomClassifier implementations for
+computing fundamental, valuation, trend, and risk factors using Sharadar data.
+Includes factors for fundamentals retrieval, daily valuation metrics, time-series
+trends, market beta, and various financial ratios.
+"""
 
 import numpy as np
 import pandas as pd
@@ -16,6 +23,15 @@ from sharadar.util.logger import log
 
 
 class Fundamentals(CustomFactor, BundleLoader):
+    """Loads a single fundamental data field for each asset.
+
+    Retrieves fundamental data from the Sharadar bundle. If the field name
+    does not contain an underscore, '_arq' (as-reported quarterly) is appended.
+
+    Params:
+        field: Name of the fundamental data field to retrieve.
+    """
+
     inputs = []
     window_length = 1
     params = ('field',)
@@ -32,11 +48,21 @@ class Fundamentals(CustomFactor, BundleLoader):
 
 
 class FundamentalsTTM(Fundamentals):
+    """Loads trailing twelve month (TTM) fundamental data for each asset.
+
+    Computes the sum of the last four quarters of the specified fundamental field.
+
+    Params:
+        field: Name of the fundamental data field to retrieve on a TTM basis.
+    """
+
     def compute(self, today, assets, out, field):
         out[:] = self.asset_finder().get_fundamentals_ttm(assets, field, today, k=self.window_length)
 
 
 class DaysSinceFiling(CustomFactor, BundleLoader):
+    """Computes the number of days since the last SEC filing date for each asset."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -51,6 +77,12 @@ class DaysSinceFiling(CustomFactor, BundleLoader):
 
 
 class AbstractClassifier(CustomClassifier, BundleLoader):
+    """Base class for categorical classifiers using Sharadar metadata.
+
+    Subclasses specify categories and a metadata field to classify assets into
+    discrete categorical buckets.
+    """
+
     inputs = []
     window_length = 1
     dtype = object_dtype
@@ -69,6 +101,8 @@ class AbstractClassifier(CustomClassifier, BundleLoader):
 
 
 class Exchange(AbstractClassifier):
+    """Classifies assets by their listing stock exchange."""
+
     def __init__(self):
         categories = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
         field = 'exchange'
@@ -76,6 +110,8 @@ class Exchange(AbstractClassifier):
 
 
 class Sector(AbstractClassifier):
+    """Classifies assets by their market sector."""
+
     def __init__(self):
         categories = ['Basic Materials', 'Communication Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy',
                       'Financial Services', 'Healthcare', 'Industrials', 'Real Estate', 'Technology', 'Utilities']
@@ -84,6 +120,8 @@ class Sector(AbstractClassifier):
 
 
 class IsDomesticCommonStock(CustomClassifier, BundleLoader):
+    """Filter that returns 1 for domestic common and preferred stocks, 0 otherwise."""
+
     inputs = []
     window_length = 1
     dtype = np.int64
@@ -126,6 +164,19 @@ class IsDelinquent(CustomClassifier, BundleLoader):
 
 
 def get_daily_metrics(asset_finder, assets, field, today, n, mult=1):
+    """Fetches daily metric data with fallback to previous day if all NaN.
+
+    Args:
+        asset_finder: AssetFinder instance for data retrieval.
+        assets: Array of asset sids.
+        field: Name of the daily metric field.
+        today: Current trading date.
+        n: Number of rows (window length) to retrieve.
+        mult: Multiplier applied to raw values (default 1).
+
+    Returns:
+        numpy array of metric values for the requested assets.
+    """
     metric = mult * asset_finder.get_daily_metrics(assets, field, today, n)
     if np.isnan(metric).all():
         # If all NaN (not ingested because delay in computation in SEP) then use the data of the previous day
@@ -134,6 +185,8 @@ def get_daily_metrics(asset_finder, assets, field, today, n, mult=1):
     return metric
 
 class MarketCap(CustomFactor, BundleLoader):
+    """Market capitalization in dollars (values stored in millions, scaled to full)."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -145,6 +198,8 @@ class MarketCap(CustomFactor, BundleLoader):
         return "MarketCap(%d)" % self.window_length
 
 class EV(CustomFactor, BundleLoader):
+    """Enterprise value in dollars (values stored in millions, scaled to full)."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -156,6 +211,8 @@ class EV(CustomFactor, BundleLoader):
         return "EV(%d)" % self.window_length
 
 class EvEbit(CustomFactor, BundleLoader):
+    """Enterprise value to EBIT ratio."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -168,6 +225,8 @@ class EvEbit(CustomFactor, BundleLoader):
 
 
 class EvEbitda(CustomFactor, BundleLoader):
+    """Enterprise value to EBITDA ratio."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -180,6 +239,8 @@ class EvEbitda(CustomFactor, BundleLoader):
 
 
 class PriceBook(CustomFactor, BundleLoader):
+    """Price-to-book ratio."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -192,6 +253,8 @@ class PriceBook(CustomFactor, BundleLoader):
 
 
 class PriceEarnings(CustomFactor, BundleLoader):
+    """Price-to-earnings ratio."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -204,6 +267,8 @@ class PriceEarnings(CustomFactor, BundleLoader):
 
 
 class PriceSales(CustomFactor, BundleLoader):
+    """Price-to-sales ratio."""
+
     inputs = []
     window_length = 1
     window_safe = True
@@ -261,6 +326,16 @@ def time_trend(Y, allowed_missing=0):
 
 
 class FundamentalsTrend(CustomFactor, BundleLoader):
+    """Computes the linear time trend of a fundamental field over multiple quarters.
+
+    Outputs:
+        trend: Slope of the linear regression over the window.
+        std_err: Standard error of the slope estimate.
+
+    Params:
+        field: Name of the fundamental data field to compute the trend for.
+    """
+
     inputs = []
     outputs = ['trend', 'std_err']
     # 20 quarters = 5 years
@@ -283,6 +358,15 @@ class FundamentalsTrend(CustomFactor, BundleLoader):
 
 # to avoid divide by zero
 def _robust(x, fn):
+    """Applies a function safely, returning 0.0 for zero-valued inputs.
+
+    Args:
+        x: Scalar or numpy array input.
+        fn: Function to apply to non-zero elements.
+
+    Returns:
+        Transformed value(s) with zeros preserved.
+    """
     if np.isscalar(x):
         return fn(x) if x != 0.0 else 0.0
 
@@ -293,16 +377,38 @@ def _robust(x, fn):
 
 
 def _logscale(x):
+    """Computes sign-preserving log transform: sign(x) * log(|x| + 1).
+
+    Args:
+        x: Scalar or numpy array input.
+
+    Returns:
+        Log-scaled value approximating x for small values.
+    """
     # Given: y=log(1+x), y≈x when x is small (less than 1).
     return np.sign(x) * nanlog(np.abs(x + np.sign(x)))
 
 
 # to avoid divide by zero
 def logscale(x):
+    """Robust log-scale transform that handles zero values safely.
+
+    Args:
+        x: Scalar or numpy array input.
+
+    Returns:
+        Log-scaled value(s) with zeros preserved.
+    """
     return _robust(x, _logscale)
 
 
 class LogFundamentalsTrend(FundamentalsTrend):
+    """Log-scaled fundamental trend normalized to [0, 1] via arctan transform.
+
+    Applies logscale to fundamental data before computing the time trend,
+    then normalizes the slope using arctan to produce values in [0, 1].
+    """
+
     def compute(self, today, assets, out, field):
         data = self.retrieve_data(assets, field, today)
         y = logscale(data)
@@ -317,6 +423,16 @@ class LogFundamentalsTrend(FundamentalsTrend):
 
 
 class TimeTrend(CustomFactor):
+    """Computes a linear time trend on periodic price or factor data.
+
+    Outputs:
+        trend: Slope of the linear regression.
+        std_err: Standard error of the slope estimate.
+
+    Params:
+        periodic: Indices of rows to include for periodic sampling.
+    """
+
     outputs = ['trend', 'std_err']
     window_length = 756
     params = ('periodic',)
@@ -326,6 +442,12 @@ class TimeTrend(CustomFactor):
 
 
 class LogTimeTrend(TimeTrend):
+    """Log-scaled time trend normalized to [0, 1] via arctan transform.
+
+    Applies logscale before computing the time trend, then normalizes
+    the slope using arctan to produce values in [0, 1].
+    """
+
     def compute(self, today, assets, out, data, periodic):
         y = logscale(data[list(periodic)])
 
@@ -339,6 +461,8 @@ class LogTimeTrend(TimeTrend):
 
 
 class LogLatest(CustomFactor):
+    """Computes the log-scaled value of the most recent observation."""
+
     window_length = 1
 
     def compute(self, today, assets, out, data):
@@ -346,6 +470,8 @@ class LogLatest(CustomFactor):
 
 
 class StdDev(CustomFactor):
+    """Computes the standard deviation of a factor over the trailing window."""
+
     window_length = 252
 
     def compute(self, today, assets, out, factor):
@@ -404,6 +530,16 @@ def beta_residual(Y, X, allowed_missing=0, standardize=False):
 
 
 class Beta(CustomFactor):
+    """Computes market beta and residual variance relative to SPY.
+
+    Outputs:
+        beta: Market beta (slope of regression against SPY returns).
+        residual_var: Variance of the regression residuals.
+
+    Params:
+        standardize: If True, standardize returns before regression.
+    """
+
     outputs = ['beta', 'residual_var']
     inputs = [DailyReturns(), DailyReturns()[symbol('SPY')]]
     window_length = 252
@@ -416,6 +552,8 @@ class Beta(CustomFactor):
 
 
 class Previous(CustomFactor):
+    """Returns the value of a factor from window_length days ago."""
+
     def compute(self, today, assets, out, data):
         index = -self.window_length
         out[:] = data[index]
@@ -485,6 +623,16 @@ class InvestmentToAssets(CustomFactor, BundleLoader):
 
 
 def shift(arr, num, fill_value=np.nan):
+    """Shifts array elements by num positions, filling vacated slots.
+
+    Args:
+        arr: Input numpy array.
+        num: Number of positions to shift (positive=right, negative=left).
+        fill_value: Value to fill vacated positions (default NaN).
+
+    Returns:
+        Shifted array of the same shape.
+    """
     result = np.empty_like(arr)
     if num > 0:
         result[:num] = fill_value

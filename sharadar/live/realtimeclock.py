@@ -1,3 +1,13 @@
+"""Real-time clock implementation for live trading.
+
+Provides a wall-clock-synchronized event emitter that replaces
+zipline's MinuteSimulationClock for live trading sessions.
+"""
+"""Real-time clock implementation for live trading.
+
+Provides a wall-clock-synchronized event emitter that replaces
+zipline's MinuteSimulationClock for live trading sessions.
+"""
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,6 +57,19 @@ class RealtimeClock(object):
                  is_broker_alive=None,
                  execution_id=None,
                  stop_execution_callback=None):
+        """Initialize the real-time clock.
+
+        Args:
+            sessions: Trading session dates.
+            execution_opens: Market open times for each session.
+            execution_closes: Market close times for each session.
+            before_trading_start_minutes: Times to emit BEFORE_TRADING_START_BAR.
+            minute_emission: Whether to emit MINUTE_END events.
+            time_skew: Time difference between broker and local clock.
+            is_broker_alive: Callable returning True if broker connection is active.
+            execution_id: Identifier for the current execution run.
+            stop_execution_callback: Callable to check if execution should stop.
+        """
         today = pd.Timestamp.utcnow().tz_convert(None).date()
         beginning_of_today = pd.to_datetime(today, utc=None)
         self.sessions = sessions[(beginning_of_today <= sessions)]
@@ -65,6 +88,12 @@ class RealtimeClock(object):
         self._stop_execution_callback = stop_execution_callback
 
     def __iter__(self):
+        """Yield (timestamp, event) tuples synchronized to wall clock time.
+
+        Yields:
+            Tuple of (pd.Timestamp, event_type) where event_type is one of
+            SESSION_START, BEFORE_TRADING_START_BAR, BAR, MINUTE_END, SESSION_END.
+        """
         if not len(self.sessions):
             return
 

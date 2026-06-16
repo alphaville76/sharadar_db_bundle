@@ -1,4 +1,12 @@
-﻿import datetime
+"""Logging infrastructure for the sharadar_db_bundle trading system.
+
+Provides two logger classes built on logbook:
+- SharadarDbBundleLogger: General-purpose logger for the bundle (writes to
+  file, stdout, and optionally systemd journal on Linux).
+- BacktestLogger: Specialized logger for backtests and live trading that
+  timestamps log entries with the simulated trading day.
+"""
+import datetime
 import os
 import subprocess
 import sys

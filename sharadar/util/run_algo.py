@@ -1,5 +1,10 @@
-"""
-Created on the basis of ~/zipline/lib/python3.6/site-packages/zipline-trader/zipline/utils/run_algo.py
+"""Algorithm execution module for the sharadar_db_bundle trading system.
+
+Provides the core run_algorithm() entry point and internal _run() function
+for executing backtests and live trading sessions using zipline-reloaded
+with Sharadar data bundles. Supports both programmatic and CLI invocation.
+
+Based on zipline-trader's zipline/utils/run_algo.py.
 """
 import sys
 
@@ -273,6 +278,33 @@ def _run(handle_data,
 def create_algo_class(TradingAlgorithmClass, start, end, algofile, algotext, analyze, before_trading_start,
                       benchmark_returns, benchmark_sid, blotter, bundle_data, capital_base, data, data_frequency,
                       emission_rate, handle_data, initialize, metrics_set, namespace, trading_calendar):
+    """Instantiate and configure a TradingAlgorithm with a pipeline engine.
+
+    Args:
+        TradingAlgorithmClass: The algorithm class (or partial) to instantiate.
+        start: Backtest start date.
+        end: Backtest end date.
+        algofile: File object for the algorithm script, or None.
+        algotext: Algorithm source code string, or None.
+        analyze: Optional analyze callback function.
+        before_trading_start: Optional pre-market callback function.
+        benchmark_returns: Series of benchmark returns.
+        benchmark_sid: SID of the benchmark asset, or None.
+        blotter: Blotter instance for order management.
+        bundle_data: Loaded data bundle with readers and asset finder.
+        capital_base: Starting capital amount.
+        data: DataPortal instance for market data access.
+        data_frequency: Either 'daily' or 'minute'.
+        emission_rate: Frequency for metrics reporting.
+        handle_data: Optional per-bar callback function.
+        initialize: Algorithm initialization callback.
+        metrics_set: Set of metrics to compute.
+        namespace: Namespace dict for algorithm execution.
+        trading_calendar: Exchange calendar for session scheduling.
+
+    Returns:
+        A configured TradingAlgorithm instance with pipeline engine attached.
+    """
     algo = TradingAlgorithmClass(
         namespace=namespace,
         data_portal=data,

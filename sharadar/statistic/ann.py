@@ -1,8 +1,32 @@
+"""Single hidden-layer feedforward neural network with L-BFGS-B optimization.
+
+This module implements a neural network classifier/regressor with one hidden layer,
+using sigmoid output activation and cross-entropy loss on soft labels. Weight
+optimization is performed via the L-BFGS-B algorithm from scipy.optimize.
+Supports tanh, sigmoid, and ReLU hidden-layer activations with L2 regularization.
+"""
 import numpy as np
 from scipy import optimize
 
 
 class NeuralNetwork(object):
+    """Single hidden-layer feedforward neural network.
+
+    Uses L-BFGS-B optimization with cross-entropy loss and L2 regularization.
+    The output layer uses sigmoid activation, making it suitable for binary
+    classification or soft-label regression in [0, 1].
+
+    Attributes:
+        n_h: Number of hidden units.
+        n_x: Number of input features (set after fit).
+        n_y: Number of output units (set after fit).
+        activation: Hidden layer activation function (tanh, sigmoid, or relu).
+        alpha: L2 regularization parameter.
+        bias_k: Bias scaling constant.
+        parameters: Dictionary of weight matrices and bias vectors.
+        J: List of cost values recorded during training.
+    """
+
     def __init__(self, hidden_units=None, alpha=0.0001, activation='tanh', initw='uniform', bias_k=1.0):
         self.n_h = hidden_units
 
@@ -23,6 +47,15 @@ class NeuralNetwork(object):
     #    return str(self.parameters)
 
     def unravel_parameters(self, params_flat):
+        """Reshape a flat parameter vector into weight matrices and bias vectors.
+
+        Args:
+            params_flat: 1-D numpy array containing all network parameters
+                concatenated in order: W1, b1, W2, b2.
+
+        Returns:
+            Dictionary with keys W1, b1, W2, b2 as properly shaped arrays.
+        """
         W1_start = 0
         W1_end = self.n_h * self.n_x
         W1 = np.reshape(params_flat[W1_start:W1_end], (self.n_h, self.n_x), order='F')
@@ -42,6 +75,14 @@ class NeuralNetwork(object):
         return parameters["W1"], parameters["b1"], parameters["W2"], parameters["b2"]
 
     def ravel_parameters(self, parameters):
+        """Flatten weight matrices and bias vectors into a single 1-D array.
+
+        Args:
+            parameters: Dictionary with keys W1, b1, W2, b2.
+
+        Returns:
+            1-D numpy array of all parameters concatenated.
+        """
         W1, b1, W2, b2 = self.param_vars(parameters)
         return np.concatenate((W1.ravel(order='F'), b1.ravel(order='F'), W2.ravel(order='F'), b2.ravel(order='F')))
 
@@ -50,6 +91,19 @@ class NeuralNetwork(object):
         return np.concatenate((dW1.ravel(order='F'), db1.ravel(order='F'), dW2.ravel(order='F'), db2.ravel(order='F')))
 
     def cost_function_wrapper(self, params_flat, X, Y):
+        """Compute cost and gradient for the L-BFGS-B optimizer.
+
+        Serves as the objective function for scipy.optimize.minimize. Performs
+        a full forward and backward pass and records the cost.
+
+        Args:
+            params_flat: Flattened parameter vector.
+            X: Input data of shape (m, n_x).
+            Y: Target labels of shape (m, n_y).
+
+        Returns:
+            Tuple of (cost, gradients_flat).
+        """
         parameters = self.unravel_parameters(params_flat)
         self.parameters = parameters
 
@@ -64,6 +118,12 @@ class NeuralNetwork(object):
         return cost, grads_flat
 
     def train(self, X, Y):
+        """Run L-BFGS-B optimization to minimize the cost function.
+
+        Args:
+            X: Input data of shape (m, n_x).
+            Y: Target labels of shape (m, n_y).
+        """
         # Make empty list to store costs:
         self.J = []
 
@@ -82,6 +142,21 @@ class NeuralNetwork(object):
             raise ValueError('X and Y must have the same lenght.')
 
     def fit(self, X, Y):
+        """Fit the neural network to training data.
+
+        Initializes network architecture, randomly initializes weights,
+        and trains via L-BFGS-B optimization.
+
+        Args:
+            X: Training input data of shape (m, n_features).
+            Y: Training labels of shape (m, n_outputs) or (m,).
+
+        Returns:
+            The fitted NeuralNetwork instance.
+
+        Raises:
+            ValueError: If X and Y have mismatched sample counts.
+        """
         if len(Y.shape) == 1:
             Y = Y.values.reshape((Y.shape[0], 1))
 
@@ -117,10 +192,26 @@ class NeuralNetwork(object):
         return {"W1": R1[:, 1:], "b1": R1[:, 0], "W2": R2[:, 1:], "b2": R2[:, 0]}
 
     def predict(self, X):
+        """Generate predictions for input data.
+
+        Args:
+            X: Input data of shape (m, n_x).
+
+        Returns:
+            Predicted output of shape (m, n_y) with values in [0, 1].
+        """
         Y_hat, cache = self.forward_propagation(X, self.parameters)
         return Y_hat
 
     def sigmoid(self, x):
+        """Compute the sigmoid activation function.
+
+        Args:
+            x: Input array of any shape.
+
+        Returns:
+            Array of same shape with values in (0, 1).
+        """
         return 1 / (1 + np.exp(-x))
 
     def relu(self, x):

@@ -1,4 +1,9 @@
-﻿import pandas as pd
+"""Trading calendar utilities for session date resolution.
+
+Provides helper functions to find valid trading dates relative to
+a given date using exchange calendars.
+"""
+import pandas as pd
 from exchange_calendars import get_calendar
 
 

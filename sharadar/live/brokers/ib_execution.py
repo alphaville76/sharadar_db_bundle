@@ -1,22 +1,49 @@
+"""Interactive Brokers order execution styles.
+
+Defines custom execution styles for IB-specific order types such as
+Market-to-Limit and Midprice orders, extending zipline's ExecutionStyle.
+"""
 from zipline.finance.execution import ExecutionStyle
 
 
 class TWSOrder(ExecutionStyle):
+    """Base class for TWS-specific order execution styles.
+
+    Extends zipline's ExecutionStyle to support IB-specific order types
+    with configurable time-in-force and exchange routing.
+
+    Attributes:
+        _exchange: Target exchange for order routing.
+        _order_type: IB order type string (e.g., 'MTL', 'MIDPRICE').
+        _time_in_force: Order duration (e.g., 'GTC', 'DAY').
+    """
+
     def __init__(self, order_type, time_in_force="GTC", exchange=None):
+        """Initialize a TWS order style.
+
+        Args:
+            order_type: IB order type string.
+            time_in_force: Order duration policy. Defaults to 'GTC'.
+            exchange: Target exchange. Defaults to None (SMART routing).
+        """
         self._exchange = exchange
         self._order_type = order_type
         self._time_in_force = time_in_force
 
     def get_order_type(self):
+        """Return the IB order type string."""
         return self._order_type
 
     def get_time_in_force(self):
+        """Return the time-in-force setting for this order."""
         return self._time_in_force
 
     def get_limit_price(self, _is_buy):
+        """Return the limit price (None for non-limit order types)."""
         return None
 
     def get_stop_price(self, _is_buy):
+        """Return the stop price (None for non-stop order types)."""
         return None
 
 

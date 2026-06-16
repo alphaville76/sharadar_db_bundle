@@ -1,3 +1,9 @@
+"""Performance reporting module for backtesting analysis.
+
+Generates HTML reports with pyfolio tear sheets, log return charts,
+drawdown tables, and portfolio statistics. Supports both standalone
+execution and integration with the zipline trading framework.
+"""
 import pandas as pd
 import matplotlib.pyplot as plt
 import pyfolio as pf
@@ -22,6 +28,14 @@ DATETIME_FMT = '%Y-%m-%d_%H%M'
 
 
 def _to_img(figure):
+    """Convert a matplotlib figure to a base64-encoded HTML img tag.
+
+    Args:
+        figure: A matplotlib Figure object to convert.
+
+    Returns:
+        An HTML img tag string with the figure embedded as base64 PNG.
+    """
     pic_IObytes = io.BytesIO()
     figure.savefig(pic_IObytes, format='png')
     pic_IObytes.seek(0)
@@ -30,6 +44,22 @@ def _to_img(figure):
 
 
 def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show_image=True, context=None, round_trips=False):
+    """Analyze backtest performance and generate serialized output and HTML report.
+
+    Args:
+        perf: DataFrame of backtest performance results from zipline.
+        filename: Path to the algorithm source file (used for naming outputs).
+        doc: Optional algorithm description text for the report.
+        duration: Optional backtest duration in seconds.
+        param: Optional dictionary of algorithm parameters.
+        info: Optional additional info string for the report.
+        show_image: Whether to include pyfolio tear sheet images.
+        context: Optional algorithm context with recorded_vars metadata.
+        round_trips: Whether to compute round-trip trade statistics.
+
+    Raises:
+        ValueError: If no positions are found in the performance data.
+    """
     num_positions = perf.positions.shape[0]
     if num_positions == 0:
         raise ValueError("No positions found")
@@ -53,6 +83,13 @@ def analyze(perf, filename, doc=None, duration=None, param=None, info=None, show
 
 
 def serialise(perf, filename, now):
+    """Serialize performance data to a pickle file.
+
+    Args:
+        perf: DataFrame of backtest performance results.
+        filename: Base filename for the algorithm (extension will be replaced).
+        now: datetime object used to timestamp the output file.
+    """
     suffix = '_' + now.strftime(DATETIME_FMT) + '_perf.dump'
     perf_dump_file = change_extension(filename, suffix)
     log.info("Serialise performance date in %s" % perf_dump_file)
@@ -61,6 +98,22 @@ def serialise(perf, filename, now):
 
 # round_trips is very time intensive.
 def create_report(perf, filename, now, doc=None, duration=None, param=None, info=None, show_image=True, round_trips=False):
+    """Generate an HTML performance report with tear sheets and statistics.
+
+    Creates a comprehensive HTML report including performance stats vs benchmark,
+    drawdown analysis, stress event tables, and optional pyfolio tear sheet images.
+
+    Args:
+        perf: DataFrame of backtest performance results from zipline.
+        filename: Path to the algorithm source file.
+        now: datetime object for timestamping the report.
+        doc: Optional algorithm description text.
+        duration: Optional backtest duration in seconds.
+        param: Optional dictionary of algorithm parameters.
+        info: Optional additional info string.
+        show_image: Whether to include pyfolio tear sheet images.
+        round_trips: Whether to include round-trip trade analysis.
+    """
     log.info("create_report")
     if not hasattr(perf, 'returns'):
         perf['returns'] = perf['pnl'] / (perf['portfolio_value'] - perf['pnl'])
@@ -285,12 +338,27 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
 
 
 def format_perf_stats(perf_stats_df):
+    """Format percentage statistics in a performance stats DataFrame in-place.
+
+    Args:
+        perf_stats_df: DataFrame with performance statistics to format.
+    """
     for column in perf_stats_df.columns:
         for stat, value in perf_stats_df[column].items():
             if stat in STAT_FUNCS_PCT:
                 perf_stats_df.loc[stat, column] = str(np.round(value * 100, 2)) + '%'
 
 def create_log_returns_chart(rets, benchmark_rets, perf):
+    """Create a log returns chart, with recorded variables if available.
+
+    Args:
+        rets: Series of portfolio returns.
+        benchmark_rets: Series of benchmark returns.
+        perf: DataFrame of performance data with optional _metadata attribute.
+
+    Returns:
+        A matplotlib Figure with cumulative log returns plotted.
+    """
     try:
         log.info("create_log_returns_chart_with_vars")
         return create_log_returns_chart_with_vars(rets, benchmark_rets, perf)
@@ -300,6 +368,15 @@ def create_log_returns_chart(rets, benchmark_rets, perf):
 
 
 def create_log_returns_chart_no_vars(rets, benchmark_rets):
+    """Create a simple log returns chart comparing backtest to benchmark.
+
+    Args:
+        rets: Series of portfolio returns.
+        benchmark_rets: Series of benchmark returns.
+
+    Returns:
+        A matplotlib Figure with cumulative log returns.
+    """
     cum_log_returns = np.log1p(rets).cumsum()
     cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
 
@@ -314,6 +391,16 @@ def create_log_returns_chart_no_vars(rets, benchmark_rets):
 
 
 def create_log_returns_chart_with_vars(rets, benchmark_rets, perf):
+    """Create a log returns chart with subplots for recorded variables.
+
+    Args:
+        rets: Series of portfolio returns.
+        benchmark_rets: Series of benchmark returns.
+        perf: DataFrame with _metadata["recorded_vars"] listing variable names.
+
+    Returns:
+        A matplotlib Figure with log returns and variable subplots.
+    """
     cum_log_returns = np.log1p(rets).cumsum()
     cum_log_benchmark_rets = np.log1p(benchmark_rets).cumsum()
 
@@ -341,6 +428,15 @@ def create_log_returns_chart_with_vars(rets, benchmark_rets, perf):
 
 
 def change_extension(filename, new_ext):
+    """Replace a file extension with a new suffix.
+
+    Args:
+        filename: Original file path.
+        new_ext: New extension/suffix to append.
+
+    Returns:
+        The filename with its extension replaced by new_ext.
+    """
     path, ext = os.path.splitext(filename)
     return path + new_ext
 
@@ -398,8 +494,15 @@ def to_html_table(table,
 
 
 def describe_portfolio(positions):
-    """
-    Describe Portfolio Performance
+    """Build a DataFrame summarizing portfolio position performance.
+
+    Args:
+        positions: Dictionary mapping asset to Position objects, each having
+            cost_basis, last_sale_price, and amount attributes.
+
+    Returns:
+        A DataFrame with columns cost_basis, amount, pl, pl_pct for each
+        position plus a Summary row. Returns None if no valid positions.
     """
     if len(positions) == 0:
         return None
@@ -431,6 +534,12 @@ def describe_portfolio(positions):
     return pdf
 
 def print_portfolio(log, context):
+    """Log current portfolio performance and memory usage.
+
+    Args:
+        log: Logger instance (if falsy, function is a no-op).
+        context: Algorithm context with portfolio attribute.
+    """
     if log:
         mem = psutil.virtual_memory()
         log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))

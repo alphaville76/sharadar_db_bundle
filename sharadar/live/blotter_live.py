@@ -1,3 +1,13 @@
+"""Live trading blotter that delegates order management to the broker.
+
+Replaces zipline's SimulationBlotter for live trading, routing all
+order operations through the connected broker instance.
+"""
+"""Live trading blotter that delegates order management to the broker.
+
+Replaces zipline's SimulationBlotter for live trading, routing all
+order operations through the connected broker instance.
+"""
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +41,23 @@ from zipline.utils.input_validation import expect_types
 from sharadar.util.logger import log
 
 class BlotterLive(Blotter):
+    """Live trading blotter delegating order management to the broker.
+
+    Unlike SimulationBlotter, this class does not simulate fills internally.
+    All order placement, cancellation, and fill tracking is handled by the
+    connected broker.
+
+    Attributes:
+        broker: The live broker instance handling order execution.
+        new_orders: List of orders placed during the current bar.
+    """
+
     def __init__(self, broker):
+        """Initialize the live blotter.
+
+        Args:
+            broker: Broker instance to delegate order operations to.
+        """
         self.broker = broker
         self._processed_closed_orders = []
         self._processed_transactions = []
@@ -79,6 +105,17 @@ class BlotterLive(Blotter):
 
     @expect_types(asset=Asset)
     def order(self, asset, amount, style, order_id=None):
+        """Place an order through the broker.
+
+        Args:
+            asset: The asset to trade.
+            amount: Number of shares (positive=buy, negative=sell).
+            style: Execution style (MarketOrder, LimitOrder, etc.).
+            order_id: Must be None for live orders.
+
+        Returns:
+            The order ID string, or None if amount is zero.
+        """
         assert order_id is None
         if amount == 0:
             return None
@@ -88,6 +125,12 @@ class BlotterLive(Blotter):
         return order.id
 
     def cancel(self, order_id, relay_status=True):
+        """Cancel an open order via the broker.
+
+        Args:
+            order_id: The ID of the order to cancel.
+            relay_status: Unused in live trading.
+        """
         return self.broker.cancel_order(order_id)
 
     def cancel_all_orders_for_asset(self, asset, warn=False, relay_status=True):
@@ -105,6 +148,14 @@ class BlotterLive(Blotter):
         log.warning("Unexpected hold request for {}: '{}'".format(order_id, reason))
 
     def get_transactions(self, bar_data):
+        """Get new transactions, commissions, and closed orders since last call.
+
+        Args:
+            bar_data: Current bar data (unused, for interface compatibility).
+
+        Returns:
+            Tuple of (new_transactions, new_commissions, new_closed_orders).
+        """
         # All returned values from this function are delta between
         # the previous and actual call.
         def _list_delta(lst_a, lst_b):

@@ -1,9 +1,24 @@
+"""Email notification utilities using Mailjet API.
+
+Sends email notifications (e.g., trade alerts, error reports) via
+the Mailjet REST API. Requires MJ_APIKEY_PUBLIC, MJ_APIKEY_PRIVATE,
+MJ_EMAIL, and MJ_NAME environment variables.
+"""
 import sys
 from os import environ as env
 from mailjet_rest import Client
 
 
 def send_mail(subject, message):
+    """Send an email notification via Mailjet.
+
+    Args:
+        subject: Email subject line.
+        message: Plain text email body.
+
+    Returns:
+        bool: True if sent successfully, None if Mailjet is not configured.
+    """
     try:
         api_key = env["MJ_APIKEY_PUBLIC"]
     except KeyError:

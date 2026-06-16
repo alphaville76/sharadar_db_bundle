@@ -1,10 +1,26 @@
-﻿import time
+"""Portfolio-level and equity-level stop loss utilities.
+
+Provides functions for monitoring portfolio and individual equity losses,
+automatically closing positions when configurable loss limits are breached,
+and waiting for open orders to fill in live trading.
+"""
+import time
 from sharadar.util.performance import print_portfolio
 from zipline.api import order_target, get_open_orders
 
 
 def compute_portfolio_return(context):
-    '''Compute the return of the current portfolio.'''
+    """Compute the aggregate return of the current portfolio.
+
+    Calculates total return based on cost basis vs last sale price
+    across all positions.
+
+    Args:
+        context: Zipline algorithm context with portfolio.positions.
+
+    Returns:
+        Portfolio return as a decimal (e.g., -0.05 for a 5%% loss).
+    """
     positions = context.portfolio.positions
     if len(positions) == 0:
         return 0
@@ -27,9 +43,16 @@ def compute_portfolio_return(context):
 
 
 def stop_loss_portfolio(context, data, log=None):
-    '''
-    Close all positions when the whole portfolio loss exceeded the loss_limit.
-    '''
+    """Close all positions when portfolio loss exceeds the loss limit.
+
+    Args:
+        context: Zipline algorithm context. Must have context.PARAM['loss_limit'].
+        data: Zipline data portal.
+        log: Optional logger for warning messages.
+
+    Returns:
+        True if stop loss was triggered and positions closed, False otherwise.
+    """
     portfolio_return = compute_portfolio_return(context)
 
     if portfolio_return <= context.PARAM['loss_limit']:
@@ -43,9 +66,13 @@ def stop_loss_portfolio(context, data, log=None):
 
 
 def stop_loss_equities(context, data, log=None):
-    '''
-    Close all positions of an equity, when its loss exceeded the loss_limit.
-    '''
+    """Close individual equity positions that exceed the loss limit.
+
+    Args:
+        context: Zipline algorithm context. Must have context.PARAM['loss_limit'].
+        data: Zipline data portal.
+        log: Optional logger for warning messages.
+    """
     positions = context.portfolio.positions
     if len(positions) == 0:
         return
@@ -65,9 +92,14 @@ def stop_loss_equities(context, data, log=None):
 
 
 def close_all(context, data, exclude=None, log=None):
-    '''
-    Close all positions, except those in the exclude list.
-    '''
+    """Close all positions, except those in the exclude list.
+
+    Args:
+        context: Zipline algorithm context.
+        data: Zipline data portal.
+        exclude: Optional list of assets to skip.
+        log: Optional logger for debug messages.
+    """
     if exclude is None:
         exclude = []
     
@@ -82,7 +114,14 @@ def close_all(context, data, exclude=None, log=None):
 
 
 def await_no_open_orders(timeout_sec=3600, log=None):
-    '''Wait until all open orders are filled or timeout is reached.'''
+    """Wait until all open orders are filled or timeout is reached.
+
+    Only active in live trading mode. Polls open orders every second.
+
+    Args:
+        timeout_sec: Maximum seconds to wait. Default is 3600.
+        log: Logger instance; also used to detect live trading via log.arena.
+    """
     # Check if we're in live trading mode
     if log is None or not hasattr(log, 'arena') or log.arena != 'live':
         return

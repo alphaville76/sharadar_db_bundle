@@ -1,3 +1,9 @@
+"""Data ingestion module for Sharadar/NASDAQ Data Link equity data.
+
+Fetches equity prices (SEP/SFP), fundamentals (SF1), daily metrics,
+splits, and dividends from NASDAQ Data Link and writes them into
+SQLite databases compatible with the zipline-reloaded pipeline.
+"""
 from os import environ as env
 import os
 import pandas as pd
@@ -26,6 +32,18 @@ nasdaqdatalink.ApiConfig.api_key = env.get("NASDAQ_API_KEY", "")
 
 def process_data_table(df):
     # 'close' prices are adjusted only for stock splits, but not for dividends.
+    """Convert adjusted price data back to unadjusted prices.
+
+    Reverses the split adjustment applied by Sharadar to return raw
+    unadjusted OHLCV data suitable for zipline's adjustment framework.
+
+    Args:
+        df: DataFrame with columns including 'close', 'closeunadj',
+            'closeadj', 'open', 'high', 'low', 'volume', 'lastupdated'.
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with unadjusted OHLCV data.
+    """
     m = df['closeunadj'] / df['close']
 
     # Remove the split factor to get back the unadjusted data
@@ -42,6 +60,14 @@ def process_data_table(df):
 
 
 def must_fetch_entire_table(date):
+    """Determine whether to fetch the entire table or incremental update.
+
+    Args:
+        date: The last available date from the database, or NaT.
+
+    Returns:
+        bool: True if entire table must be fetched (no prior data or too old).
+    """
     if pd.isnull(date):
         return True
     return pd.Timestamp(date) <= OLDEST_DATE_SEP
@@ -64,6 +90,21 @@ def fetch_data(start, end):
 
 
 def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
+    """Fetch and prepare price data with security identifiers.
+
+    Fetches raw price data, maps tickers to SIDs, removes unknown
+    securities, and converts to unadjusted prices.
+
+    Args:
+        sharadar_metadata_df: Sharadar ticker metadata DataFrame.
+        related_tickers: Series mapping tickers to related ticker strings.
+        start: Start date for fetch. Defaults to None (full fetch).
+        end: End date for fetch. Defaults to None.
+
+    Returns:
+        pd.DataFrame: Sorted DataFrame indexed by ['date', 'sid'] with
+        unadjusted OHLCV columns.
+    """
     df = fetch_data(start, end)
 
     log.info("Adding SIDs to all stocks...")
@@ -78,6 +119,17 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
 
 
 def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
+    """Create a dividends DataFrame from NASDAQ Data Link actions data.
+
+    Args:
+        sharadar_metadata_df: Sharadar ticker metadata DataFrame.
+        related_tickers: Series mapping tickers to related ticker strings.
+        existing_tickers: List of tickers with price data.
+        start: Start date for dividend query.
+
+    Returns:
+        pd.DataFrame: Dividend records with sid, amount, and date columns.
+    """
     dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start},
                                                  action=['dividend', 'spinoffdividend'], paginate=True)
 
@@ -96,6 +148,17 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
 
 
 def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, start):
+    """Create a splits DataFrame from NASDAQ Data Link actions data.
+
+    Args:
+        sharadar_metadata_df: Sharadar ticker metadata DataFrame.
+        related_tickers: Series mapping tickers to related ticker strings.
+        existing_tickers: List of tickers with price data.
+        start: Start date for splits query.
+
+    Returns:
+        pd.DataFrame: Split records with effective_date, ratio, and sid columns.
+    """
     splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
@@ -120,6 +183,18 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
 
 
 def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, df: pd.DataFrame):
+    """Synchronize ticker price data to the trading calendar.
+
+    Fills missing interstitial trading dates by forward-filling price data
+    and setting volume to 0 for missing days.
+
+    Args:
+        sessions: DatetimeIndex of all valid trading sessions.
+        start_date: First date of ticker data.
+        end_date: Last date of ticker data.
+        df_ticker: DataFrame subset for a single ticker.
+        df: Full prices DataFrame (modified in place).
+    """
     this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
 
     missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
@@ -162,6 +237,20 @@ def trading_date(date, cal):
 
 def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00')), output_dir=get_data_dir(),
             universe=False, sanity_check=True, use_last_available_dt=True):
+    """Main ingestion logic for Sharadar data.
+
+    Orchestrates the full ingestion pipeline: fetches prices, metadata,
+    fundamentals, daily metrics, splits, and dividends, then writes
+    everything to SQLite databases.
+
+    Args:
+        start: Start date for data ingestion.
+        calendar: Trading calendar instance. Defaults to NYSE.
+        output_dir: Directory for output SQLite files.
+        universe: If True, updates the tradable stocks universe.
+        sanity_check: If True, validates metadata consistency after write.
+        use_last_available_dt: If True, uses last DB date as fetch start.
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     print("logfiles:", log.filename)
@@ -281,6 +370,11 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
 
 
 def create_metadata():
+    """Load Sharadar ticker metadata from NASDAQ Data Link.
+
+    Returns:
+        Tuple of (related_tickers Series, sharadar_metadata_df DataFrame).
+    """
     sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
@@ -291,6 +385,18 @@ def create_metadata():
 
 def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progress):
     # Prepare an empty DataFrame for equities, the index of this dataframe is the sid.
+    """Build the equities metadata DataFrame for asset DB writing.
+
+    Args:
+        df: Full prices DataFrame with 'ticker' column.
+        tickers: Array of unique ticker symbols.
+        sessions: DatetimeIndex of trading sessions.
+        sharadar_metadata_df: Sharadar ticker metadata.
+        show_progress: Whether to display a progress bar.
+
+    Returns:
+        pd.DataFrame: Equities metadata indexed by sid.
+    """
     equities_df = pd.DataFrame(columns=METADATA_HEADERS)
     with maybe_show_progress(tickers, show_progress, label='Loading custom pricing data: ') as it:
         for ticker in it:

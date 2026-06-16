@@ -1,3 +1,9 @@
+"""SQLite-based asset data store for the Sharadar zipline bundle.
+
+Provides SQLiteAssetFinder for querying equity metadata, fundamentals,
+and daily metrics from a SQLite database, and SQLiteAssetDBWriter for
+writing asset data with supplementary mappings.
+"""
 import warnings
 from datetime import timedelta
 
@@ -20,11 +26,30 @@ from sqlalchemy import text
 
 class SQLiteAssetFinder(AssetFinder):
 
+    """SQLite-backed asset finder extending zipline's AssetFinder.
+
+    Provides methods to retrieve fundamental data, daily metrics, and
+    supplementary equity information from the SQLite asset database.
+
+    Attributes:
+        is_live_trading: When True, extends end_date/auto_close_date by 5 days
+            to support live pipeline usage.
+    """
     def __init__(self, engine):
         super().__init__(engine)
         self.is_live_trading = False
 
     def _retrieve_asset_dicts(self, sids, asset_tbl, querying_equities):
+        """Retrieve asset dictionaries, extending dates for live trading.
+
+        Args:
+            sids: Security identifiers to look up.
+            asset_tbl: The SQLAlchemy table to query.
+            querying_equities: Whether we are querying equities.
+
+        Returns:
+            List of asset dictionaries with optional date extension.
+        """
         rows = list(super()._retrieve_asset_dicts(sids, asset_tbl, querying_equities))
         if self.is_live_trading:
             for row in rows:
@@ -51,6 +76,11 @@ class SQLiteAssetFinder(AssetFinder):
         raise NotImplementedError()
 
     def _get_inner_select(self):
+        """Build the inner SQL SELECT for supplementary mappings lookup.
+
+        Returns:
+            str: SQL query string with placeholders for sids, field, date, and delay.
+        """
         sql = ("SELECT sid, value, "
                "ROW_NUMBER() OVER (PARTITION BY sid "
                "ORDER BY start_date DESC) AS rown "
@@ -181,6 +211,18 @@ class SQLiteAssetFinder(AssetFinder):
 
     # @cached
     def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))):
+        """Retrieve daily metric values over a trading window.
+
+        Args:
+            sids: List of security identifiers.
+            field_name: Daily metric field name (e.g., 'marketcap').
+            as_of_date: End date for the window. Defaults to today.
+            n: Number of trading days to retrieve (window length).
+            calendar: Trading calendar for session resolution.
+
+        Returns:
+            numpy.ndarray: Array of shape (n, num_assets) with float64 values.
+        """
         assert n > 0
         count = -n + 1
         if count == 0:
@@ -209,6 +251,14 @@ class SQLiteAssetFinder(AssetFinder):
         return self.last_available_dt('marketcap')
 
     def last_available_dt(self, field):
+        """Get the most recent date with data for a given field.
+
+        Args:
+            field: The supplementary mapping field name.
+
+        Returns:
+            pd.Timestamp: The latest date, or pd.NaT if no data exists.
+        """
         sql = "SELECT MAX(start_date) FROM equity_supplementary_mappings WHERE field = '%s';" % field
         with self.engine.connect() as conn:
             res = conn.execute(text(sql)).fetchall()
@@ -219,12 +269,36 @@ class SQLiteAssetFinder(AssetFinder):
 
 class SQLiteAssetDBWriter(AssetDBWriter):
 
+    """SQLite-backed asset database writer extending zipline's AssetDBWriter.
+
+    Handles writing equity metadata, symbol mappings, and supplementary
+    mappings to the SQLite asset database. Uses INSERT OR REPLACE semantics
+    for upsert behavior.
+    """
     def init_db(self, txn=None):
+        """Initialize the database schema with additional indexes.
+
+        Args:
+            txn: SQLAlchemy transaction for schema creation.
+        """
         super().init_db(txn)
         txn.execute(text(
             "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
+        """Write asset data to the appropriate database tables.
+
+        Args:
+            asset_type: Either 'equity' or 'future'.
+            assets: DataFrame of asset metadata indexed by sid.
+            txn: SQLAlchemy transaction.
+            chunk_size: Number of rows to write per batch.
+            mapping_data: Symbol mapping DataFrame (required for equities).
+
+        Raises:
+            TypeError: If mapping_data is missing for equities or present for futures.
+            ValueError: If asset_type is not 'equity' or 'future'.
+        """
         if asset_type == 'future':
             tbl = futures_contracts_table
             if mapping_data is not None:
@@ -266,6 +340,17 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         # Replace all " with "".
         # Wrap the entire thing in double quotes.
 
+        """Escape a string for safe use as a SQLite identifier.
+
+        Args:
+            name: The identifier string to escape.
+
+        Returns:
+            str: The escaped identifier wrapped in double quotes.
+
+        Raises:
+            ValueError: If name is empty or contains NUL characters.
+        """
         try:
             uname = str(name).encode("utf-8", "strict").decode("utf-8")
         except UnicodeError as err:
@@ -279,6 +364,17 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         return '"' + uname.replace('"', '""') + '"'
 
     def insert_statement(self, df, table_name, index=True, index_label=None):
+        """Generate an INSERT OR REPLACE SQL statement for a DataFrame.
+
+        Args:
+            df: DataFrame whose columns define the insert columns.
+            table_name: Target table name.
+            index: Whether to include the DataFrame index.
+            index_label: Label(s) for the index column(s).
+
+        Returns:
+            str: The parameterized INSERT OR REPLACE SQL statement.
+        """
         names = list(map(str, df.columns))
 
         if index:
@@ -303,6 +399,16 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         return insert_statement
 
     def _write_df_to_table(self, tbl, df, txn, chunk_size=None, idx=True, idx_label=None):
+        """Write a DataFrame to a SQLite table row by row.
+
+        Args:
+            tbl: SQLAlchemy Table object.
+            df: DataFrame to write.
+            txn: SQLAlchemy transaction.
+            chunk_size: Unused, kept for API compatibility.
+            idx: Whether to include the index in the insert.
+            idx_label: Label for the index column.
+        """
         index_label = (
             idx_label
             if idx_label is not None else
@@ -376,6 +482,15 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         return sane
 
     def _check_field(self, field, expected):
+        """Check that distinct values for a field match expected values.
+
+        Args:
+            field: The supplementary mapping field to check.
+            expected: List of expected distinct values in sorted order.
+
+        Returns:
+            bool: True if actual values match expected, False otherwise.
+        """
         sql = "SELECT DISTINCT(value) as r FROM equity_supplementary_mappings WHERE field = '%s' ORDER BY r;" % field
         with self.engine.connect() as conn:
             ret = [x[0] for x in conn.execute(text(sql)).fetchall()]

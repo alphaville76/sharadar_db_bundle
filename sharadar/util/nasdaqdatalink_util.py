@@ -1,3 +1,9 @@
+"""NASDAQ Data Link (formerly Quandl) API utilities.
+
+Provides functions for downloading bulk data tables, fetching
+incremental updates by date, and determining the last available
+data date from the NASDAQ Data Link service.
+"""
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -72,6 +78,24 @@ def load_data_table(file, index_col=None, parse_dates=False):
 
 
 def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, retries=5):
+    """Download and parse an entire NASDAQ Data Link table.
+
+    Uses the bulk export endpoint to download the complete table
+    as a zip file, with retry logic for transient failures.
+
+    Args:
+        api_key: NASDAQ Data Link API key.
+        table_name: Fully qualified table name (e.g., 'SHARADAR/SEP').
+        index_col: Column(s) to use as DataFrame index.
+        parse_dates: Column(s) to parse as dates.
+        retries: Number of retry attempts. Defaults to 5.
+
+    Returns:
+        pd.DataFrame: The complete table data.
+
+    Raises:
+        ValueError: If all retry attempts fail.
+    """
     log.info("Start loading the entire %s dataset..." % table_name)
     for _ in range(retries):
         try:
@@ -116,6 +140,16 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
 
 
 def fetch_sf1_table_date(api_key, start, end=None):
+    """Fetch SF1 fundamentals data filtered by last-updated date.
+
+    Args:
+        api_key: NASDAQ Data Link API key.
+        start: Start date for lastupdated filter.
+        end: End date for lastupdated filter. Defaults to None (today).
+
+    Returns:
+        pd.DataFrame: SF1 quarterly and trailing data.
+    """
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
     return nasdaqdatalink.get_table('SHARADAR/SF1', dimension=['ARQ', 'ART'],
@@ -124,4 +158,11 @@ def fetch_sf1_table_date(api_key, start, end=None):
 
 
 def last_available_date():
+    """Get the last available price date from NASDAQ Data Link.
+
+    Queries the SPY ticker to determine the most recent data date.
+
+    Returns:
+        str: Last available date in 'YYYY-MM-DD' format.
+    """
     return nasdaqdatalink.get_table('SHARADAR/TICKERS', ticker='SPY')['lastpricedate'][0].strftime('%Y-%m-%d')

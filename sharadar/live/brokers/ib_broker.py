@@ -80,6 +80,24 @@ def _method_params_to_dict(args):
 
 
 class TWSConnection(EWrapper, EClient):
+    """Low-level connection to Interactive Brokers TWS/Gateway.
+
+    Manages the TCP connection, market data subscriptions, account updates,
+    order tracking, and execution reporting via the IB API callbacks.
+
+    Attributes:
+        tws_uri: Connection URI in format host:port:client_id.
+        account_id: The IB account identifier.
+        symbol_to_ticker_id: Mapping of symbols to IB ticker IDs.
+        bars: Dict of symbol -> DataFrame with trade price/size data.
+        accounts: Nested dict of account values by account/currency/key.
+        ib_positions: Dict of symbol -> IBPosition namedtuples.
+        open_orders: Dict of order_id -> order details.
+        order_statuses: Dict of order_id -> status details.
+        executions: Dict of order_id -> OrderedDict of executions.
+        time_skew: Time difference between local and IB server clocks.
+    """
+
     def __init__(self, tws_uri, account_id):
         """
         :param tws_uri: host:listening_port:client_id
@@ -119,6 +137,7 @@ class TWSConnection(EWrapper, EClient):
         self.tick_dict = {}
 
     def start(self):
+        """Connect to TWS, download account details, and initialize state."""
         self.bind()
 
         # Initialise the threads for various components
@@ -157,6 +176,7 @@ class TWSConnection(EWrapper, EClient):
         log.info("Sending request %s %s" % (fnName, prms))
 
     def bind(self):
+        """Establish the TCP connection to TWS/Gateway."""
         log.info("Connecting: {}:{}:{}".format(self._host, self._port, self.client_id))
         self.connect(self._host, self._port, self.client_id)
 
@@ -193,6 +213,15 @@ class TWSConnection(EWrapper, EClient):
 
     def subscribe_to_market_data(self, ib_symbol, exchange='SMART', primaryExchange='ISLAND', secType='STK',
                                  currency='USD'):
+        """Subscribe to real-time market data for a symbol.
+
+        Args:
+            ib_symbol: The IB ticker symbol.
+            exchange: Exchange for routing. Defaults to 'SMART'.
+            primaryExchange: Primary listing exchange.
+            secType: Security type ('STK', 'IND', etc.).
+            currency: Currency of the instrument.
+        """
         if ib_symbol in self.symbol_to_ticker_id:
             # Already subscribed to market data
             return
@@ -483,6 +512,18 @@ class TWSConnection(EWrapper, EClient):
 
 
 class IBBroker(Broker):
+    """Interactive Brokers broker implementation.
+
+    Provides live trading capabilities through TWS/IB Gateway including
+    order management, position tracking, real-time market data, and
+    account information.
+
+    Attributes:
+        account_id: The IB account identifier.
+        currency: Trading currency (default USD).
+        metrics_tracker: Zipline metrics tracker for portfolio state.
+    """
+
     def __init__(self, tws_uri, account_id):
         """
         :param tws_uri: host:listening_port:client_id
@@ -513,6 +554,11 @@ class IBBroker(Broker):
         self._tws.disconnect()
 
     def subscribe_to_market_data(self, asset):
+        """Subscribe to real-time market data for an asset.
+
+        Args:
+            asset: The zipline asset to subscribe to.
+        """
         if asset not in self.subscribed_assets:
             ib_symbol = self._asset_symbol(asset)
             exchange = 'SMART'
@@ -636,6 +682,14 @@ class IBBroker(Broker):
         return not self._tws.unrecoverable_error
 
     def _to_ib_symbol(self, symbol):
+        """Convert a zipline symbol to IB symbol format.
+
+        Args:
+            symbol: Zipline symbol string.
+
+        Returns:
+            str: IB-formatted symbol.
+        """
         # some example: NAV-PD -> NAV, LGF.B -> LGF B
         return symbol.replace('.', ' ').partition('-')[0]
 
@@ -644,6 +698,14 @@ class IBBroker(Broker):
 
     @staticmethod
     def _safe_symbol_lookup(ib_symbol: str):
+        """Look up a zipline asset by IB symbol, returning None if not found.
+
+        Args:
+            ib_symbol: The IB symbol string.
+
+        Returns:
+            Asset or None: The zipline asset, or None if not found.
+        """
         if not ib_symbol:
             return None
 
@@ -657,6 +719,15 @@ class IBBroker(Broker):
 
     @classmethod
     def _create_order_ref(cls, ib_order, dt=pd.to_datetime('now', utc=True)):
+        """Create an order reference string encoding order metadata.
+
+        Args:
+            ib_order: The IB Order object.
+            dt: Timestamp for the order reference.
+
+        Returns:
+            str: Encoded order reference string.
+        """
         order_type = ib_order.orderType.replace(' ', '_')
         return \
             "A:{action} Q:{qty} T:{order_type} " \
@@ -671,6 +742,14 @@ class IBBroker(Broker):
 
     @classmethod
     def _parse_order_ref(cls, ib_order_ref):
+        """Parse an order reference string into order metadata.
+
+        Args:
+            ib_order_ref: The order reference string to parse.
+
+        Returns:
+            dict or None: Parsed order details, or None if not a valid reference.
+        """
         if not ib_order_ref or \
                 not ib_order_ref.endswith(cls._zl_order_ref_magic):
             return None
@@ -702,6 +781,16 @@ class IBBroker(Broker):
             return None
 
     def order(self, asset, amount, style):
+        """Place an order through Interactive Brokers.
+
+        Args:
+            asset: The asset to trade.
+            amount: Number of shares (positive=buy, negative=sell).
+            style: Execution style (MarketOrder, LimitOrder, StopOrder, etc.).
+
+        Returns:
+            ZPOrder: The zipline order object.
+        """
         ib_symbol = self._asset_symbol(asset)
 
         contract = Contract()
@@ -960,10 +1049,26 @@ class IBBroker(Broker):
                 self._transactions[exec_id] = tx
 
     def cancel_order(self, zp_order_id):
+        """Cancel an order by its zipline order ID.
+
+        Args:
+            zp_order_id: The zipline order ID to cancel.
+        """
         ib_order_id = self.orders[zp_order_id].broker_order_id
         self._tws.cancelOrder(ib_order_id, OrderCancel())
 
     def get_spot_value(self, asset, field, dt, data_frequency):
+        """Get the current spot value for an asset from real-time data.
+
+        Args:
+            asset: The asset to query.
+            field: Data field ('price', 'open', 'high', 'low', 'close', 'volume', 'last_traded').
+            dt: Current datetime.
+            data_frequency: Data frequency.
+
+        Returns:
+            The current value for the requested field.
+        """
         self.subscribe_to_market_data(asset)
 
         ib_symbol = self._asset_symbol(asset)
@@ -999,11 +1104,31 @@ class IBBroker(Broker):
                     return minute_df.last_trade_size.sum()
 
     def get_last_traded_dt(self, asset):
+        """Get the last traded datetime for an asset.
+
+        Args:
+            asset: The asset to query.
+
+        Returns:
+            pd.Timestamp: The datetime of the last trade.
+        """
         self.subscribe_to_market_data(asset)
         ib_symbol = self._asset_symbol(asset)
         return self._tws.bars[ib_symbol].index[-1]
 
     def get_realtime_bars(self, assets, frequency):
+        """Get real-time OHLCV bars for assets.
+
+        Args:
+            assets: List of assets to retrieve bars for.
+            frequency: Bar frequency ('1m' or '1d').
+
+        Returns:
+            pd.DataFrame: Multi-level columns (asset, OHLCV) with datetime index.
+
+        Raises:
+            ValueError: If frequency is not '1m' or '1d'.
+        """
         if frequency == '1m':
             resample_freq = '1 Min'
         elif frequency == '1d':

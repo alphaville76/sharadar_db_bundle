@@ -1,3 +1,13 @@
+"""Live data portal merging ingested historical data with real-time broker data.
+
+Extends zipline's DataPortal to provide live market data by combining
+historical bundle data with real-time quotes from the broker.
+"""
+"""Live data portal that merges ingested historical data with real-time broker data.
+
+Extends zipline's DataPortal to provide live market data by combining
+historical bundle data with real-time quotes from the broker.
+"""
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,14 +28,42 @@ from sharadar.util.logger import log
 
 
 class DataPortalLive(DataPortal):
+    """Data portal for live trading combining historical and real-time data.
+
+    Extends DataPortal to fetch current prices from the broker while
+    falling back to ingested historical data for history windows.
+
+    Attributes:
+        broker: The live broker instance providing real-time market data.
+    """
+
     def __init__(self, broker, *args, **kwargs):
+        """Initialize the live data portal.
+
+        Args:
+            broker: Broker instance for real-time data access.
+            *args: Positional arguments passed to DataPortal.
+            **kwargs: Keyword arguments passed to DataPortal.
+        """
         self.broker = broker
         super(DataPortalLive, self).__init__(*args, **kwargs)
 
     def get_last_traded_dt(self, asset, dt, data_frequency):
+        """Get the last traded datetime for an asset from the broker."""
         return self.broker.get_last_traded_dt(asset)
 
     def get_spot_value(self, assets, field, dt, data_frequency):
+        """Get the current spot value for assets from the broker.
+
+        Args:
+            assets: Asset or assets to query.
+            field: Data field (e.g., 'price', 'volume', 'last_traded').
+            dt: Current datetime.
+            data_frequency: Frequency of data ('daily' or 'minute').
+
+        Returns:
+            The spot value, or NaN/NaT if unavailable.
+        """
         try:
             return self.broker.get_spot_value(assets, field, dt, data_frequency)
         except:
@@ -41,6 +79,20 @@ class DataPortalLive(DataPortal):
                            field,
                            data_frequency,
                            ffill=True):
+        """Get a history window merging ingested data with real-time broker data.
+
+        Args:
+            assets: Assets to retrieve data for.
+            end_dt: End datetime of the window.
+            bar_count: Number of bars to return.
+            frequency: Bar frequency ('1d' or '1m').
+            field: Data field ('open', 'high', 'low', 'close', 'volume', 'price').
+            data_frequency: Source data frequency.
+            ffill: Whether to forward-fill missing values.
+
+        Returns:
+            pd.DataFrame: Combined historical and real-time bars.
+        """
         # This method is responsible for merging the ingested historical data
         # with the real-time collected data through the Broker.
         # DataPortal.get_history_window() is called with ffill=False to mark

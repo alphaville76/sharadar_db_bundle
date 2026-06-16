@@ -1,4 +1,10 @@
-﻿import pickle
+"""Context serialization utilities for algorithm state persistence.
+
+Provides functions to save and restore algorithm context state using pickle,
+enabling algo restarts without losing accumulated state (e.g., when
+transitioning from backtest to live trading).
+"""
+import pickle
 import warnings
 
 

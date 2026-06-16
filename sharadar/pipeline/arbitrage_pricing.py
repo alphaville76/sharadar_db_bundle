@@ -1,3 +1,20 @@
+"""Arbitrage Pricing Theory (APT) style factors for Zipline pipelines.
+
+This module implements multi-factor risk model components inspired by the
+Arbitrage Pricing Theory. It provides CustomFactor classes that compute
+sensitivities (betas) of equity returns to macroeconomic risk factors
+including interest rates, term spreads, credit spreads, purchasing
+manager index, and inflation.
+
+Key factors:
+    TBillBeta: Sensitivity to 3-month Treasury bill rate changes.
+    TBillBondSpreadBeta: Sensitivity to the term spread (20y - 3m).
+    CorpGvrnBondsSpreadBeta: Sensitivity to the credit spread.
+    PurchaseManagerIndexBeta: Sensitivity to PMI changes.
+    InterestRate: Current 1-year Treasury rate.
+    InflationRate: Current US inflation rate (YoY).
+    InflationRateBeta: Sensitivity to inflation rate changes.
+"""
 import numpy as np
 from sharadar.pipeline.engine import symbol
 from sharadar.pipeline.factors import beta_residual
@@ -7,6 +24,7 @@ from zipline.pipeline.data import USEquityPricing
 
 
 class Closes(CustomFactor):
+    """CustomFactor that retrieves the latest closing prices for all assets."""
     inputs = [USEquityPricing.close]
     window_safe = True
     window_length = 1
@@ -18,12 +36,27 @@ class Closes(CustomFactor):
 
 
 def prices_by_sid(assets, close, sid):
+    """Extract price series for a specific security ID from the close array.
+
+    Args:
+        assets: Array of asset identifiers.
+        close: 2D array of closing prices (time x assets).
+        sid: Security ID to extract.
+
+    Returns:
+        Column vector of prices for the specified security.
+    """
     rate_index = np.where((assets == sid) == True)[0][0]
     rate = np.reshape(close[:, rate_index], (-1, 1))
     return rate
 
 
 class TBillBeta(CustomFactor):
+    """Compute rolling beta of equity returns to 3-month Treasury bill rate.
+
+    Uses monthly log returns over a 252-day window to estimate sensitivity
+    to short-term interest rate movements.
+    """
     inputs = [USEquityPricing.close, Closes()[symbol('TR3M')]]
     window_safe = True
     window_length = 252
@@ -89,6 +122,11 @@ class CorpGvrnBondsSpreadBeta(CustomFactor):
 
 
 class PurchaseManagerIndexBeta(CustomFactor):
+    """Compute rolling beta of equity returns to Purchasing Managers Index.
+
+    Measures sensitivity of monthly stock returns to changes in the PMI,
+    a leading economic indicator.
+    """
     inputs = [USEquityPricing.close]
     window_safe = True
     window_length = 252
@@ -106,6 +144,7 @@ class PurchaseManagerIndexBeta(CustomFactor):
 
 
 class InterestRate(CustomFactor):
+    """CustomFactor returning the current 1-year Treasury rate."""
     inputs = [Closes()[symbol('TR1Y')]]
     window_safe = True
     window_length = 1
@@ -115,6 +154,7 @@ class InterestRate(CustomFactor):
 
 
 class InflationRate(CustomFactor):
+    """CustomFactor returning the current US year-over-year inflation rate."""
     inputs = [USEquityPricing.close]
     window_safe = True
     window_length = 1
@@ -128,6 +168,11 @@ class InflationRate(CustomFactor):
 
 
 class InflationRateBeta(CustomFactor):
+    """Compute rolling beta of equity returns to US inflation rate.
+
+    Estimates sensitivity of monthly stock returns to inflation using
+    a 252-day rolling window.
+    """
     inputs = [
         USEquityPricing.close,
         InflationRate()

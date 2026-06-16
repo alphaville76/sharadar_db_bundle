@@ -1,3 +1,13 @@
+"""Live trading algorithm implementation.
+
+Extends zipline's TradingAlgorithm to support live trading with a real broker,
+real-time clock, state persistence, and live portfolio/account updates.
+"""
+"""Live trading algorithm implementation.
+
+Extends zipline's TradingAlgorithm to support live trading with a real broker,
+real-time clock, state persistence, and live portfolio/account updates.
+"""
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,6 +47,12 @@ class RequireInitError(ZiplineError):
     msg = "{function} should only be called after initialization."
 
 class LiveAlgorithmExecutor(AlgorithmSimulator):
+    """Algorithm executor adapted for live trading.
+
+    Overrides simulation-specific behavior that is inappropriate for
+    live trading, such as expiring assets at simulation end date.
+    """
+
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
 
@@ -48,7 +64,27 @@ class LiveAlgorithmExecutor(AlgorithmSimulator):
 
 
 class LiveTradingAlgorithm(TradingAlgorithm):
+    """Trading algorithm for live execution via a broker.
+
+    Extends TradingAlgorithm with live broker integration, real-time clock,
+    state persistence across restarts, and live portfolio tracking.
+
+    Attributes:
+        broker: The live broker instance.
+        orders: Dictionary of placed orders.
+        algo_filename: Path to the algorithm source file.
+        state_filename: Path for persisting algorithm state.
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize the live trading algorithm.
+
+        Args:
+            *args: Positional arguments passed to TradingAlgorithm.
+            **kwargs: Keyword arguments. Special keys:
+                broker: Broker instance for live trading.
+                state_filename: Path to save/load algorithm state.
+        """
         self.broker = kwargs.pop('broker', None)
         self.orders = {}
 
@@ -107,6 +143,11 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         store_context(self.state_filename, context=self)
 
     def _create_clock(self):
+        """Create a RealtimeClock synchronized to the broker's wall clock.
+
+        Returns:
+            RealtimeClock: Clock instance emitting events in real time.
+        """
         # This method is taken from TradingAlgorithm.
         # The clock has been replaced to use RealtimeClock
         trading_o_and_c = self.trading_calendar.schedule.loc[
@@ -133,6 +174,14 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         )
 
     def _create_generator(self, sim_params):
+        """Create the live trading event generator.
+
+        Args:
+            sim_params: Simulation parameters (uses self.sim_params in practice).
+
+        Returns:
+            Generator yielding trading events from the live executor.
+        """
         TradingAlgorithm._create_generator(self, self.sim_params)
 
         self.metrics_tracker = metrics_tracker = self._create_live_metrics_tracker()
@@ -154,10 +203,13 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         return self.trading_client.transform()
 
     def _create_live_metrics_tracker(self):
-        """
-        creating the metrics_tracker but setting values from the broker and
-        not from the simulation params
-        :return:
+        """Create a metrics tracker initialized with live broker account values.
+
+        Uses the broker's NetLiquidation as capital_base instead of
+        simulation parameters.
+
+        Returns:
+            MetricsTracker: Tracker initialized with live account data.
         """
         account = self.broker.get_account_from_broker()
         capital_base = float(account['NetLiquidation'])
@@ -174,9 +226,11 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         )
 
     def updated_portfolio(self):
+        """Get the current portfolio state from the broker."""
         return self.broker.portfolio
 
     def updated_account(self):
+        """Get the current account state from the broker."""
         return self.broker.account
 
     @api_method
@@ -288,11 +342,29 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
     @staticmethod
     def round_order(amount):
+        """Round an order amount to the nearest integer.
+
+        Args:
+            amount: The order amount to round.
+
+        Returns:
+            int: Rounded order amount, or 0 if NaN.
+        """
         if pd.isna(amount):
             return 0
         return int(round_if_near_integer(amount))
 
     def run_pipeline(self, pipeline, start_session, chunksize):
+        """Run a pipeline for the current session only.
+
+        Args:
+            pipeline: The Pipeline to run.
+            start_session: Session date to run the pipeline for.
+            chunksize: Ignored in live mode.
+
+        Returns:
+            Tuple of (pipeline_output, start_session).
+        """
         # In Live mode a Pipeline can be run only for the current session (end_session = start_session)
         return self.engine.run_pipeline(pipeline, start_session, start_session), start_session
 

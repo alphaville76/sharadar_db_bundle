@@ -1,3 +1,13 @@
+"""Order cancellation and resubmission policies for live trading.
+
+Provides end-of-day order cancellation and next-day resubmission logic
+for use with zipline scheduled functions.
+"""
+"""Order cancellation and resubmission policies for live trading.
+
+Provides end-of-day order cancellation and next-day resubmission logic
+for use with zipline scheduled functions.
+"""
 from zipline.api import get_open_orders, cancel_order, get_datetime, order
 
 
