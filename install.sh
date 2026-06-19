@@ -1,12 +1,12 @@
 #!/bin/bash
-sudo dnf install -y systemd-devel python3.13
+sudo dnf install -y systemd-devel python3.13-devel cmake gcc-c++
+sudo dnf group install -y development-tools
 
-export PYTHON_VERSION=3.13
-export VENV_NAME=zipline-reloaded-venv$PYTHON_VERSION
-python -m venv -p /usr/bin/python$PYTHON_VERSION ~/$VENV_NAME
+export VENV_NAME=zipline-reloaded-venv3.13
+python3.13 -m venv ~/$VENV_NAME
 source ~/$VENV_NAME/bin/activate
-python -m pip install --upgrade pip
-export PYTHON_LIBS=~/$VENV_NAME/lib/python$PYTHON_VERSION/site-packages
+python3.13 -m pip install --upgrade pip
+export PYTHON_LIBS=~/$VENV_NAME/lib/python3.13/site-packages
 
 # Install TA LIB
 cd $PYTHON_LIBS
@@ -25,7 +25,7 @@ unzip twsapi_macunix.1045.01.zip -d twsapi
 rm twsapi_macunix.1045.01.zip
 cd twsapi/IBJts/source/pythonclient
 pip install wheel setuptools build
-python -m build
+python3.13 -m build
 pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
 
 # Install sharadar_db_bundle and its requirements
@@ -34,9 +34,10 @@ git clone git@github.com:alphaville76/algo.git
 git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd $HOME/sharadar_db_bundle
 pip install -r requirements.txt
-python -m build
+python3.13 -m build
 pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
-python -m pytest -q
+pip install  pytest
+python3.13 -m pytest -q
 
 if [ "$?" -eq 0 ]
 then
