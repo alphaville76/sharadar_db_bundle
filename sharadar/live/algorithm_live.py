@@ -3,6 +3,10 @@
 Extends zipline's TradingAlgorithm to support live trading with a real broker,
 real-time clock, state persistence, and live portfolio/account updates.
 """
+import datetime
+
+from sharadar.util.events import AfterOpen, BeforeClose
+
 """Live trading algorithm implementation.
 
 Extends zipline's TradingAlgorithm to support live trading with a real broker,
@@ -103,13 +107,32 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         super().on_dt_changed(dt)
 
     def schedule_function(self, func, date_rule=None, time_rule=None, half_days=True, calendar=None):
+        now = pd.Timestamp.utcnow().normalize()
+        # In case of every day schedulers, otherwise the value is set later.
+        next_date = now.date()
+        next_time = None
+
         if hasattr(date_rule, 'execution_period_values'):
             values = date_rule.execution_period_values
-            now = pd.Timestamp.utcnow().normalize().value
-            filtered = sorted([x for x in values if x >= now])
+
+            filtered = sorted([x for x in values if x >= now.value])
             next_date = pd.to_datetime(filtered[0], unit='ns', origin='unix').date()
-            #TODO log also the time_rule
-            log.info('Next execution of %s scheduled on %s' % (func.__name__, str(next_date)))
+
+        if time_rule._period_start is None or time_rule._period_close <= next_date:
+            my_calendar = self.data_portal.trading_calendar
+            if isinstance(time_rule, AfterOpen):
+                period_start = my_calendar.session_first_minute(my_calendar.minute_to_session(next_date))
+                next_time = period_start + time_rule.offset - datetime.timedelta(minutes=1)
+            elif isinstance(time_rule, BeforeClose):
+                period_end = my_calendar.session_close(my_calendar.minute_to_session(next_date))
+                next_time = period_end - time_rule.offset
+
+        if next_time is not None:
+            log.info('Next execution of %s scheduled on %s New York time...' % (func.__name__, str(next_time.tz_convert("America/New_York").strftime("%Y-%m-%d %H:%M"))))
+        elif next_date is not None:
+            log.info('Next execution of %s scheduled on %s...' % (func.__name__, str(next_date)))
+        else:
+            log.info('Next execution of %s...' % func.__name__)
 
         return super().schedule_function(func, date_rule, time_rule, half_days, calendar)
 
@@ -368,9 +391,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         """
         # In Live mode a Pipeline can be run only for the current session (end_session = start_session)
         return self.engine.run_pipeline(pipeline, start_session, start_session), start_session
-
-
-
 
 
 
