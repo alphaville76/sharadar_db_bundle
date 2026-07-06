@@ -254,7 +254,7 @@ class TWSConnection(EWrapper, EClient):
             return
 
         self.tick_dict["SYMBOL_" + str(ticker_id)] = symbol
-        self.tick_dict[TickTypeEnum.to_str(tick_type) + "_" + str(ticker_id)] = value
+        self.tick_dict[TickTypeEnum.toStr(tick_type) + "_" + str(ticker_id)] = value
 
     def tickSnapshotEnd(self, ticker_id):
         key = "SYMBOL_" + str(ticker_id)
