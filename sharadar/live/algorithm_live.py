@@ -107,8 +107,9 @@ class LiveTradingAlgorithm(TradingAlgorithm):
             values = date_rule.execution_period_values
             now = pd.Timestamp.utcnow().normalize().value
             filtered = sorted([x for x in values if x >= now])
-            next_datetime = pd.to_datetime(filtered[0], unit='ns', origin='unix')
-            log.info('Next execution of %s scheduled on %s' % (func.__name__, str(next_datetime)))
+            next_date = pd.to_datetime(filtered[0], unit='ns', origin='unix').date()
+            #TODO log also the time_rule
+            log.info('Next execution of %s scheduled on %s' % (func.__name__, str(next_date)))
 
         return super().schedule_function(func, date_rule, time_rule, half_days, calendar)
 
@@ -367,6 +368,8 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         """
         # In Live mode a Pipeline can be run only for the current session (end_session = start_session)
         return self.engine.run_pipeline(pipeline, start_session, start_session), start_session
+
+
 
 
 
