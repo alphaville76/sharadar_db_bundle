@@ -162,8 +162,15 @@ class TWSConnection(EWrapper, EClient):
         self.reqCurrentTime()
         self.reqIds(1)
 
-        while self.time_skew is None or self._next_order_id is None:
+        timeout = _connection_timeout
+        while (self.time_skew is None or self._next_order_id is None) and timeout > 0:
+            if self.unrecoverable_error:
+                raise RuntimeError("Connection was closed while waiting for time and order ID.")
             sleep(_poll_frequency)
+            timeout -= _poll_frequency
+        
+        if self.time_skew is None or self._next_order_id is None:
+            raise RuntimeError("Timeout waiting for time skew and order ID. The IBGateway may be unresponsive.")
 
         log.info("Local-Broker Time Skew: {}".format(self.time_skew))
 
@@ -190,8 +197,17 @@ class TWSConnection(EWrapper, EClient):
         self.reqExecutions(self.next_request_id, exec_filter)
         self.reqAccountUpdates(subscribe=True, acctCode=self.account_id)
 
-        while self.accounts_download_complete is False:
+        timeout = _connection_timeout
+        while self.accounts_download_complete is False and timeout > 0:
+            if self.unrecoverable_error:
+                raise RuntimeError("Connection was closed while downloading account details. "
+                                   "This may happen during market hours. Please retry the connection.")
             sleep(_poll_frequency)
+            timeout -= _poll_frequency
+        
+        if not self.accounts_download_complete:
+            raise RuntimeError("Timeout waiting for account details download. "
+                               "The IBGateway may be overloaded during market hours.")
 
     @property
     def next_ticker_id(self):
