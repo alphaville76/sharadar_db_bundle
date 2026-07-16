@@ -168,7 +168,44 @@ class TWSConnection(EWrapper, EClient):
             except RuntimeError as e:
                 msg = str(e)
                 if "Connection was closed while downloading account details" in msg and attempt <= max_retries:
-                    log.info("Connection closed while downloading account details. Retry %d/%d in %ds..." % (attempt, max_retries, retry_delay))
+                    log.info("Connection closed while downloading account details. Attempting to restart IB connection and retry %d/%d..." % (attempt, max_retries))
+
+                    # Try to cleanly disconnect then re-bind/connect to the gateway
+                    try:
+                        # Best-effort disconnect
+                        try:
+                            self.disconnect()
+                        except Exception:
+                            pass
+
+                        # Reconnect socket
+                        try:
+                            self.bind()
+                        except Exception as ex:
+                            log.warning("Re-bind/connect raised: %s" % ex)
+
+                        # Ensure the run thread is active; restart if needed
+                        thread_alive = hasattr(self, "_thread") and getattr(self, "_thread") is not None and getattr(self, "_thread").is_alive()
+                        if not thread_alive:
+                            thread = threading.Thread(target=self.run, daemon=True)
+                            thread.start()
+                            setattr(self, "_thread", thread)
+
+                        # Wait a short while for the connection to be re-established
+                        timeout = _connection_timeout
+                        while timeout > 0 and not self.isConnected():
+                            log.info("Waiting for reconnection to TWS. Retrying in %ds (timeout in %ds)..." % (_poll_frequency, timeout))
+                            sleep(_poll_frequency)
+                            timeout -= _poll_frequency
+
+                        if not self.isConnected():
+                            log.warning("Reconnection attempt failed; will wait %ds before next retry." % retry_delay)
+                        else:
+                            log.info("Reconnected to TWS successfully. Waiting %ds before retrying account download." % retry_delay)
+
+                    except Exception as ex:
+                        log.warning("Error during reconnect attempt: %s" % ex)
+
                     sleep(retry_delay)
                     continue
                 # Not the handled error or exceeded retries: propagate
