@@ -156,7 +156,24 @@ class TWSConnection(EWrapper, EClient):
         else:
             raise SystemError("Connection timeout during TWS connection!")
 
-        self._download_account_details()
+        # Download account details with retry logic for transient connection closures
+        max_retries = 3
+        retry_delay = 5  # seconds
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                self._download_account_details()
+                break
+            except RuntimeError as e:
+                msg = str(e)
+                if "Connection was closed while downloading account details" in msg and attempt <= max_retries:
+                    log.info("Connection closed while downloading account details. Retry %d/%d in %ds..." % (attempt, max_retries, retry_delay))
+                    sleep(retry_delay)
+                    continue
+                # Not the handled error or exceeded retries: propagate
+                raise
+
         log.info("Current account: {}".format(self.account_id))
 
         self.reqCurrentTime()
