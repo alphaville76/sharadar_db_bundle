@@ -18,16 +18,6 @@ cd ta-lib
 make
 sudo make install
 
-# Install TWS api
-cd $PYTHON_LIBS
-wget https://interactivebrokers.github.io/downloads/twsapi_macunix.1045.01.zip
-unzip twsapi_macunix.1045.01.zip -d twsapi
-rm twsapi_macunix.1045.01.zip
-cd twsapi/IBJts/source/pythonclient
-pip install wheel setuptools build
-python3.13 -m build
-pip install --upgrade dist/ibapi-10.45.1-py3-none-any.whl
-
 # Install sharadar_db_bundle and its requirements
 cd $HOME
 git clone git@github.com:alphaville76/algo.git
