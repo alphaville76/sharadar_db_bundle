@@ -40,6 +40,7 @@ from zipline.api import symbol as symbol_lookup
 from zipline.errors import SymbolNotFound
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
+import ibapi.wrapper
 from ibapi.ticktype import TickTypeEnum
 from ibapi.contract import Contract
 from ibapi.order import Order
@@ -77,6 +78,20 @@ def _method_params_to_dict(args):
     return {k: v
             for k, v in args.items()
             if k != 'self'}
+
+
+def my_log_answer(fnName, fnParams):
+    """Custom logAnswer that uses our logger."""
+    if 'self' in fnParams:
+        prms = dict(fnParams)
+        del prms['self']
+    else:
+        prms = fnParams
+    log.info(f"API Answer: {fnName} {prms}")
+
+
+# Sovrascrivi logAnswer nel modulo ibapi.wrapper
+ibapi.wrapper.logAnswer = my_log_answer
 
 
 class TWSConnection(EWrapper, EClient):
@@ -156,85 +171,25 @@ class TWSConnection(EWrapper, EClient):
         else:
             raise SystemError("Connection timeout during TWS connection!")
 
-        # Download account details with retry logic for transient connection closures
-        max_retries = 3
-        retry_delay = 5  # seconds
-        attempt = 0
-        while True:
-            attempt += 1
-            try:
-                self._download_account_details()
-                break
-            except RuntimeError as e:
-                msg = str(e)
-                if "Connection was closed while downloading account details" in msg and attempt <= max_retries:
-                    log.info("Connection closed while downloading account details. Attempting to restart IB connection and retry %d/%d..." % (attempt, max_retries))
-
-                    # Try to cleanly disconnect then re-bind/connect to the gateway
-                    try:
-                        # Best-effort disconnect
-                        try:
-                            self.disconnect()
-                        except Exception:
-                            pass
-
-                        # Reconnect socket
-                        try:
-                            self.bind()
-                        except Exception as ex:
-                            log.warning("Re-bind/connect raised: %s" % ex)
-
-                        # Ensure the run thread is active; restart if needed
-                        thread_alive = hasattr(self, "_thread") and getattr(self, "_thread") is not None and getattr(self, "_thread").is_alive()
-                        if not thread_alive:
-                            thread = threading.Thread(target=self.run, daemon=True)
-                            thread.start()
-                            setattr(self, "_thread", thread)
-
-                        # Wait a short while for the connection to be re-established
-                        timeout = _connection_timeout
-                        while timeout > 0 and not self.isConnected():
-                            log.info("Waiting for reconnection to TWS. Retrying in %ds (timeout in %ds)..." % (_poll_frequency, timeout))
-                            sleep(_poll_frequency)
-                            timeout -= _poll_frequency
-
-                        if not self.isConnected():
-                            log.warning("Reconnection attempt failed; will wait %ds before next retry." % retry_delay)
-                        else:
-                            log.info("Reconnected to TWS successfully. Waiting %ds before retrying account download." % retry_delay)
-
-                    except Exception as ex:
-                        log.warning("Error during reconnect attempt: %s" % ex)
-
-                    sleep(retry_delay)
-                    continue
-                # Not the handled error or exceeded retries: propagate
-                raise
-
+        self._download_account_details()
         log.info("Current account: {}".format(self.account_id))
 
         self.reqCurrentTime()
         self.reqIds(1)
 
-        timeout = _connection_timeout
-        while (self.time_skew is None or self._next_order_id is None) and timeout > 0:
-            if self.unrecoverable_error:
-                raise RuntimeError("Connection was closed while waiting for time and order ID.")
+        while self.time_skew is None or self._next_order_id is None:
             sleep(_poll_frequency)
-            timeout -= _poll_frequency
-        
-        if self.time_skew is None or self._next_order_id is None:
-            raise RuntimeError("Timeout waiting for time skew and order ID. The IBGateway may be unresponsive.")
 
         log.info("Local-Broker Time Skew: {}".format(self.time_skew))
 
     def logRequest(self, fnName, fnParams):
+        log.info("Sending request %s" % (fnName))
         if 'self' in fnParams:
             prms = dict(fnParams)
             del prms['self']
         else:
             prms = fnParams
-        log.info("Sending request %s %s" % (fnName, prms))
+        log.debug("Sending request %s with params %s" % (fnName, prms))
 
     def bind(self):
         """Establish the TCP connection to TWS/Gateway."""
@@ -248,20 +203,17 @@ class TWSConnection(EWrapper, EClient):
     def _download_account_details(self):
         exec_filter = ExecutionFilter()
         exec_filter.clientId = self.client_id
+
+        log.info("Requesting Executions...")
         self.reqExecutions(self.next_request_id, exec_filter)
+
+        log.info("Requesting Account Updates...")
         self.reqAccountUpdates(subscribe=True, acctCode=self.account_id)
 
-        timeout = _connection_timeout
-        while self.accounts_download_complete is False and timeout > 0:
-            if self.unrecoverable_error:
-                raise RuntimeError("Connection was closed while downloading account details. "
-                                   "This may happen during market hours. Please retry the connection.")
+        log.info("Waiting until account details are downloaded...")
+        while not self.accounts_download_complete:
+            log.info("Retry in {} seconds".format(_poll_frequency))
             sleep(_poll_frequency)
-            timeout -= _poll_frequency
-        
-        if not self.accounts_download_complete:
-            raise RuntimeError("Timeout waiting for account details download. "
-                               "The IBGateway may be overloaded during market hours.")
 
     @property
     def next_ticker_id(self):
@@ -405,6 +357,8 @@ class TWSConnection(EWrapper, EClient):
 
     def accountDownloadEnd(self, account_name):
         self.accounts_download_complete = True
+        my_log_answer("accountDownloadEnd", vars())
+        log.info("Account download completed for account {}".format(account_name))
 
     def nextValidId(self, order_id):
         self._next_order_id = order_id

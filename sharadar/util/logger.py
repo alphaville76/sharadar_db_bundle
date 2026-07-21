@@ -41,11 +41,17 @@ class SharadarDbBundleLogger(Logger):
         self.filename = os.path.join(log_dir,
                                      'sharadar-zipline' + '_' + now.strftime('%Y-%m-%d_%H%M') + '.log')
 
+        ##############################################
+        # Set here the log level for the file logger #
+        ##############################################
         log_file_handler = FileHandler(self.filename, level=DEBUG, bubble=True)
         log_file_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(log_file_handler)
 
-        log_std_handler = StreamHandler(sys.stdout, level=INFO)
+        #################################################
+        # Set here the log level for the std out logger #
+        #################################################
+        log_std_handler = StreamHandler(sys.stdout, level=DEBUG)
         log_std_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(log_std_handler)
 
