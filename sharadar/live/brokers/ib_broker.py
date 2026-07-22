@@ -211,9 +211,10 @@ class TWSConnection(EWrapper, EClient):
         self.reqAccountUpdates(subscribe=True, acctCode=self.account_id)
 
         log.info("Waiting until account details are downloaded...")
-        while not self.accounts_download_complete:
-            log.info("Retry in {} seconds".format(_poll_frequency))
+        sleep(_poll_frequency)
+        while self.accounts_download_complete is False:
             sleep(_poll_frequency)
+            log.info("Retry in {} seconds".format(_poll_frequency))
 
     @property
     def next_ticker_id(self):
@@ -356,9 +357,9 @@ class TWSConnection(EWrapper, EClient):
         pass
 
     def accountDownloadEnd(self, account_name):
-        self.accounts_download_complete = True
         my_log_answer("accountDownloadEnd", vars())
         log.info("Account download completed for account {}".format(account_name))
+        self.accounts_download_complete = True
 
     def nextValidId(self, order_id):
         self._next_order_id = order_id
