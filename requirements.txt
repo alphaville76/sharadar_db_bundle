@@ -116,3 +116,5 @@ xgboost==2.0.0
 yfinance==0.2.31
 zipline-reloaded==3.1.1
 zipp==3.17.0
+--index-url https://pytorch.org
+torch==2.12.0+cpu
