@@ -161,15 +161,17 @@ class TWSConnection(EWrapper, EClient):
         setattr(self, "_thread", thread)
 
         timeout = _connection_timeout
-        while timeout > 0 and not self.isConnected():
-            log.info("Cannot connect to TWS. Retrying in %ds (timeout in %ds)..." % (_poll_frequency, timeout))
+        # The loop will continue to wait if you are NOT connected OR if the ID is still None
+        while timeout > 0 and (not self.isConnected() or self._next_order_id is None):
+            log.info("Waiting for TWS connection and nextValidId... (timeout in %ds)" % timeout)
             sleep(_poll_frequency)
             timeout -= _poll_frequency
 
-        if self.isConnected():
-            log.info("Connected to TWS!")
+        # After the loop, verify both conditions actually succeeded
+        if not self.isConnected() or self._next_order_id is None:
+            raise ConnectionError("Failed to fully connect and receive nextValidId within timeout period.")
         else:
-            raise SystemError("Connection timeout during TWS connection!")
+            log.info("Connected to TWS!")
 
         self._download_account_details()
         log.info("Current account: {}".format(self.account_id))
@@ -204,6 +206,8 @@ class TWSConnection(EWrapper, EClient):
         exec_filter = ExecutionFilter()
         exec_filter.clientId = self.client_id
 
+        sleep(_poll_frequency)
+
         log.info("Requesting Executions...")
         self.reqExecutions(self.next_request_id, exec_filter)
 
@@ -211,10 +215,9 @@ class TWSConnection(EWrapper, EClient):
         self.reqAccountUpdates(subscribe=True, acctCode=self.account_id)
 
         log.info("Waiting until account details are downloaded...")
-        sleep(_poll_frequency)
+
         while self.accounts_download_complete is False:
             sleep(_poll_frequency)
-            log.info("Retry in {} seconds".format(_poll_frequency))
 
     @property
     def next_ticker_id(self):
@@ -362,6 +365,7 @@ class TWSConnection(EWrapper, EClient):
         self.accounts_download_complete = True
 
     def nextValidId(self, order_id):
+        super().nextValidId(order_id)
         self._next_order_id = order_id
 
     def contractDetails(self, req_id, contract_details):
