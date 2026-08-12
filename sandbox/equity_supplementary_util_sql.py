@@ -1,5 +1,3 @@
-import pandas as pd
-import numpy as np
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table
 from sharadar.util.equity_supplementary_util import insert_asset_info
 from sharadar.util.equity_supplementary_util import insert_fundamentals
@@ -31,7 +29,10 @@ CREATE TABLE IF NOT EXISTS equity_supplementary_mappings (
 );
     """)
 
-sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table='SEP', paginate=True)
+sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS',
+                                                table='SEP',
+                                                params={"qopts.data_version": 3},
+                                                paginate=True)
 sharadar_metadata_df.set_index('ticker', inplace=True)
 with closing(sqlite3.connect(db_file)) as conn, conn, closing(conn.cursor()) as cursor:
     insert_asset_info(sharadar_metadata_df, cursor)

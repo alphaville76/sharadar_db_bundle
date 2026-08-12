@@ -4,6 +4,8 @@ Provides SQLiteAssetFinder for querying equity metadata, fundamentals,
 and daily metrics from a SQLite database, and SQLiteAssetDBWriter for
 writing asset data with supplementary mappings.
 """
+import os
+import time
 import warnings
 from datetime import timedelta
 
@@ -12,16 +14,20 @@ import pandas as pd
 from exchange_calendars import get_calendar
 from pandas.tseries.offsets import DateOffset
 from sharadar.util.logger import log
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from toolz import first
 from zipline.assets import AssetFinder, AssetDBWriter
 from zipline.assets.asset_db_schema import (
     asset_router,
     equities as equities_table,
     equity_symbol_mappings,
+    equity_supplementary_mappings as equity_supplementary_mappings_table,
+    exchanges as exchanges_table,
     futures_contracts as futures_contracts_table,
+    futures_root_symbols,
 )
 from zipline.utils.memoize import lazyval
-from sqlalchemy import text
 
 
 class SQLiteAssetFinder(AssetFinder):
@@ -275,15 +281,131 @@ class SQLiteAssetDBWriter(AssetDBWriter):
     mappings to the SQLite asset database. Uses INSERT OR REPLACE semantics
     for upsert behavior.
     """
+    def __init__(self, engine, lock_retry_count=8, lock_retry_delay=2.0):
+        if isinstance(engine, (str, os.PathLike)):
+            db_path = os.fspath(engine)
+            if not os.path.isabs(db_path):
+                db_path = os.path.abspath(db_path)
+            engine = create_engine(
+                f"sqlite:///{db_path}",
+                connect_args={"timeout": 30.0, "check_same_thread": False},
+            )
+
+        super().__init__(engine)
+        self._lock_retry_count = lock_retry_count
+        self._lock_retry_delay = lock_retry_delay
+
+    @staticmethod
+    def _is_lock_error(error):
+        message = str(error).lower()
+        return "locked" in message or "database schema is locked" in message
+
+    def _configure_sqlite_connection(self, conn):
+        if getattr(self.engine.url, "get_backend_name", lambda: "")() != "sqlite":
+            return
+        conn.exec_driver_sql("PRAGMA busy_timeout = 30000")
+        conn.exec_driver_sql("PRAGMA journal_mode = WAL")
+        conn.exec_driver_sql("PRAGMA synchronous = NORMAL")
+
+    def _execute_with_retry(self, operation, operation_name):
+        last_error = None
+        delay = self._lock_retry_delay
+        for attempt in range(self._lock_retry_count):
+            try:
+                return operation()
+            except OperationalError as error:
+                last_error = error
+                if self._is_lock_error(error) and attempt < self._lock_retry_count - 1:
+                    log.warning(
+                        "SQLite database is locked while %s; retrying in %.1f seconds "
+                        "(attempt %d/%d)",
+                        operation_name,
+                        delay,
+                        attempt + 1,
+                        self._lock_retry_count,
+                    )
+                    time.sleep(delay)
+                    delay *= 1.5
+                    continue
+                raise
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("SQLiteAssetDBWriter retry loop did not execute any operation")
+
     def init_db(self, txn=None):
         """Initialize the database schema with additional indexes.
 
         Args:
             txn: SQLAlchemy transaction for schema creation.
         """
-        super().init_db(txn)
-        txn.execute(text(
-            "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"))
+        def run():
+            if txn is None:
+                with self.engine.begin() as conn:
+                    self._configure_sqlite_connection(conn)
+                    super().init_db(conn)
+                    conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
+                    ))
+                return
+
+            self._configure_sqlite_connection(txn)
+            super().init_db(txn)
+            txn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
+            ))
+
+        self._execute_with_retry(run, "initializing the asset database")
+
+    def _real_write(self, equities, equity_symbol_mappings, equity_supplementary_mappings, futures, exchanges,
+                    root_symbols, chunk_size):
+        def run():
+            with self.engine.begin() as conn:
+                self._configure_sqlite_connection(conn)
+                self.init_db(conn)
+
+                if exchanges is not None:
+                    self._write_df_to_table(
+                        exchanges_table,
+                        exchanges,
+                        conn,
+                        chunk_size,
+                    )
+
+                if root_symbols is not None:
+                    self._write_df_to_table(
+                        futures_root_symbols,
+                        root_symbols,
+                        conn,
+                        chunk_size,
+                    )
+
+                if equity_supplementary_mappings is not None:
+                    self._write_df_to_table(
+                        equity_supplementary_mappings_table,
+                        equity_supplementary_mappings,
+                        conn,
+                        chunk_size,
+                    )
+
+                if futures is not None:
+                    self._write_assets(
+                        "future",
+                        futures,
+                        conn,
+                        chunk_size,
+                    )
+
+                if equities is not None:
+                    self._write_assets(
+                        "equity",
+                        equities,
+                        conn,
+                        chunk_size,
+                        mapping_data=equity_symbol_mappings,
+                    )
+
+        self._execute_with_retry(run, "writing asset metadata")
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         """Write asset data to the appropriate database tables.

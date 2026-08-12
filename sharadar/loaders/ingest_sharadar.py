@@ -130,8 +130,11 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     Returns:
         pd.DataFrame: Dividend records with sid, amount, and date columns.
     """
-    dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start},
-                                                 action=['dividend', 'spinoffdividend'], paginate=True)
+    dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
+                                            date={'gte': start},
+                                            action=['dividend', 'spinoffdividend'],
+                                            params={"qopts.data_version": 3},
+                                            paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
     tickers_dividends = dividends_df['ticker'].unique()
@@ -159,7 +162,11 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
     Returns:
         pd.DataFrame: Split records with effective_date, ratio, and sid columns.
     """
-    splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS', date={'gte': start}, action=['split'], paginate=True)
+    splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
+                                         date={'gte': start},
+                                         action=['split'],
+                                         params={"qopts.data_version": 3},
+                                         paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -375,7 +382,10 @@ def create_metadata():
     Returns:
         Tuple of (related_tickers Series, sharadar_metadata_df DataFrame).
     """
-    sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+    sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS',
+                                                    table=['SFP', 'SEP'],
+                                                    params={"qopts.data_version": 3},
+                                                    paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
     # Add a space at the start and end of relatedtickers, search for ' TICKER '

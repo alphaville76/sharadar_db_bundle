@@ -1,6 +1,7 @@
 import pytest
 import pandas as pd
-from sharadar.data.sql_lite_assets import SQLiteAssetFinder
+from sqlalchemy.exc import OperationalError
+from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 
 
 @pytest.fixture
@@ -34,3 +35,36 @@ class TestSQLiteAssetFinder:
         assert 'SELECT' in sql
         assert 'equity_supplementary_mappings' in sql
         assert 'ROW_NUMBER' in sql
+
+
+def test_asset_db_writer_retries_when_database_is_locked(tmp_path, monkeypatch):
+    writer = SQLiteAssetDBWriter(str(tmp_path / 'assets.sqlite'), lock_retry_count=2, lock_retry_delay=0)
+    begin_calls = {'count': 0}
+
+    class DummyConnection:
+        def exec_driver_sql(self, sql):
+            return None
+
+        def execute(self, stmt):
+            return None
+
+    class DummyTransaction:
+        def __enter__(self):
+            return DummyConnection()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FailingThenWorkingBegin:
+        def __call__(self):
+            begin_calls['count'] += 1
+            if begin_calls['count'] == 1:
+                raise OperationalError('database is locked', None, None)
+            return DummyTransaction()
+
+    monkeypatch.setattr(writer.engine, 'begin', FailingThenWorkingBegin())
+    writer.init_db = lambda txn=None: None
+
+    writer._real_write(None, None, None, None, None, None, 1000)
+
+    assert begin_calls['count'] == 2

@@ -132,6 +132,7 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     nasdaqdatalink.ApiConfig.api_key = api_key
     df = nasdaqdatalink.get_table(table_name,
                                   date={'gte': start, 'lte': end},
+                                  params={"qopts.data_version": 3},
                                   paginate=True)
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
@@ -152,8 +153,10 @@ def fetch_sf1_table_date(api_key, start, end=None):
     """
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    return nasdaqdatalink.get_table('SHARADAR/SF1', dimension=['ARQ', 'ART'],
+    return nasdaqdatalink.get_table('SHARADAR/SF1',
+                                    dimension=['ARQ', 'ART'],
                                     lastupdated={'gte': start, 'lte': end},
+                                    params={"qopts.data_version": 3},
                                     paginate=True)
 
 
@@ -165,4 +168,7 @@ def last_available_date():
     Returns:
         str: Last available date in 'YYYY-MM-DD' format.
     """
-    return nasdaqdatalink.get_table('SHARADAR/TICKERS', ticker='SPY')['lastpricedate'][0].strftime('%Y-%m-%d')
+    return nasdaqdatalink.get_table('SHARADAR/TICKERS',
+                                    ticker='SPY',
+                                    params={"qopts.data_version": 3}
+                                    )['lastpricedate'][0].strftime('%Y-%m-%d')
