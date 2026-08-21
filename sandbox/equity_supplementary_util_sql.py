@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS equity_supplementary_mappings (
 
 sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS',
                                                 table='SEP',
-                                                params={"qopts.data_version": 3},
                                                 paginate=True)
 sharadar_metadata_df.set_index('ticker', inplace=True)
 with closing(sqlite3.connect(db_file)) as conn, conn, closing(conn.cursor()) as cursor:

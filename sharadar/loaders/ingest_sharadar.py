@@ -133,7 +133,6 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
                                             date={'gte': start},
                                             action=['dividend', 'spinoffdividend'],
-                                            params={"qopts.data_version": 3},
                                             paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
@@ -165,7 +164,6 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
     splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
                                          date={'gte': start},
                                          action=['split'],
-                                         params={"qopts.data_version": 3},
                                          paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
@@ -384,7 +382,6 @@ def create_metadata():
     """
     sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS',
                                                     table=['SFP', 'SEP'],
-                                                    params={"qopts.data_version": 3},
                                                     paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
