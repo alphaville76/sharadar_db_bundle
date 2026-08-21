@@ -557,6 +557,8 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         field = 'category'
 
         expected = [
+            ' Preferred',
+            ' Warrant',
             'ADR Common Stock',
             'ADR Common Stock Primary Class',
             'ADR Common Stock Secondary Class',
@@ -583,6 +585,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             'ETMF',
             'ETN',
             'IDX',
+            'MF',
             'UNIT'
         ]
 
