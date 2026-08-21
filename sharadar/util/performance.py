@@ -542,11 +542,11 @@ def print_portfolio(log, context):
     """
     if log:
         mem = psutil.virtual_memory()
-        log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))
+        #log.info("Memory used %.2f Gb von %.2f Gb (%d%%)" % (mem.used / 1e9, mem.total / 1e9, mem.percent))
 
         pdf = describe_portfolio(context.portfolio.positions)
         log.info('Portfolio performance:\n{stats}'.format(stats=pdf))
-        log.info('Portfolio value: %.2f' % context.portfolio.portfolio_value)
+        #log.info('Portfolio value: %.2f' % context.portfolio.portfolio_value)
 
 if __name__ == "__main__":
     warnings.filterwarnings('ignore')
