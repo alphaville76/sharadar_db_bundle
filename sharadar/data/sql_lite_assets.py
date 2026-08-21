@@ -343,14 +343,14 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             if txn is None:
                 with self.engine.begin() as conn:
                     self._configure_sqlite_connection(conn)
-                    super().init_db(conn)
+                    super(SQLiteAssetDBWriter, self).init_db(conn)
                     conn.execute(text(
                         "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
                     ))
                 return
 
             self._configure_sqlite_connection(txn)
-            super().init_db(txn)
+            super(SQLiteAssetDBWriter, self).init_db(txn)
             txn.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
             ))
