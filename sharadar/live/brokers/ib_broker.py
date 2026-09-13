@@ -87,7 +87,7 @@ def my_log_answer(fnName, fnParams):
         del prms['self']
     else:
         prms = fnParams
-    log.info(f"API Answer: {fnName} {prms}")
+    log.debug(f"API Answer: {fnName} {prms}")
 
 
 # Sovrascrivi logAnswer nel modulo ibapi.wrapper

@@ -51,7 +51,7 @@ class SharadarDbBundleLogger(Logger):
         #################################################
         # Set here the log level for the std out logger #
         #################################################
-        log_std_handler = StreamHandler(sys.stdout, level=DEBUG)
+        log_std_handler = StreamHandler(sys.stdout, level=INFO)
         log_std_handler.format_string = LOG_ENTRY_FMT
         self.handlers.append(log_std_handler)
 
