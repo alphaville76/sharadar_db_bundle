@@ -143,8 +143,8 @@ class DataPortalLive(DataPortal):
             # To provide values for such cases we backward fill.
             # Backward fill as a second operation will have no effect if the
             # forward-fill was successful.
-            combined_bars.fillna(method='ffill', inplace=True)
-            combined_bars.fillna(method='bfill', inplace=True)
+            combined_bars.ffill(inplace=True)
+            combined_bars.bfill(inplace=True)
 
         return combined_bars[-bar_count:]
 
@@ -182,10 +182,10 @@ class DataPortalLive(DataPortal):
             data_frequency = '1d'
         prices = self.broker.get_realtime_bars([asset], data_frequency)
         if field == 'last_traded':
-            return pd.Timestamp(prices[asset][-1:].index.get_values()[0])
+            return pd.Timestamp(prices[asset][-1:].index[0])
         elif field == 'volume':
-            return prices[asset][field][-1] * 100
+            return prices[asset][field].iloc[-1] * 100
         elif field == 'price':
-            return prices[asset]['close'][-1]
+            return prices[asset]['close'].iloc[-1]
         else:
-            return prices[asset][field][-1]
+            return prices[asset][field].iloc[-1]

@@ -207,14 +207,14 @@ def ipython_only(option):
     '-s',
     '--start',
     type=Date(tz='utc', as_timestamp=True),
-    default=pd.Timestamp.utcnow(),
+    default=None,
     help='The start date of the simulation.',
 )
 @click.option(
     '-e',
     '--end',
     type=Date(tz='utc', as_timestamp=True),
-    default=pd.Timestamp.utcnow() + pd.Timedelta(days=1, seconds=1),  # Add 1-second to assure that end is > 1day
+    default=None,
     help='The end date of the simulation.',
 )
 @click.option(

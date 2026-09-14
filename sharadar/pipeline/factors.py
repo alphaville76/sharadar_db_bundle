@@ -288,7 +288,7 @@ def time_trend(Y, allowed_missing=0):
     if allowed_missing == 0:
         # interpolate is too slow for the Algo Platform
         # Y = pd.DataFrame(Y).interpolate().fillna(method='bfill').fillna(0)
-        Y = pd.DataFrame(Y).fillna(method='ffill', axis=0).fillna(0)
+        Y = pd.DataFrame(Y).ffill(axis=0).fillna(0)
     n = Y.shape[0]
     m = Y.shape[1]
     # idx: n-1 to 0; chronological order: from the oldest to the most recent observation

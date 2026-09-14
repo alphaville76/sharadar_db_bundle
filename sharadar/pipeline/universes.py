@@ -134,9 +134,22 @@ class UniverseReader(object):
         Args:
             db_path: Path to the universes SQLite database file.
         """
-        db = sqlite3.connect(db_path, isolation_level=None)
-        db.row_factory = lambda cursor, row: row[0]
-        self.cursor = db.cursor()
+        self.db = sqlite3.connect(db_path, isolation_level=None)
+        self.db.row_factory = lambda cursor, row: row[0]
+        self.cursor = self.db.cursor()
+
+    def close(self):
+        """Close the underlying SQLite connection."""
+        self.db.close()
+
+    def __del__(self):
+        # Defensive fallback so the SQLite connection is not left open
+        # (and does not trigger a ResourceWarning) if close() was never
+        # called explicitly.
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def _query(self, sql):
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:

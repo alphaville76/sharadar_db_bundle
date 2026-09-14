@@ -21,7 +21,8 @@ def asset_db_engine():
             asset_metadata.tables['version_info'].insert().values(version=ASSET_DB_VERSION)
         )
         conn.commit()
-    return engine
+    yield engine
+    engine.dispose()
 
 @pytest.fixture
 def mock_asset_finder():

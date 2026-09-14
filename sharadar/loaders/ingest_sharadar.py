@@ -199,14 +199,19 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, d
         start_date: First date of ticker data.
         end_date: Last date of ticker data.
         df_ticker: DataFrame subset for a single ticker.
-        df: Full prices DataFrame (modified in place).
+        df: Full prices DataFrame.
+
+    Returns:
+        pd.DataFrame: The prices DataFrame with the ticker's interstitial
+        dates filled in (forward-filled). If there are no missing dates,
+        `df` is returned unchanged.
     """
     this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
 
     missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
     if len(missing_dates) > 0:
         sid = df_ticker.index.get_level_values('sid')[0]
-        ticker = df_ticker['ticker'][0]
+        ticker = df_ticker['ticker'].iloc[0]
         log.info("Fixing missing %d interstitial dates for %s from %s to %s: %s."
                  % (len(missing_dates), ticker, this_cal[0], this_cal[-1], missing_dates))
 
@@ -216,16 +221,17 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, d
 
         # Forward fill missing data, volume and dividens must remain 0
         columns_ffill = ['ticker', 'open', 'high', 'low', 'close']
-        df_ticker_synch[columns_ffill] = df_ticker_synch[columns_ffill].fillna(method='ffill')
+        df_ticker_synch[columns_ffill] = df_ticker_synch[columns_ffill].ffill()
         df_ticker_synch = df_ticker_synch.fillna({'volume': 0})
 
         # Drop remaining NaN
         df_ticker_synch.dropna(inplace=True)
 
         # drop the existing sub dataframe
-        df.drop(df_ticker.index, inplace=True)
+        df = df.drop(df_ticker.index)
         # and concat with the new one with all the dates.
-        pd.concat([df, df_ticker_synch])
+        df = pd.concat([df, df_ticker_synch])
+    return df
 
 def trading_date(date, cal):
     """
@@ -290,7 +296,7 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     # iterate over all the securities and pack data and metadata for writing
     tickers = prices_df['ticker'].unique()
     log.info("Start creating data for %d equities..." % (len(tickers)))
-    equities_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress=True)
+    equities_df, prices_df = create_equities_df(prices_df, tickers, sessions, sharadar_metadata_df, show_progress=True)
 
     # Additional MACRO data
     #macro_equities_df = create_macro_equities_df()
@@ -471,7 +477,9 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
         show_progress: Whether to display a progress bar.
 
     Returns:
-        pd.DataFrame: Equities metadata indexed by sid.
+        tuple[pd.DataFrame, pd.DataFrame]: The equities metadata DataFrame
+        indexed by sid, and `df` with any interstitial dates synchronized
+        to the trading calendar (forward-filled).
     """
     equities_df = pd.DataFrame(columns=METADATA_HEADERS)
     with maybe_show_progress(tickers, show_progress, label='Loading custom pricing data: ') as it:
@@ -508,11 +516,11 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             date_index = df_ticker.index.get_level_values('date')
             start_date_df = date_index[0]
             end_date_df = date_index[-1]
-            synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
+            df = synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
 
             # Add a row to the metadata DataFrame.
             equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange
-    return equities_df
+    return equities_df, df
 
 
 def from_nasdaqdatalink():

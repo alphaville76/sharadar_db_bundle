@@ -315,7 +315,7 @@ class SQLiteDailyBarReader(SessionBarReader):
             sids = [x.sid for x in sids]
 
         raw_arrays = []
-        with sqlite3.connect(self._filename) as conn:
+        with closing(sqlite3.connect(self._filename)) as conn:
             for field in fields:
                 query = "SELECT date, sid, %s FROM prices WHERE sid in (%s) and date >= '%s' AND date <= '%s';" \
                         % (field, ",".join(map(str, sids)), str(start_day), str(end_day))

@@ -4,12 +4,11 @@ This module provides a simplified FX rate reader that bypasses currency
 conversion by always returning a rate of 1.0, effectively treating all
 assets as if they are denominated in the same currency.
 """
-from interface import implements
 import numpy as np
 from zipline.data.fx.base import FXRateReader
 
 
-class SimpleFXRateReader(implements(FXRateReader)):
+class SimpleFXRateReader(FXRateReader):
     """An FXRateReader that bypasses currency conversion.
 
     Returns a rate of 1.0 for all currency pairs, effectively assuming all
