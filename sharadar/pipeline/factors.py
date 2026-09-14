@@ -14,6 +14,7 @@ from zipline.lib.labelarray import LabelArray
 from zipline.pipeline.classifiers import CustomClassifier
 from zipline.pipeline.data import USEquityPricing
 from zipline.pipeline.factors import CustomFactor, DailyReturns
+from zipline.pipeline.term import NotSpecified
 from zipline.utils.numpy_utils import object_dtype
 from zipline.pipeline.factors import AverageDollarVolume
 from sharadar.pipeline.engine import returns
@@ -541,9 +542,15 @@ class Beta(CustomFactor):
     """
 
     outputs = ['beta', 'residual_var']
-    inputs = [DailyReturns(), DailyReturns()[symbol('SPY')]]
     window_length = 252
     params = ('standardize',)
+
+    def __new__(cls, inputs=NotSpecified, **kwargs):
+        # Resolve SPY lazily: doing it at class-definition time would make
+        # importing this module fail whenever no bundle has been ingested yet.
+        if inputs is NotSpecified:
+            inputs = [DailyReturns(), DailyReturns()[symbol('SPY')]]
+        return super().__new__(cls, inputs=inputs, **kwargs)
 
     def compute(self, today, assets, out, assets_returns, market_returns, standardize):
         allowed_missing_percentage = 0.25

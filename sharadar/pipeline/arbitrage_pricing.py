@@ -21,6 +21,7 @@ from sharadar.pipeline.factors import beta_residual
 from sharadar.util.numpy_invalid_values_util import nanlog, nanlog1p
 from zipline.pipeline import CustomFactor
 from zipline.pipeline.data import USEquityPricing
+from zipline.pipeline.term import NotSpecified
 
 
 class Closes(CustomFactor):
@@ -57,9 +58,15 @@ class TBillBeta(CustomFactor):
     Uses monthly log returns over a 252-day window to estimate sensitivity
     to short-term interest rate movements.
     """
-    inputs = [USEquityPricing.close, Closes()[symbol('TR3M')]]
     window_safe = True
     window_length = 252
+
+    def __new__(cls, inputs=NotSpecified, **kwargs):
+        # Resolve TR3M lazily: doing it at class-definition time would make
+        # importing this module fail whenever no bundle has been ingested yet.
+        if inputs is NotSpecified:
+            inputs = [USEquityPricing.close, Closes()[symbol('TR3M')]]
+        return super().__new__(cls, inputs=inputs, **kwargs)
 
     def compute(self, today, assets, out, close, rate):
         # monthly log returns
@@ -145,9 +152,15 @@ class PurchaseManagerIndexBeta(CustomFactor):
 
 class InterestRate(CustomFactor):
     """CustomFactor returning the current 1-year Treasury rate."""
-    inputs = [Closes()[symbol('TR1Y')]]
     window_safe = True
     window_length = 1
+
+    def __new__(cls, inputs=NotSpecified, **kwargs):
+        # Resolve TR1Y lazily: doing it at class-definition time would make
+        # importing this module fail whenever no bundle has been ingested yet.
+        if inputs is NotSpecified:
+            inputs = [Closes()[symbol('TR1Y')]]
+        return super().__new__(cls, inputs=inputs, **kwargs)
 
     def compute(self, today, assets, out, int_rate):
         out[:] = int_rate[-self.window_length]
