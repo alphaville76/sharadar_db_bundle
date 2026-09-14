@@ -11,9 +11,9 @@ jobs:
         python-version: [3.13]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python-version }}
     - name: Main
@@ -42,4 +42,4 @@ jobs:
         pip install -r requirements.txt
         python -m build
         pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
-        python -m pytest -q --tb=native
+        python -m pytest -q --tb=short
