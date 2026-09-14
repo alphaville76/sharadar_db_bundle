@@ -6,12 +6,13 @@ SQLite databases compatible with the zipline-reloaded pipeline.
 """
 from os import environ as env
 import os
+import re
 import pandas as pd
 import numpy as np
 import nasdaqdatalink
 
 from exchange_calendars import get_calendar
-from sharadar.util.output_dir import get_data_dir
+from sharadar.util.output_dir import get_data_dir, get_cache_dir
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
 from sharadar.util.nasdaqdatalink_util import last_available_date
 from sharadar.util.equity_supplementary_util import lookup_sid
@@ -369,9 +370,77 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
         if asset_db_writer.check_sanity():
             log.info("Sanity check successful!")
 
+    # The pipeline engine (sharadar.pipeline.engine.BundlePipelineEngine) caches
+    # computed root masks and term results on disk, keyed only by dates/screen/term
+    # name (no data-version/freshness component). Since this ingest just refreshed
+    # data starting from `cache_invalidation_start`, any previously cached pipeline
+    # results covering that period are now stale and must be invalidated, otherwise
+    # pipelines would keep returning old (possibly wrong, e.g. all-NaN/empty-universe)
+    # cached results forever, even though the underlying data has since been corrected.
+    cache_invalidation_start = min(
+        pd.Timestamp(start_fetch_date),
+        start_date_fundamentals if pd.notnull(start_date_fundamentals) else pd.Timestamp.min,
+        start_date_metrics if pd.notnull(start_date_metrics) else pd.Timestamp.min,
+    )
+    clear_cache_dir(cache_invalidation_start)
+
     okay_path = os.path.join(output_dir, "ok")
     Path(okay_path).touch()
     log.info("Ingest finished!")
+
+
+def clear_cache_dir(cache_invalidation_start=None):
+    """Remove cached pipeline computation files affected by newly ingested data.
+
+    The pipeline engine caches root masks (``root-<start>_<end>_<calendar>_
+    <country>_<extra_rows>.pkl``) and computed term results (``term-<start>_
+    <end>_<screen>_<term>.npy``) under ``get_cache_dir()`` with no data-version
+    or freshness check: once written, a cache file is loaded from disk forever,
+    regardless of whether the underlying bundle data has since changed.
+
+    This must be called after every successful ingest so that pipelines
+    recompute against the freshly ingested data instead of serving stale
+    cached results. Only cache files whose date range overlaps the period
+    that was actually (re-)ingested are removed; cache files entirely before
+    ``cache_invalidation_start`` are left untouched since the data they
+    depend on was not touched by this ingest.
+
+    Args:
+        cache_invalidation_start: The earliest date for which data was
+            (re-)fetched during this ingest. If None, all cache files are
+            removed (e.g. on a first/full ingest).
+    """
+    cache_dir = get_cache_dir()
+    removed = 0
+    kept = 0
+    filename_re = re.compile(r'^(?:root|term)-(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})_')
+    for name in os.listdir(cache_dir):
+        if not (name.endswith('.pkl') or name.endswith('.npy')):
+            continue
+
+        remove = cache_invalidation_start is None
+        if not remove:
+            match = filename_re.match(name)
+            if match is None:
+                # Unrecognized filename format: be conservative and keep it.
+                log.warn("Could not parse cache filename, leaving it in place: %s" % name)
+            else:
+                end_date = pd.Timestamp(match.group(2))
+                # The term/root mask covers dates up to end_date; if that end
+                # date falls within (or after) the period we just refreshed,
+                # the cached result may depend on data that changed.
+                remove = end_date >= cache_invalidation_start
+
+        if remove:
+            try:
+                os.remove(os.path.join(cache_dir, name))
+                removed += 1
+            except OSError as e:
+                log.warn("Could not remove cache file %s: %s" % (name, e))
+        else:
+            kept += 1
+    log.info("Cleared %d stale pipeline cache file(s) from %s (%d kept, unaffected by this ingest)" %
+              (removed, cache_dir, kept))
 
 
 def create_metadata():
