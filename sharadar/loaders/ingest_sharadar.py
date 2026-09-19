@@ -507,10 +507,24 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
 
             # The canonical name of the exchange, for example 'NYSE' or 'NASDAQ'
             exchange = sharadar_metadata.loc['exchange']
-            if (exchange is None) or (exchange == 'None'):
-                exchange = 'OTC'
+            if exchange is None or (isinstance(exchange, str) and exchange.strip() == ''):
+                raise ValueError(
+                    f"Missing exchange metadata for ticker '{ticker}' (sid={sid}). "
+                    "Please add this exchange to sharadar/loaders/constant.py EXCHANGE_DF "
+                    "or correct the metadata source before re-running ingestion."
+                )
+            if isinstance(exchange, str):
+                exchange = exchange.strip().upper()
+            else:
+                exchange = str(exchange).upper()
             if exchange == 'NYSEAERCA':
                 exchange = 'NYSEARCA'
+            if exchange not in set(EXCHANGE_DF['exchange']):
+                raise ValueError(
+                    f"Unsupported exchange '{exchange}' for ticker '{ticker}' (sid={sid}). "
+                    "Please update sharadar/loaders/constant.py EXCHANGE_DF with this exchange "
+                    "and then re-run ingestion."
+                )
 
             # Synch to the official exchange calendar, if necessary
             date_index = df_ticker.index.get_level_values('date')

@@ -16,6 +16,7 @@ EXCHANGE_DF = pd.DataFrame([
     ['OTC', 'US'],
     ['NYSEMKT', 'US'],
     ['NYSEARCA', 'US'],
+    ['TXSE', 'US'],
     ['BATS', 'US'],
     ['INDEX', 'US'],
     ['MACRO', 'US'],

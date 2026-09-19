@@ -40,9 +40,10 @@ class TestIsDomesticCommonStockLogic:
 
 class TestExchangeClassifier:
     def test_exchange_categories(self):
-        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+        expected = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC', 'TXSE']
         assert 'NYSE' in expected
         assert 'OTC' in expected
+        assert 'TXSE' in expected
 
 
 class TestSectorClassifier:
