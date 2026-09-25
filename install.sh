@@ -25,7 +25,7 @@ git clone git@github.com:alphaville76/sharadar_db_bundle.git
 cd $HOME/sharadar_db_bundle
 pip install -r requirements.txt
 python3.13 -m build
-pip install --upgrade --force-reinstall dist/sharadar_db_bundle-3.0-py3-none-any.whl
+pip install --upgrade --force-reinstall dist/sharadar_db_bundle-4.0-py3-none-any.whl
 pip install  pytest
 python3.13 -m pytest -q
 
