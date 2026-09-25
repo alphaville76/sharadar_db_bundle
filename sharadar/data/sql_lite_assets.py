@@ -347,12 +347,18 @@ class SQLiteAssetDBWriter(AssetDBWriter):
                     conn.execute(text(
                         "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
                     ))
+                    conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_equity_mappings_field_value ON equity_supplementary_mappings (field, value);"
+                    ))
                 return
 
             self._configure_sqlite_connection(txn)
             super(SQLiteAssetDBWriter, self).init_db(txn)
             txn.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
+            ))
+            txn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_equity_mappings_field_value ON equity_supplementary_mappings (field, value);"
             ))
 
         self._execute_with_retry(run, "initializing the asset database")
