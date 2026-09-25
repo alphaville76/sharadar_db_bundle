@@ -105,7 +105,7 @@ class Exchange(AbstractClassifier):
     """Classifies assets by their listing stock exchange."""
 
     def __init__(self):
-        categories = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC']
+        categories = ['BATS', 'INDEX', 'NASDAQ', 'NYSE', 'NYSEARCA', 'NYSEMKT', 'OTC', 'TXSE']
         field = 'exchange'
         super().__init__(categories, field)
 

@@ -510,8 +510,8 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             if exchange is None or (isinstance(exchange, str) and exchange.strip() == ''):
                 raise ValueError(
                     f"Missing exchange metadata for ticker '{ticker}' (sid={sid}). "
-                    "Please add this exchange to sharadar/loaders/constant.py EXCHANGE_DF "
-                    "or correct the metadata source before re-running ingestion."
+                    "Please update sharadar/loaders/constant.py EXCHANGE_DF and sharadar/pipeline/factors.py Exchange with this exchange "
+                    "and then re-run ingestion."
                 )
             if isinstance(exchange, str):
                 exchange = exchange.strip().upper()
@@ -522,7 +522,7 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             if exchange not in set(EXCHANGE_DF['exchange']):
                 raise ValueError(
                     f"Unsupported exchange '{exchange}' for ticker '{ticker}' (sid={sid}). "
-                    "Please update sharadar/loaders/constant.py EXCHANGE_DF with this exchange "
+                    "Please update sharadar/loaders/constant.py EXCHANGE_DF and sharadar/pipeline/factors.py Exchange with this exchange "
                     "and then re-run ingestion."
                 )
 
