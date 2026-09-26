@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS "prices" (
   "volume" REAL NOT NULL,
   PRIMARY KEY (date, sid)
 );
-CREATE INDEX  "ix_prices_date" ON "prices" ("date");
+CREATE INDEX "ix_prices_date" ON "prices" ("date");
 CREATE INDEX "ix_prices_sid" ON "prices" ("sid");
 """
 
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS "mergers" (
   "sid" INTEGER,
   PRIMARY KEY (effective_date, sid)
 );
-CREATE INDEX IF NOT EXISTS "ix_mergers_index"ON "mergers" ("index");
+CREATE INDEX IF NOT EXISTS "ix_mergers_index" ON "mergers" ("index");
 
 CREATE TABLE IF NOT EXISTS "dividend_payouts" (
 "date" TIMESTAMP,

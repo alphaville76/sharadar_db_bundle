@@ -1,17 +1,14 @@
 #!/bin/bash
 
-if [ ! $# -eq 1 ]
-  then
-    echo "You must provide the START_DATE argument"
-    echo "Usage $0 <START_DATE>"
-    exit 1
-fi
+[ $# -eq 1 ] || { echo -e "You must provide the START_DATE argument\nUsage: $0 <START_DATE>"; exit 1; }
+[ "$(basename "$PWD")" = "latest" ] || { echo "Error: you must be in the 'latest' folder"; exit 1; }
 
-export start_date="$1"
-export start_date_s=`date --date="$start_date 00:00:00 +0000" +"%s"`
-export start_date_ns=`date --date="$start_date 00:00:00 +0000" +"%s%9N"`
 
-cd ~/.zipline/data/sharadar
+start_date="$1"
+start_date_s=$(date --date="$start_date 00:00:00 +0000" +"%s") || { echo "Invalid date"; exit 1; }
+start_date_ns=$(date --date="$start_date 00:00:00 +0000" +"%s%9N") || { echo "Invalid date"; exit 1; }
+
+cd ..
 cp -rv latest latest_all
 cd latest
 
