@@ -14,7 +14,7 @@ import nasdaqdatalink
 from exchange_calendars import get_calendar
 from sharadar.util.output_dir import get_data_dir, get_cache_dir
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
-from sharadar.util.nasdaqdatalink_util import last_available_date
+from sharadar.util.nasdaqdatalink_util import last_available_date, get_table_with_retry
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
@@ -131,10 +131,10 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     Returns:
         pd.DataFrame: Dividend records with sid, amount, and date columns.
     """
-    dividends_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
-                                            date={'gte': start},
-                                            action=['dividend', 'spinoffdividend'],
-                                            paginate=True)
+    dividends_df = get_table_with_retry('SHARADAR/ACTIONS',
+                                        date={'gte': start},
+                                        action=['dividend', 'spinoffdividend'],
+                                        paginate=True)
 
     # Remove dividends_df entries, whose ticker doesn't exist
     tickers_dividends = dividends_df['ticker'].unique()
@@ -162,10 +162,10 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
     Returns:
         pd.DataFrame: Split records with effective_date, ratio, and sid columns.
     """
-    splits_df = nasdaqdatalink.get_table('SHARADAR/ACTIONS',
-                                         date={'gte': start},
-                                         action=['split'],
-                                         paginate=True)
+    splits_df = get_table_with_retry('SHARADAR/ACTIONS',
+                                     date={'gte': start},
+                                     action=['split'],
+                                     paginate=True)
 
     # Remove splits_df entries, whose ticker doesn't exist
     tickers_splits = splits_df['ticker'].unique()
@@ -455,9 +455,9 @@ def create_metadata():
     Returns:
         Tuple of (related_tickers Series, sharadar_metadata_df DataFrame).
     """
-    sharadar_metadata_df = nasdaqdatalink.get_table('SHARADAR/TICKERS',
-                                                    table=['SFP', 'SEP'],
-                                                    paginate=True)
+    sharadar_metadata_df = get_table_with_retry('SHARADAR/TICKERS',
+                                                table=['SFP', 'SEP'],
+                                                paginate=True)
     sharadar_metadata_df.set_index('ticker', inplace=True)
     related_tickers = sharadar_metadata_df['relatedtickers'].dropna()
     # Add a space at the start and end of relatedtickers, search for ' TICKER '

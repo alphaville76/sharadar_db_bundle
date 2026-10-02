@@ -57,3 +57,47 @@ class TestLoadDataTable:
             zf.writestr("data2.csv", "a,b\n3,4\n")
         with pytest.raises(AssertionError):
             load_data_table(str(zip_path))
+
+class TestGetTableWithRetry:
+    def test_retries_on_chunked_encoding_error(self, monkeypatch):
+        import requests
+        from sharadar.util import nasdaqdatalink_util as util
+        calls = []
+
+        def fake_get_table(table_name, **kwargs):
+            calls.append(kwargs)
+            if len(calls) < 3:
+                raise requests.exceptions.ChunkedEncodingError("Connection broken")
+            return pd.DataFrame({'ticker': ['SPY']})
+
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', fake_get_table)
+        monkeypatch.setattr(util.time, 'sleep', lambda s: None)
+        df = util.get_table_with_retry('SHARADAR/TICKERS', paginate=True)
+        assert len(calls) == 3
+        assert calls[0] == {'paginate': True}
+        assert df['ticker'][0] == 'SPY'
+
+    def test_raises_after_max_retries(self, monkeypatch):
+        import requests
+        from sharadar.util import nasdaqdatalink_util as util
+
+        def fake_get_table(table_name, **kwargs):
+            raise requests.exceptions.ConnectionError("down")
+
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', fake_get_table)
+        monkeypatch.setattr(util.time, 'sleep', lambda s: None)
+        with pytest.raises(requests.exceptions.ConnectionError):
+            util.get_table_with_retry('SHARADAR/TICKERS', retries=2)
+
+    def test_non_transient_error_not_retried(self, monkeypatch):
+        from sharadar.util import nasdaqdatalink_util as util
+        calls = []
+
+        def fake_get_table(table_name, **kwargs):
+            calls.append(1)
+            raise ValueError("bad request")
+
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', fake_get_table)
+        with pytest.raises(ValueError):
+            util.get_table_with_retry('SHARADAR/TICKERS')
+        assert len(calls) == 1

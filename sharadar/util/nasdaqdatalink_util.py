@@ -4,6 +4,7 @@ Provides functions for downloading bulk data tables, fetching
 incremental updates by date, and determining the last available
 data date from the NASDAQ Data Link service.
 """
+import time
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -121,6 +122,38 @@ def fetch_entire_table(api_key, table_name, index_col=None, parse_dates=False, r
         raise ValueError("Failed to download data from '%s' after %d attempts." % (source_url, retries))
 
 
+TRANSIENT_ERRORS = (
+    requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+)
+
+
+def get_table_with_retry(table_name, retries=5, backoff=10, **kwargs):
+    """Call ``nasdaqdatalink.get_table`` retrying on transient network errors.
+
+    Args:
+        table_name: Fully qualified table name (e.g., 'SHARADAR/TICKERS').
+        retries: Maximum number of attempts. Defaults to 5.
+        backoff: Initial wait in seconds between attempts, doubled each retry.
+        **kwargs: Forwarded to ``nasdaqdatalink.get_table``.
+
+    Returns:
+        pd.DataFrame: The requested table data.
+    """
+    delay = backoff
+    for attempt in range(1, retries + 1):
+        try:
+            return nasdaqdatalink.get_table(table_name, **kwargs)
+        except TRANSIENT_ERRORS as e:
+            if attempt == retries:
+                raise
+            log.warning("Transient error fetching %s (attempt %d/%d): %s. Retrying in %d seconds..."
+                        % (table_name, attempt, retries, e, delay))
+            time.sleep(delay)
+            delay *= 2
+
+
 def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     """
     Load data from nasdaqdatalink and correct them so that they are unadjusted.
@@ -130,9 +163,9 @@ def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     log.info(
         "Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    df = nasdaqdatalink.get_table(table_name,
-                                  date={'gte': start, 'lte': end},
-                                  paginate=True)
+    df = get_table_with_retry(table_name,
+                              date={'gte': start, 'lte': end},
+                              paginate=True)
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
         df.set_index(index_col, inplace=True)
@@ -152,10 +185,10 @@ def fetch_sf1_table_date(api_key, start, end=None):
     """
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    return nasdaqdatalink.get_table('SHARADAR/SF1',
-                                    dimension=['ARQ', 'ART'],
-                                    lastupdated={'gte': start, 'lte': end},
-                                    paginate=True)
+    return get_table_with_retry('SHARADAR/SF1',
+                                dimension=['ARQ', 'ART'],
+                                lastupdated={'gte': start, 'lte': end},
+                                paginate=True)
 
 
 def last_available_date():
@@ -166,6 +199,6 @@ def last_available_date():
     Returns:
         str: Last available date in 'YYYY-MM-DD' format.
     """
-    return nasdaqdatalink.get_table('SHARADAR/TICKERS',
-                                    ticker='SPY',
-                                    )['lastpricedate'][0].strftime('%Y-%m-%d')
+    return get_table_with_retry('SHARADAR/TICKERS',
+                                ticker='SPY',
+                                )['lastpricedate'][0].strftime('%Y-%m-%d')
