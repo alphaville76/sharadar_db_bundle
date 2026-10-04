@@ -348,10 +348,16 @@ class SQLiteAssetDBWriter(AssetDBWriter):
                         "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
                     ))
                     conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_field_start_date ON equity_supplementary_mappings (field, start_date);"
+                    ))
+                    conn.execute(text(
                         "CREATE INDEX IF NOT EXISTS idx_equity_mappings_field_value ON equity_supplementary_mappings (field, value);"
                     ))
                     conn.execute(text(
                         "CREATE INDEX IF NOT EXISTS idx_equity_supp_start ON equity_supplementary_mappings(start_date);"
+                    ))
+                    conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_sid_field_start ON equity_supplementary_mappings (sid, field, start_date);"
                     ))
 
                 return
@@ -362,10 +368,16 @@ class SQLiteAssetDBWriter(AssetDBWriter):
                 "CREATE INDEX IF NOT EXISTS idx_start_date_field  ON equity_supplementary_mappings (start_date, field);"
             ))
             txn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_field_start_date ON equity_supplementary_mappings (field, start_date);"
+            ))
+            txn.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_equity_mappings_field_value ON equity_supplementary_mappings (field, value);"
             ))
             txn.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_equity_supp_start ON equity_supplementary_mappings(start_date);"
+            ))
+            txn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_sid_field_start ON equity_supplementary_mappings (sid, field, start_date);"
             ))
 
         self._execute_with_retry(run, "initializing the asset database")
