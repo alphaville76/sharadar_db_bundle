@@ -534,15 +534,11 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         return insert_statement
 
     def _write_df_to_table(self, tbl, df, txn, chunk_size=None, idx=True, idx_label=None):
-        """Write a DataFrame to a SQLite table row by row.
+        """Write a DataFrame to a SQLite table using batched executemany for speed.
 
-        Args:
-            tbl: SQLAlchemy Table object.
-            df: DataFrame to write.
-            txn: SQLAlchemy transaction.
-            chunk_size: Unused, kept for API compatibility.
-            idx: Whether to include the index in the insert.
-            idx_label: Label for the index column.
+        Uses the provided transaction/connection (txn) when available so all
+        inserts are executed in a single transaction instead of opening a new
+        connection and committing per-row (which is very slow for large datasets).
         """
         index_label = (
             idx_label
@@ -551,15 +547,33 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         )
         cmd = self.insert_statement(df, tbl.name, idx, index_label)
 
+        # Build list of parameter dicts for executemany
+        params_list = []
         for index, row in df.iterrows():
             values = row.values
             if idx:
                 values = np.insert(values, 0, str(index), axis=0)
-
             params = dict(zip([str(x) for x in range(0, len(values))], values.flatten()))
-            with self.engine.connect() as conn:
-                conn.execute(text(cmd), params)
-                conn.commit()
+            params_list.append(params)
+
+        if not params_list:
+            return
+
+        # Execute as a single batch using the provided transaction/connection
+        def _exec_on_conn(conn):
+            # Ensure SQLite pragmas are configured for performance when using a new connection
+            try:
+                self._configure_sqlite_connection(conn)
+            except Exception:
+                # _configure_sqlite_connection is a no-op for non-sqlite engines
+                pass
+            conn.execute(text(cmd), params_list)
+
+        if txn is None:
+            with self.engine.begin() as conn:
+                _exec_on_conn(conn)
+        else:
+            _exec_on_conn(txn)
 
     def check_sanity(self):
         """

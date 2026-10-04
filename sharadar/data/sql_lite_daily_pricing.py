@@ -168,17 +168,37 @@ class SQLiteDailyBarWriter(object):
             properties = pd.Series({'calendar_name': self._calendar.name})
             properties.to_sql('properties', con, index_label='key', if_exists="replace")
 
-            with click.progressbar(length=len(df), label="Inserting price data...") as pbar:
+            insert_sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)"
+            batch = []
+            batch_size = 1000
+            total = len(df)
+
+            with click.progressbar(length=total, label="Inserting price data...") as pbar:
                 count = 0
                 for index, row in df.iterrows():
-                    sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES ('%s',%f,%f,%f,%f,%f,%f)"
-                    values = index + tuple(row.values)
-                    try:
-                        c.execute(sql % values)
-                    except sqlite3.OperationalError as e:
-                        log.error("SqlError %s: %s" % (e, (sql % values)))
+                    # index is a (date, sid) tuple
+                    date_str = pd.to_datetime(index[0]).strftime('%Y-%m-%d') + " 00:00:00"
+                    sid = int(index[1])
+                    values = (date_str, sid, float(row['open']), float(row['high']), float(row['low']), float(row['close']), float(row['volume']))
+                    batch.append(values)
                     count += 1
+
+                    if len(batch) >= batch_size:
+                        try:
+                            c.executemany(insert_sql, batch)
+                            con.commit()
+                        except sqlite3.OperationalError as e:
+                            log.error("SqlError %s: %s" % (e, str(batch[:1])))
+                        batch = []
+
                     pbar.update(count)
+
+                if batch:
+                    try:
+                        c.executemany(insert_sql, batch)
+                        con.commit()
+                    except sqlite3.OperationalError as e:
+                        log.error("SqlError %s: %s" % (e, str(batch[:1])))
 
 
 class SQLiteDailyBarReader(SessionBarReader):
