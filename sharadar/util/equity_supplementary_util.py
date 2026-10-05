@@ -9,6 +9,42 @@ import numpy as np
 from zipline.utils.cli import maybe_show_progress
 
 
+UNIQUE_INDEX_NAME = 'ux_equity_supp_sid_field_start'
+
+
+def ensure_unique_key(cursor):
+    """Guarantee uniqueness of (sid, field, start_date) in equity_supplementary_mappings.
+
+    The INSERT OR REPLACE statements below rely on that key. If the table was
+    rebuilt without its PRIMARY KEY (e.g. via "CREATE TABLE ... AS SELECT"),
+    duplicate rows accumulate. Removes existing duplicates (keeping the most
+    recently inserted row) and creates a UNIQUE index.
+
+    Returns:
+        int: Number of duplicate rows removed.
+    """
+    cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='equity_supplementary_mappings'")
+    table = cursor.fetchone()
+    if table is None:
+        return 0
+    if 'PRIMARY KEY' in (table[0] or '').upper():
+        return 0
+    cursor.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name=?", (UNIQUE_INDEX_NAME,))
+    if cursor.fetchone() is not None:
+        return 0
+
+    cursor.execute(
+        "DELETE FROM equity_supplementary_mappings WHERE rowid NOT IN "
+        "(SELECT MAX(rowid) FROM equity_supplementary_mappings GROUP BY sid, field, start_date)"
+    )
+    removed = cursor.rowcount
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS %s ON equity_supplementary_mappings (sid, field, start_date)"
+        % UNIQUE_INDEX_NAME
+    )
+    return removed
+
+
 def value_changed(cursor, sid, field, value):
     """
     Returns True, if the entry existed and its value changed

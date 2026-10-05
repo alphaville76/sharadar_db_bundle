@@ -17,6 +17,7 @@ from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by
 from sharadar.util.nasdaqdatalink_util import last_available_date, get_table_with_retry
 from sharadar.util.equity_supplementary_util import lookup_sid
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
+from sharadar.util.equity_supplementary_util import ensure_unique_key
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
 from sharadar.data.sql_lite_assets import SQLiteAssetDBWriter, SQLiteAssetFinder
 from zipline.assets import ASSET_DB_VERSION
@@ -341,6 +342,10 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     log.info("Start writing supplementary_mappings data...")
     # EQUITY SUPPLEMENTARY MAPPINGS are used for company name, sector, industry and fundamentals financial data.
     # They could be retrieved by AssetFinder.get_supplementary_field(sid, field_name, as_of_date)
+    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+        removed = ensure_unique_key(cursor)
+        if removed:
+            log.warning("Removed %d duplicate rows from equity_supplementary_mappings" % removed)
     log.info("Start creating company info dataframe...")
     with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_asset_info(sharadar_metadata_df, cursor)

@@ -241,6 +241,7 @@ class SQLiteAssetFinder(AssetFinder):
                 % (field_name, ",".join(map(str, sids)), sessions[0].value, sessions[-1].value)
 
         df = pd.read_sql_query(query, self.engine)
+        df = df.drop_duplicates(subset=['start_date', 'sid'], keep='last')
         df = df.pivot(index='start_date', columns='sid', values='value')
         df = df.reindex(index=list(map(self._fmt_date, sessions)), columns=sids)
         return df.values.astype('float64')
