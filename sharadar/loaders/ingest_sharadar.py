@@ -207,7 +207,15 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, d
         dates filled in (forward-filled). If there are no missing dates,
         `df` is returned unchanged.
     """
-    this_cal = sessions[(sessions >= start_date) & (sessions <= end_date)]
+    df_ticker_synch = _synch_ticker_to_calendar(sessions, start_date, end_date, df_ticker)
+    if df_ticker_synch is df_ticker:
+        return df
+    return pd.concat([df.drop(df_ticker.index), df_ticker_synch])
+
+
+def _synch_ticker_to_calendar(sessions, start_date, end_date, df_ticker):
+    """Repair one ticker without copying the full prices DataFrame."""
+    this_cal = sessions[sessions.searchsorted(start_date):sessions.searchsorted(end_date, side='right')]
 
     missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
     if len(missing_dates) > 0:
@@ -228,11 +236,8 @@ def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, d
         # Drop remaining NaN
         df_ticker_synch.dropna(inplace=True)
 
-        # drop the existing sub dataframe
-        df = df.drop(df_ticker.index)
-        # and concat with the new one with all the dates.
-        df = pd.concat([df, df_ticker_synch])
-    return df
+        return df_ticker_synch
+    return df_ticker
 
 def trading_date(date, cal):
     """
@@ -487,14 +492,19 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
         to the trading calendar (forward-filled).
     """
     equities_df = pd.DataFrame(columns=METADATA_HEADERS)
+    prices_by_ticker = df.groupby('ticker', sort=False)
+    metadata_by_sid = sharadar_metadata_df.drop_duplicates('permaticker').set_index('permaticker')
+    exchanges = set(EXCHANGE_DF['exchange'])
+    repaired_prices = []
+    replaced_indices = []
     with maybe_show_progress(tickers, show_progress, label='Loading custom pricing data: ') as it:
         for ticker in it:
-            df_ticker = df[df['ticker'] == ticker]
+            df_ticker = prices_by_ticker.get_group(ticker)
             df_ticker = df_ticker.sort_index()
 
             sid = df_ticker.index.get_level_values('sid')[0]
 
-            sharadar_metadata = sharadar_metadata_df[sharadar_metadata_df['permaticker'] == sid].iloc[0, :]
+            sharadar_metadata = metadata_by_sid.loc[sid]
 
             asset_name = sharadar_metadata.loc['name']
 
@@ -524,7 +534,7 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
                 exchange = str(exchange).upper()
             if exchange == 'NYSEAERCA':
                 exchange = 'NYSEARCA'
-            if exchange not in set(EXCHANGE_DF['exchange']):
+            if exchange not in exchanges:
                 raise ValueError(
                     f"Unsupported exchange '{exchange}' for ticker '{ticker}' (sid={sid}). "
                     "Please update sharadar/loaders/constant.py EXCHANGE_DF and sharadar/pipeline/factors.py Exchange with this exchange "
@@ -535,10 +545,18 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             date_index = df_ticker.index.get_level_values('date')
             start_date_df = date_index[0]
             end_date_df = date_index[-1]
-            df = synch_to_calendar(sessions, start_date_df, end_date_df, df_ticker, df)
+            df_ticker_synch = _synch_ticker_to_calendar(sessions, start_date_df, end_date_df, df_ticker)
+            if df_ticker_synch is not df_ticker:
+                repaired_prices.append(df_ticker_synch)
+                replaced_indices.append(df_ticker.index)
 
             # Add a row to the metadata DataFrame.
             equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange
+    if repaired_prices:
+        # Replace all repaired tickers at once, rather than copying the full
+        # price history on every ticker with missing sessions.
+        replaced_index = replaced_indices[0].append(replaced_indices[1:])
+        df = pd.concat([df.drop(replaced_index), *repaired_prices])
     return equities_df, df
 
 
