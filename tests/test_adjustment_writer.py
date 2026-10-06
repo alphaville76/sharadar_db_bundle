@@ -95,3 +95,24 @@ def test_calc_dividend_ratios_uses_raw_previous_close(adjustments_path):
     assert ratios['sid'].tolist() == [1, 1]
     assert ratios['effective_date'].tolist() == list(pd.to_datetime(['2026-01-06', '2026-01-08']))
     assert ratios['ratio'].tolist() == [1 - 1 / 100.0, 1 - 1 / 50.0]
+
+class StubPricesReaderByPairs(StubPricesReader):
+    def load_raw_arrays(self, fields, start, end, sids):
+        raise AssertionError("the full price history must not be loaded")
+
+    def load_values_at(self, field, sids, dates):
+        close = StubPricesReader().load_raw_arrays([field], None, None, [1, 2])[0]
+        return np.array([close[self.sessions.get_loc(d), s - 1] for s, d in zip(sids, dates)])
+
+
+def test_calc_dividend_ratios_loads_only_previous_closes(adjustments_path):
+    writer = SQLiteDailyAdjustmentWriter(adjustments_path, StubPricesReaderByPairs(), StubAssetFinder(), None)
+    dividends = pd.DataFrame({
+        'sid': np.array([1, 1, 2], dtype='int64'),
+        'ex_date': pd.to_datetime(['2026-01-06', '2026-01-08', '2026-01-06']),
+        'amount': [1.0, 1.0, 1.0],
+    })
+    ratios = writer.calc_dividend_ratios(dividends)
+
+    assert ratios['sid'].tolist() == [1, 1]
+    assert ratios['ratio'].tolist() == [1 - 1 / 100.0, 1 - 1 / 50.0]

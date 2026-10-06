@@ -152,13 +152,11 @@ class SQLiteDailyBarWriter(object):
             raise ValueError("data indexes must be ['date', 'sid'].")
 
     def write(self, data):
-        """Write splits, mergers, and dividend data to the database.
+        """Write daily OHLCV bars, replacing existing rows with the same (date, sid).
 
         Args:
-            splits: DataFrame of split records.
-            mergers: DataFrame of merger records.
-            dividends: DataFrame of dividend payout records.
-            stock_dividends: DataFrame of stock dividend records.
+            data: DataFrame indexed by ['date', 'sid'] with open, high, low,
+                close and volume columns.
         """
         self._validate(data)
 
@@ -168,36 +166,23 @@ class SQLiteDailyBarWriter(object):
             properties.to_sql('properties', con, index_label='key', if_exists="replace")
 
             insert_sql = "INSERT OR REPLACE INTO prices (date, sid, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)"
-            batch = []
-            batch_size = 1000
+            batch_size = 100000
             total = len(df)
+            dates = pd.DatetimeIndex(df.index.get_level_values('date'))
+            sids = df.index.get_level_values('sid').to_numpy(dtype='int64')
+            values = df.to_numpy(dtype='float64')
 
             with click.progressbar(length=total, label="Inserting price data...") as pbar:
-                count = 0
-                for index, row in df.iterrows():
-                    # index is a (date, sid) tuple
-                    date_str = pd.to_datetime(index[0]).strftime('%Y-%m-%d') + " 00:00:00"
-                    sid = int(index[1])
-                    values = (date_str, sid, float(row['open']), float(row['high']), float(row['low']), float(row['close']), float(row['volume']))
-                    batch.append(values)
-                    count += 1
-
-                    if len(batch) >= batch_size:
-                        try:
-                            c.executemany(insert_sql, batch)
-                            con.commit()
-                        except sqlite3.OperationalError as e:
-                            log.error("SqlError %s: %s" % (e, str(batch[:1])))
-                        batch = []
-
-                    pbar.update(count)
-
-                if batch:
+                for start in range(0, total, batch_size):
+                    end = min(start + batch_size, total)
+                    date_strs = dates[start:end].strftime('%Y-%m-%d 00:00:00')
+                    batch = list(zip(date_strs, sids[start:end].tolist(), *values[start:end].T.tolist()))
                     try:
                         c.executemany(insert_sql, batch)
                         con.commit()
                     except sqlite3.OperationalError as e:
                         log.error("SqlError %s: %s" % (e, str(batch[:1])))
+                    pbar.update(end - start)
 
 
 class SQLiteDailyBarReader(SessionBarReader):
@@ -345,6 +330,33 @@ class SQLiteDailyBarReader(SessionBarReader):
 
         return raw_arrays
 
+    def load_values_at(self, field, sids, dates):
+        """Load one field for individual (sid, date) pairs.
+
+        Args:
+            field: Column name to load.
+            sids: Security identifiers.
+            dates: Dates, aligned with ``sids``.
+
+        Returns:
+            np.ndarray: float64 values aligned with the inputs (NaN if missing).
+        """
+        sids = np.asarray(sids, dtype='int64')
+        if len(sids) == 0:
+            return np.array([], dtype='float64')
+        date_strs = pd.DatetimeIndex(dates).strftime('%Y-%m-%d 00:00:00')
+        with closing(sqlite3.connect(self._filename)) as conn:
+            conn.execute("CREATE TEMP TABLE wanted (ix INTEGER PRIMARY KEY, date TEXT, sid INTEGER)")
+            conn.executemany("INSERT INTO wanted VALUES (?, ?, ?)",
+                             zip(range(len(sids)), date_strs, sids.tolist()))
+            rows = conn.execute(
+                'SELECT w.ix, p."%s" FROM wanted w JOIN prices p ON p.date = w.date AND p.sid = w.sid' % field
+            ).fetchall()
+        result = np.full(len(sids), np.nan)
+        if rows:
+            ix, values = zip(*rows)
+            result[list(ix)] = np.asarray(values, dtype='float64')
+        return result
     def get_last_traded_dt(self, sid, dt):
         """Get the last traded datetime for a sid on or before dt.
 
@@ -463,8 +475,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
             col_names = ', '.join('"%s"' % col for col in [table_cols[0]] + list(frame.columns))
             params = ', '.join(['?'] * (len(frame.columns) + 1))
             sql = 'INSERT OR REPLACE INTO "%s" (%s) VALUES (%s)' % (tablename, col_names, params)
-            with click.progressbar(length=len(frame), label="Inserting price data...") as pbar:
-                count = 0
+            with click.progressbar(length=len(frame), label="Inserting %s..." % tablename) as pbar:
                 for row in frame.itertuples(index=True, name=None):
                     index = str(row[0]) if isinstance(row[0], pd.Timestamp) else row[0]
                     values = [v.item() if isinstance(v, np.generic) else v for v in (index,) + row[1:]]
@@ -472,8 +483,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                         c.execute(sql, values)
                     except sqlite3.Error as e:
                         log.error("%s: %s %s" % (e, sql, values))
-                    count += 1
-                    pbar.update(count)
+                    pbar.update(1)
 
     def write(self, splits=None, mergers=None, dividends=None, stock_dividends=None):
         """Write splits, mergers, and dividend data to the database.
@@ -514,28 +524,32 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         pricing_reader = self._equity_daily_bar_reader
         input_sids = dividends.sid.values
-        unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
         dates = pricing_reader.sessions.values
-        start = pd.Timestamp(dates[0]).tz_localize(None)
-        end = pd.Timestamp(dates[-1]).tz_localize(None)
-
-        # Raw (unadjusted) closes, like the dividend amounts. An adjusted history would
-        # also include later splits/dividends and give wrong ratios for older ex dates.
-        close = np.asarray(
-            pricing_reader.load_raw_arrays(['close'], start, end, list(unique_sids))[0], dtype='float64'
-        )
-        close[close <= 0] = np.nan
 
         date_ix = np.searchsorted(dates, dividends.ex_date.values)
         mask = date_ix > 0
 
         date_ix = date_ix[mask]
-        sids_ix = sids_ix[mask]
         input_dates = dividends.ex_date.values[mask]
-
-        # subtract one day to get the close on the day prior to the merger
-        previous_close = close[date_ix - 1, sids_ix]
         input_sids = input_sids[mask]
+
+        # Raw (unadjusted) closes, like the dividend amounts. An adjusted history would
+        # also include later splits/dividends and give wrong ratios for older ex dates.
+        # subtract one day to get the close on the day prior to the ex date
+        previous_dates = dates[date_ix - 1]
+        if hasattr(pricing_reader, 'load_values_at'):
+            # Only read the needed (sid, date) closes instead of the full price history.
+            previous_close = pricing_reader.load_values_at('close', input_sids, previous_dates)
+        else:
+            unique_sids, sids_ix = np.unique(input_sids, return_inverse=True)
+            start = pd.Timestamp(dates[0]).tz_localize(None)
+            end = pd.Timestamp(dates[-1]).tz_localize(None)
+            close = np.asarray(
+                pricing_reader.load_raw_arrays(['close'], start, end, list(unique_sids))[0], dtype='float64'
+            )
+            previous_close = close[date_ix - 1, sids_ix]
+        previous_close = np.asarray(previous_close, dtype='float64').copy()
+        previous_close[previous_close <= 0] = np.nan
 
         amount = dividends.amount.values[mask]
         ratio = 1.0 - amount / previous_close

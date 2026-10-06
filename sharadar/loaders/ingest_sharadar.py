@@ -15,7 +15,7 @@ from exchange_calendars import get_calendar
 from sharadar.util.output_dir import get_data_dir, get_cache_dir
 from sharadar.util.nasdaqdatalink_util import fetch_entire_table, fetch_table_by_date, fetch_sf1_table_date
 from sharadar.util.nasdaqdatalink_util import last_available_date, get_table_with_retry
-from sharadar.util.equity_supplementary_util import lookup_sid
+from sharadar.util.equity_supplementary_util import map_tickers_to_sids
 from sharadar.util.equity_supplementary_util import insert_asset_info, insert_fundamentals, insert_daily_metrics
 from sharadar.util.equity_supplementary_util import ensure_unique_key
 from sharadar.data.sql_lite_daily_pricing import SQLiteDailyBarWriter, SQLiteDailyBarReader, SQLiteDailyAdjustmentWriter
@@ -30,6 +30,18 @@ from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEA
 import traceback
 
 nasdaqdatalink.ApiConfig.api_key = env.get("NASDAQ_API_KEY", "")
+
+# SF1 dimensions stored in the bundle (fields '<name>_arq' and '<name>_art').
+SF1_DIMENSIONS = ['ARQ', 'ART']
+
+
+def _connect_for_bulk_insert(dbpath):
+    """Open a SQLite connection tuned for large INSERT OR REPLACE batches."""
+    conn = sqlite3.connect(dbpath)
+    # A bigger page cache (1 GiB) avoids re-reading index pages for every inserted row.
+    conn.execute("PRAGMA cache_size = -1048576")
+    conn.execute("PRAGMA temp_store = MEMORY")
+    return conn
 
 
 def process_data_table(df):
@@ -110,11 +122,10 @@ def get_data(sharadar_metadata_df, related_tickers, start=None, end=None):
     df = fetch_data(start, end)
 
     log.info("Adding SIDs to all stocks...")
-    df['sid'] = df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
+    df['sid'] = map_tickers_to_sids(sharadar_metadata_df, related_tickers, df['ticker'])
     # unknown sids are -1 instead of nan to preserve the integer type. Drop them.
-    unknown_sids = df[df['sid'] == -1]
-    df.drop(unknown_sids.index, inplace=True)
-    df.set_index(['date', 'sid'], inplace=True)
+    df = df[df['sid'] != -1]
+    df = df.set_index(['date', 'sid'])
 
     df = process_data_table(df)
     return df.sort_index()
@@ -143,7 +154,7 @@ def create_dividends_df(sharadar_metadata_df, related_tickers, existing_tickers,
     dividends_df = dividends_df.loc[dividends_df['ticker'].isin(tickers_intersect)]
 
     dividends_df = dividends_df.rename(columns={'value': 'amount'})
-    dividends_df['sid'] = dividends_df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
+    dividends_df['sid'] = map_tickers_to_sids(sharadar_metadata_df, related_tickers, dividends_df['ticker'])
     dividends_df.index = dividends_df['date']
     dividends_df['record_date'] = dividends_df['declared_date'] = dividends_df['pay_date'] = dividends_df[
         'ex_date'] = dividends_df.index
@@ -184,9 +195,33 @@ def create_splits_df(sharadar_metadata_df, related_tickers, existing_tickers, st
         copy=False,
     )
     splits_df['ratio'] = splits_df['ratio'].astype(float)
-    splits_df['sid'] = splits_df['ticker'].apply(lambda x: lookup_sid(sharadar_metadata_df, related_tickers, x))
+    splits_df['sid'] = map_tickers_to_sids(sharadar_metadata_df, related_tickers, splits_df['ticker'])
     splits_df.drop(['action', 'name', 'contraticker', 'contraname', 'ticker'], axis=1, inplace=True)
     return splits_df
+
+
+def unadjust_dividends_for_splits(dividends_df, splits_df):
+    """Convert split-adjusted dividend amounts to the share basis on each ex-date."""
+    if dividends_df.empty or splits_df.empty:
+        return dividends_df
+
+    dividends_df = dividends_df.copy()
+    split_factors = np.ones(len(dividends_df))
+    for sid, splits in splits_df.groupby('sid', sort=False):
+        dividend_mask = dividends_df['sid'].values == sid
+        if not dividend_mask.any():
+            continue
+
+        splits = splits.sort_values('effective_date')
+        effective_dates = splits['effective_date'].values
+        ratios = splits['ratio'].values.astype(float)
+        later_factors = np.r_[np.cumprod(ratios[::-1])[::-1], 1.0]
+        ex_dates = dividends_df.loc[dividend_mask, 'ex_date'].values
+        later_split_ix = np.searchsorted(effective_dates, ex_dates, side='right')
+        split_factors[dividend_mask] = later_factors[later_split_ix]
+
+    dividends_df['amount'] = dividends_df['amount'].values / split_factors
+    return dividends_df
 
 
 def synch_to_calendar(sessions, start_date, end_date, df_ticker: pd.DataFrame, df: pd.DataFrame):
@@ -220,10 +255,6 @@ def _synch_ticker_to_calendar(sessions, start_date, end_date, df_ticker):
     missing_dates = this_cal.difference(df_ticker.index.get_level_values(0)).values
     if len(missing_dates) > 0:
         sid = df_ticker.index.get_level_values('sid')[0]
-        ticker = df_ticker['ticker'].iloc[0]
-        log.info("Fixing missing %d interstitial dates for %s from %s to %s: %s."
-                 % (len(missing_dates), ticker, this_cal[0], this_cal[-1], missing_dates))
-
         sids = np.full(len(this_cal), sid)
         synch_index = pd.MultiIndex.from_arrays([this_cal, sids], names=('date', 'sid'))
         df_ticker_synch = df_ticker.reindex(synch_index)
@@ -295,7 +326,7 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     if len(prices_df) > 0:
         # the first price date may differ from start_fetch_date because we query quadl by lastupdate
         log.info("Price data for %d equities from %s to %s." %
-                 (len(prices_df.index.get_level_values(1)), prices_df.index[0][0], prices_df.index[-1][0]))
+                 (prices_df.index.get_level_values(1).nunique(), prices_df.index[0][0], prices_df.index[-1][0]))
     else:
         log.info("No price data retrieved for period from %s." % start_fetch_date)
 
@@ -327,6 +358,7 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     # SPLITS
     log.info("Creating splits data...")
     splits_df = create_splits_df(sharadar_metadata_df, related_tickers, tickers, start_fetch_date)
+    dividends_df = unadjust_dividends_for_splits(dividends_df, splits_df)
 
     # mergers?
     # see also https://github.com/quantopian/zipline/blob/master/zipline/data/adjustments.py
@@ -360,11 +392,14 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     if must_fetch_entire_table(start_date_fundamentals):
         log.info("Fetch entire table.")
         sf1_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
+        # Like the incremental fetch, keep only the dimensions used by the pipelines.
+        sf1_df = sf1_df[sf1_df['dimension'].isin(SF1_DIMENSIONS)]
     else:
         log.info("Start date: %s" % start_date_fundamentals)
         sf1_df = fetch_sf1_table_date(env["NASDAQ_API_KEY"], start_date_fundamentals)
-    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
+    del sf1_df
 
     start_date_metrics = asset_db_reader.last_available_daily_metrics_dt
     log.info("Start creating daily metrics dataframe...")
@@ -372,10 +407,11 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
         log.info("Fetch entire table.")
         daily_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
     else:
-        log.info("Start date: %s" % start_date_fundamentals)
+        log.info("Start date: %s" % start_date_metrics)
         daily_df = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/DAILY', start_date_metrics)
-    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
+    del daily_df
 
     if universe:
         from sharadar.pipeline.universes import update_universe, TRADABLE_STOCKS_US, base_universe, context
@@ -491,7 +527,7 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
         indexed by sid, and `df` with any interstitial dates synchronized
         to the trading calendar (forward-filled).
     """
-    equities_df = pd.DataFrame(columns=METADATA_HEADERS)
+    equities_rows = {}
     prices_by_ticker = df.groupby('ticker', sort=False)
     metadata_by_sid = sharadar_metadata_df.drop_duplicates('permaticker').set_index('permaticker')
     exchanges = set(EXCHANGE_DF['exchange'])
@@ -550,13 +586,17 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
                 repaired_prices.append(df_ticker_synch)
                 replaced_indices.append(df_ticker.index)
 
-            # Add a row to the metadata DataFrame.
-            equities_df.loc[sid] = ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange
+            # Add a row to the metadata DataFrame (a later ticker with the same sid replaces it).
+            equities_rows[sid] = (ticker, asset_name, start_date, end_date, first_traded, auto_close_date, exchange)
+    equities_df = pd.DataFrame.from_dict(equities_rows, orient='index', columns=METADATA_HEADERS)
     if repaired_prices:
         # Replace all repaired tickers at once, rather than copying the full
         # price history on every ticker with missing sessions.
         replaced_index = replaced_indices[0].append(replaced_indices[1:])
+        added_rows = sum(map(len, repaired_prices)) - len(replaced_index)
         df = pd.concat([df.drop(replaced_index), *repaired_prices])
+        log.info("Fixed missing interstitial dates for %d equities (%d rows added)."
+                 % (len(repaired_prices), added_rows))
     return equities_df, df
 
 

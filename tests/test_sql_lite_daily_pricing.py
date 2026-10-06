@@ -171,6 +171,16 @@ class TestSQLiteDailyBarReader:
         assert arrays[0].shape == (2, 1)
         assert np.all(np.isnan(arrays[0]))
 
+    def test_load_values_at(self, reader):
+        values = reader.load_values_at(
+            'close', [2, 1, 999, 1],
+            pd.to_datetime(['2020-01-06', '2020-01-02', '2020-01-02', '2020-01-04']),
+        )
+        np.testing.assert_array_equal(values, [26.0, 14.0, np.nan, np.nan])
+
+    def test_load_values_at_empty(self, reader):
+        assert len(reader.load_values_at('close', [], [])) == 0
+
     def test_get_last_traded_dt(self, reader):
         dt = reader.get_last_traded_dt(1, pd.Timestamp('2020-01-02'))
         assert dt == pd.Timestamp('2020-01-02')

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from unittest.mock import patch
 
-from sharadar.loaders.ingest_sharadar import create_equities_df, synch_to_calendar
+from sharadar.loaders.ingest_sharadar import create_equities_df, synch_to_calendar, unadjust_dividends_for_splits
 
 
 def _make_df(dates, sid, ticker, closes, volumes):
@@ -143,12 +143,16 @@ class TestCreateEquitiesDf:
             dates = prices.index.get_level_values('date')
             expected = synch_to_calendar(sessions, dates[0], dates[-1], prices, expected)
 
-        with patch('sharadar.loaders.ingest_sharadar.pd.concat', wraps=pd.concat) as concat:
+        with patch('sharadar.loaders.ingest_sharadar.pd.concat', wraps=pd.concat) as concat, \
+                patch('sharadar.loaders.ingest_sharadar.log.info') as log_info:
             equities, result = create_equities_df(
                 df, ['AAA', 'DDD', 'CCC'], sessions, metadata, show_progress=False,
             )
 
         assert concat.call_count == 1
+        log_info.assert_called_once_with(
+            "Fixed missing interstitial dates for 2 equities (3 rows added)."
+        )
         pd.testing.assert_frame_equal(result.sort_index(), expected.sort_index())
         pd.testing.assert_frame_equal(df, original)
         assert list(equities.index) == [1, 4, 3]
@@ -161,11 +165,31 @@ class TestCreateEquitiesDf:
         df = _make_df(sessions, sid=1, ticker='AAA',
                       closes=[10.0, 11.0, 12.0], volumes=[100, 200, 300])
 
-        with patch('sharadar.loaders.ingest_sharadar.pd.concat', wraps=pd.concat) as concat:
+        with patch('sharadar.loaders.ingest_sharadar.pd.concat', wraps=pd.concat) as concat, \
+                patch('sharadar.loaders.ingest_sharadar.log.info') as log_info:
             equities, result = create_equities_df(
                 df, ['AAA'], sessions, _make_metadata([1]), show_progress=False,
             )
 
         assert concat.call_count == 0
+        log_info.assert_not_called()
         assert result is df
         assert equities.loc[1, 'symbol'] == 'AAA'
+
+def test_unadjust_dividends_for_later_splits_only():
+    ex_dates = pd.to_datetime(['2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04', '2020-01-02'])
+    dividends = pd.DataFrame({
+        'sid': [1, 1, 1, 1, 2],
+        'amount': [20.0, 20.0, 20.0, 20.0, 3.0],
+        'ex_date': ex_dates,
+    }, index=pd.DatetimeIndex(['2020-01-01'] * 5))
+    splits = pd.DataFrame({
+        'sid': [1, 1, 2],
+        'effective_date': pd.to_datetime(['2020-01-03', '2020-01-02', '2020-01-03']),
+        'ratio': [0.5, 10.0, 3.0],
+    })
+
+    result = unadjust_dividends_for_splits(dividends, splits)
+
+    assert result['amount'].tolist() == [4.0, 40.0, 20.0, 20.0, 1.0]
+    assert dividends['amount'].tolist() == [20.0, 20.0, 20.0, 20.0, 3.0]
