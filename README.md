@@ -41,6 +41,34 @@ To start a notebook
 > jupyter notebook
 
 
+## Repairing dividend adjustments
+
+Older versions of the bundle wrote the `dividends` table of `adjustments.sqlite` with shifted columns
+(sid, date and ratio in the wrong columns). As a result zipline never applied dividend adjustments to prices,
+and `reduce_db.sh` deleted most of the dividend ratios. The ingest now writes the table correctly; to repair
+an existing bundle run:
+
+> python -m sharadar.util.fix_dividends --dry-run
+
+> python -m sharadar.util.fix_dividends
+
+Optionally pass the bundle folder (the one containing `adjustments.sqlite`, `prices.sqlite` and `assets-7.sqlite`),
+default is `~/.zipline/data/sharadar/latest`:
+> python -m sharadar.util.fix_dividends /path/to/sharadar/latest
+
+The script:
+1. moves the shifted values of the `dividends` table back into the right columns;
+2. recomputes the ratios missing for the rows of `dividend_payouts` (`1 - amount / previous raw close`),
+   skipping dividends without a previous close or with a ratio <= 0;
+3. clears the pipeline cache of the default bundle, because cached results were computed without dividend
+   adjustments (for a different folder, clear its `cache` subfolder manually).
+
+`--dry-run` only prints how many rows would be repaired or rebuilt. The script can be run more than once:
+a second run changes nothing. Stop algorithms and ingests using the bundle before running it, and make a
+backup of `adjustments.sqlite`. Afterwards historical prices are adjusted for dividends, so backtests and
+price-based factors will differ from previous runs.
+
+
 Sharadar Fundamentals could be use as follows:
 ```python
 from zipline.pipeline import Pipeline

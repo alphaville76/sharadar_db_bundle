@@ -17,11 +17,10 @@ from sharadar.util.output_dir import get_data_dir
 from six import (
     iteritems,
 )
-from zipline.data.adjustments import SQLiteAdjustmentWriter, SQLiteAdjustmentReader
+from zipline.data.adjustments import SQLiteAdjustmentWriter
 from zipline.data.bar_reader import (
     NoDataBeforeDate,
 )
-from zipline.data.data_portal import DataPortal
 from zipline.data.session_bars import SessionBarReader
 from zipline.utils.numpy_utils import (
     float64_dtype,
@@ -458,15 +457,21 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                     )
 
         with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+            # Insert by column name: the frame column order (e.g. sid, effective_date, ratio
+            # from calc_dividend_ratios) may differ from the table column order.
+            table_cols = [r[1] for r in c.execute('PRAGMA table_info("%s")' % tablename)]
+            col_names = ', '.join('"%s"' % col for col in [table_cols[0]] + list(frame.columns))
+            params = ', '.join(['?'] * (len(frame.columns) + 1))
+            sql = 'INSERT OR REPLACE INTO "%s" (%s) VALUES (%s)' % (tablename, col_names, params)
             with click.progressbar(length=len(frame), label="Inserting price data...") as pbar:
                 count = 0
-                for index, row in frame.iterrows():
-                    sql = "INSERT OR REPLACE INTO %s VALUES ('%s', %s)"
-                    cmd = sql % (tablename, index, ', '.join(map(str, row.values)))
+                for row in frame.itertuples(index=True, name=None):
+                    index = str(row[0]) if isinstance(row[0], pd.Timestamp) else row[0]
+                    values = [v.item() if isinstance(v, np.generic) else v for v in (index,) + row[1:]]
                     try:
-                        c.execute(cmd)
-                    except sqlite3.OperationalError as e:
-                        log.error(str(e) + ": " + cmd)
+                        c.execute(sql, values)
+                    except sqlite3.Error as e:
+                        log.error("%s: %s %s" % (e, sql, values))
                     count += 1
                     pbar.update(count)
 
@@ -513,20 +518,13 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         dates = pricing_reader.sessions.values
         start = pd.Timestamp(dates[0]).tz_localize(None)
         end = pd.Timestamp(dates[-1]).tz_localize(None)
-        calendar = self._equity_daily_bar_reader.trading_calendar
 
-        data_portal = DataPortal(self._asset_finder,
-                                 trading_calendar=calendar,
-                                 first_trading_day=start,
-                                 equity_daily_reader=self._equity_daily_bar_reader,
-                                 adjustment_reader=SQLiteAdjustmentReader(self._filename))
-
-        close = data_portal.get_history_window(assets=unique_sids,
-                                               end_dt=end,
-                                               bar_count=calendar.sessions_distance(start, end),
-                                               frequency='1d',
-                                               field='close',
-                                               data_frequency='daily').values
+        # Raw (unadjusted) closes, like the dividend amounts. An adjusted history would
+        # also include later splits/dividends and give wrong ratios for older ex dates.
+        close = np.asarray(
+            pricing_reader.load_raw_arrays(['close'], start, end, list(unique_sids))[0], dtype='float64'
+        )
+        close[close <= 0] = np.nan
 
         date_ix = np.searchsorted(dates, dividends.ex_date.values)
         mask = date_ix > 0
@@ -556,8 +554,8 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                     start_date=start_date
                 )
 
-        valid_ratio_mask = non_nan_ratio_mask > 0
-        for ix in np.flatnonzero(~valid_ratio_mask):
+        valid_ratio_mask = non_nan_ratio_mask & (ratio > 0)
+        for ix in np.flatnonzero(non_nan_ratio_mask & ~valid_ratio_mask):
             log.warn(
                 "Dividend ratio <= 0 for dividend"
                 " sid={sid}, ex_date={ex_date:%Y-%m-%d}, amount={amount:.3f}",
