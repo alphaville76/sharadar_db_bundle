@@ -74,13 +74,22 @@ class BundlePipelineEngine(SimplePipelineEngine):
         )
 
         root_mask_filepath = get_cache_dir() + '/' + root_mask_filename
+        root_mask = None
         if exists(root_mask_filepath):
             log.info("Load root mask file: " + root_mask_filename)
             root_mask = pd.read_pickle(root_mask_filepath)
-        else:
+            if not root_mask.columns.is_monotonic_increasing:
+                # Written before the sids were sorted: zipline looks up single assets
+                # (e.g. SPY) with searchsorted, so unsorted sids break Slice terms.
+                # The cached terms of the same chunk share the old column order.
+                log.warning("Root mask %s has unsorted sids, recomputing it" % root_mask_filename)
+                remove_cached_terms(root_mask.index)
+                root_mask = None
+
+        if root_mask is None:
             root_mask = super()._compute_root_mask(domain, start_date, end_date, extra_rows)
             log.info("Save root mask file: " + root_mask_filename)
-            root_mask.to_pickle(get_cache_dir() + '/' + root_mask_filename)
+            root_mask.to_pickle(root_mask_filepath)
 
         return root_mask
 
@@ -374,6 +383,19 @@ class BundlePipelineEngine(SimplePipelineEngine):
                     log.warn("Cannot save unknown type: %s" % str(type(term_values)))
 
         return out
+
+
+def remove_cached_terms(dates):
+    """Remove the cached terms computed for the given chunk dates.
+
+    Args:
+        dates: DatetimeIndex of the chunk (root mask index, extra rows included).
+    """
+    prefix = "term-%s_%s_" % (dates[0].strftime("%Y-%m-%d"), dates[-1].strftime("%Y-%m-%d"))
+    cache_dir = get_cache_dir()
+    for filename in os.listdir(cache_dir):
+        if filename.startswith(prefix):
+            os.remove(os.path.join(cache_dir, filename))
 
 
 def create_term_filename(dates, graph, term):

@@ -25,7 +25,7 @@ from zipline.utils.cli import maybe_show_progress
 from pathlib import Path
 from sharadar.util.logger import log
 from contextlib import closing
-import sqlite3
+from sharadar.util import sqlite_util
 from sharadar.loaders.constant import EXCHANGE_DF, OLDEST_DATE_SEP, METADATA_HEADERS
 import traceback
 
@@ -37,7 +37,7 @@ SF1_DIMENSIONS = ['ARQ', 'ART']
 
 def _connect_for_bulk_insert(dbpath):
     """Open a SQLite connection tuned for large INSERT OR REPLACE batches."""
-    conn = sqlite3.connect(dbpath)
+    conn = sqlite_util.connect(dbpath)
     # A bigger page cache (1 GiB) avoids re-reading index pages for every inserted row.
     conn.execute("PRAGMA cache_size = -1048576")
     conn.execute("PRAGMA temp_store = MEMORY")
@@ -379,12 +379,12 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 
     log.info("Start writing supplementary_mappings data...")
     # EQUITY SUPPLEMENTARY MAPPINGS are used for company name, sector, industry and fundamentals financial data.
     # They could be retrieved by AssetFinder.get_supplementary_field(sid, field_name, as_of_date)
-    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+    with closing(sqlite_util.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         removed = ensure_unique_key(cursor)
         if removed:
             log.warning("Removed %d duplicate rows from equity_supplementary_mappings" % removed)
     log.info("Start creating company info dataframe...")
-    with closing(sqlite3.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+    with closing(sqlite_util.connect(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
         insert_asset_info(sharadar_metadata_df, cursor)
 
     start_date_fundamentals = asset_db_reader.last_available_fundamentals_dt

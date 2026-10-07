@@ -13,7 +13,7 @@ Key components:
     base_universe: Extended filter adding liquidity and size constraints.
     update_universe: Convenience function to incrementally update a universe.
 """
-import sqlite3
+from sharadar.util import sqlite_util
 from contextlib import closing
 
 import numpy as np
@@ -81,7 +81,7 @@ class UniverseWriter(object):
 
 
         # Create schema, if not exists
-        with closing(sqlite3.connect(self.universes_db_path)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self.universes_db_path)) as con, con, closing(con.cursor()) as c:
             c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='%s'" % universe_name)
             if c.fetchone()[0] == 0:
                 c.executescript(SCHEMA % (universe_name, universe_name, universe_name))
@@ -134,7 +134,7 @@ class UniverseReader(object):
         Args:
             db_path: Path to the universes SQLite database file.
         """
-        self.db = sqlite3.connect(db_path, isolation_level=None)
+        self.db = sqlite_util.connect(db_path, isolation_level=None)
         self.db.row_factory = lambda cursor, row: row[0]
         self.cursor = self.db.cursor()
 
@@ -152,7 +152,7 @@ class UniverseReader(object):
             pass
 
     def _query(self, sql):
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute(sql)
             return c.fetchall()
 

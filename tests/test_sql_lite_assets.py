@@ -68,3 +68,40 @@ def test_asset_db_writer_retries_when_database_is_locked(tmp_path, monkeypatch):
     writer._real_write(None, None, None, None, None, None, 1000)
 
     assert begin_calls['count'] == 2
+
+
+def test_asset_db_writer_leaves_no_wal_files(tmp_path):
+    from sharadar.loaders.constant import EXCHANGE_DF
+    from sharadar.util.sqlite_util import wal_files
+
+    path = str(tmp_path / 'assets.sqlite')
+    writer = SQLiteAssetDBWriter(path)
+    writer.write(exchanges=EXCHANGE_DF)
+
+    assert wal_files(path) == []
+    finder = SQLiteAssetFinder(path)
+    assert finder is not None
+    assert wal_files(path) == []
+
+def test_lifetimes_sids_are_sorted_regardless_of_insertion_order(tmp_path):
+    from sharadar.loaders.constant import EXCHANGE_DF
+
+    sids = [118691, 101361, 196191, 103968]
+    equities = pd.DataFrame({
+        'symbol': ['SPY', 'AAA', 'BBB', 'CCC'],
+        'asset_name': ['SPY', 'AAA', 'BBB', 'CCC'],
+        'start_date': pd.Timestamp('2020-01-02').as_unit('ns'),
+        'end_date': pd.Timestamp('2024-12-31').as_unit('ns'),
+        'first_traded': pd.Timestamp('2020-01-02').as_unit('ns'),
+        'auto_close_date': pd.Timestamp('2025-01-01').as_unit('ns'),
+        'exchange': ['NYSEARCA', 'NYSE', 'NASDAQ', 'NYSE'],
+    }, index=pd.Index(sids, name='sid'))
+    path = str(tmp_path / 'assets.sqlite')
+    SQLiteAssetDBWriter(path).write(equities=equities, exchanges=EXCHANGE_DF)
+
+    finder = SQLiteAssetFinder(path)
+    lifetimes = finder.lifetimes(pd.DatetimeIndex(['2023-03-14', '2024-03-21']), False, ('US',))
+
+    assert list(lifetimes.columns) == sorted(sids)
+    assert lifetimes.columns.searchsorted(118691) == sorted(sids).index(118691)
+    assert lifetimes.values.all()

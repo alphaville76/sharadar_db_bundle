@@ -5,6 +5,7 @@ data (splits, dividends, mergers) stored in SQLite databases.
 """
 import os
 import sqlite3
+from sharadar.util import sqlite_util
 from contextlib import closing
 
 import click
@@ -132,7 +133,7 @@ class SQLiteDailyBarWriter(object):
         self._calendar = calendar
 
         # Create schema, if not exists
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='prices'")
             if c.fetchone()[0] == 0:
                 c.executescript(SCHEMA)
@@ -161,7 +162,7 @@ class SQLiteDailyBarWriter(object):
         self._validate(data)
 
         df = data[['open', 'high', 'low', 'close', 'volume']]
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             properties = pd.Series({'calendar_name': self._calendar.name})
             properties.to_sql('properties', con, index_label='key', if_exists="replace")
 
@@ -206,7 +207,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         Returns:
             List of result tuples.
         """
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute(sql)
             return c.fetchall()
 
@@ -319,7 +320,7 @@ class SQLiteDailyBarReader(SessionBarReader):
             sids = [x.sid for x in sids]
 
         raw_arrays = []
-        with closing(sqlite3.connect(self._filename)) as conn:
+        with closing(sqlite_util.connect(self._filename)) as conn:
             for field in fields:
                 query = "SELECT date, sid, %s FROM prices WHERE sid in (%s) and date >= '%s' AND date <= '%s';" \
                         % (field, ",".join(map(str, sids)), str(start_day), str(end_day))
@@ -345,7 +346,7 @@ class SQLiteDailyBarReader(SessionBarReader):
         if len(sids) == 0:
             return np.array([], dtype='float64')
         date_strs = pd.DatetimeIndex(dates).strftime('%Y-%m-%d 00:00:00')
-        with closing(sqlite3.connect(self._filename)) as conn:
+        with closing(sqlite_util.connect(self._filename)) as conn:
             conn.execute("CREATE TEMP TABLE wanted (ix INTEGER PRIMARY KEY, date TEXT, sid INTEGER)")
             conn.executemany("INSERT INTO wanted VALUES (?, ?, ?)",
                              zip(range(len(sids)), date_strs, sids.tolist()))
@@ -433,7 +434,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
         self._asset_finder = asset_finder
 
         # Create schema, if not exists
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             c.execute("SELECT count(name) FROM sqlite_master WHERE type='table' AND name='dividends'")
             if c.fetchone()[0] == 0:
                 c.executescript(SCHEMA_ADJUST)
@@ -468,7 +469,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
                         ),
                     )
 
-        with closing(sqlite3.connect(self._filename)) as con, con, closing(con.cursor()) as c:
+        with closing(sqlite_util.connect(self._filename)) as con, con, closing(con.cursor()) as c:
             # Insert by column name: the frame column order (e.g. sid, effective_date, ratio
             # from calc_dividend_ratios) may differ from the table column order.
             table_cols = [r[1] for r in c.execute('PRAGMA table_info("%s")' % tablename)]

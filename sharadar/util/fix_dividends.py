@@ -23,7 +23,7 @@ BUNDLE_DIR is the folder with adjustments.sqlite, prices.sqlite and assets-7.sql
 (default: ~/.zipline/data/sharadar/latest).
 """
 import os
-import sqlite3
+from sharadar.util import sqlite_util
 import sys
 from contextlib import closing
 
@@ -45,7 +45,7 @@ def fix_shifted_rows(adjustments_path, dry_run=False):
     Returns:
         int: Number of shifted rows (repaired unless dry_run).
     """
-    with closing(sqlite3.connect(adjustments_path)) as con, con:
+    with closing(sqlite_util.connect(adjustments_path)) as con, con:
         n_total = con.execute("SELECT COUNT(*) FROM dividends").fetchone()[0]
         n_shifted = con.execute("SELECT COUNT(*) FROM dividends WHERE " + SHIFTED).fetchone()[0]
         print("dividends: %d rows, %d shifted" % (n_total, n_shifted))
@@ -69,7 +69,7 @@ def rebuild_missing_ratios(bundle_dir, dry_run=False, chunk_size=200):
         int: Number of payouts without ratio (written ratios unless dry_run).
     """
     adjustments_path = os.path.join(bundle_dir, "adjustments.sqlite")
-    with closing(sqlite3.connect(adjustments_path)) as con:
+    with closing(sqlite_util.connect(adjustments_path)) as con:
         missing = pd.read_sql_query(MISSING_RATIOS, con)
     print("dividend_payouts without ratio: %d" % len(missing))
     if dry_run or missing.empty:

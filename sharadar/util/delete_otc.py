@@ -4,14 +4,14 @@ Removes all OTC (Over-The-Counter) exchange equities and their
 associated data from the assets, prices, and adjustments SQLite
 databases. Useful for creating a bundle excluding illiquid OTC stocks.
 """
-import sqlite3
+from sharadar.util import sqlite_util
 import sys
 
 FOLDER = '/home/c.cerbo/.zipline/data/sharadar_no_otc/latest/'
 
-assets_db = sqlite3.connect(FOLDER + 'assets-7.sqlite', isolation_level=None)
-prices_db = sqlite3.connect(FOLDER + 'prices.sqlite', isolation_level=None)
-adjust_db = sqlite3.connect(FOLDER + 'adjustments.sqlite', isolation_level=None)
+assets_db = sqlite_util.connect(FOLDER + 'assets-7.sqlite', isolation_level=None)
+prices_db = sqlite_util.connect(FOLDER + 'prices.sqlite', isolation_level=None)
+adjust_db = sqlite_util.connect(FOLDER + 'adjustments.sqlite', isolation_level=None)
 
 assets_db_cursor = assets_db.cursor()
 prices_db_cursor = prices_db.cursor()

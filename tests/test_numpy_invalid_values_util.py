@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from sharadar.util.numpy_invalid_values_util import (
     nansubtract,
@@ -7,6 +8,7 @@ from sharadar.util.numpy_invalid_values_util import (
     nanmean,
     nanvar,
     nanstd,
+    nanmax,
 )
 
 
@@ -162,19 +164,24 @@ class TestNanmean:
         assert np.isnan(result)
 
     def test_partial_nan(self):
-        a = np.array([1.0, np.nan, 3.0])
+        a = np.array([1.0, np.nan, 3.0, 5.0])
         result = nanmean(a)
-        assert result == 2.0
+        assert result == 3.0
+
+    def test_less_than_75_percent_valid_returns_nan(self):
+        a = np.array([1.0, np.nan, 3.0])
+        assert np.isnan(nanmean(a))
+        assert nanmean(a, min_valid_fraction=0.5) == 2.0
 
     def test_2d_with_axis_0(self):
-        a = np.array([[1.0, 2.0], [3.0, 4.0], [np.nan, 6.0]])
+        a = np.array([[1.0, 2.0], [3.0, 4.0], [np.nan, 6.0], [5.0, 8.0]])
         result = nanmean(a, axis=0)
-        np.testing.assert_allclose(result, np.array([2.0, 4.0]))
+        np.testing.assert_allclose(result, np.array([3.0, 5.0]))
 
     def test_2d_with_axis_1(self):
         a = np.array([[1.0, np.nan], [3.0, 4.0]])
         result = nanmean(a, axis=1)
-        np.testing.assert_allclose(result, np.array([1.0, 3.5]))
+        np.testing.assert_allclose(result, np.array([np.nan, 3.5]))
 
     def test_empty_slice_returns_nan(self):
         a = np.array([[np.nan, np.nan], [1.0, 2.0]])
@@ -228,11 +235,41 @@ class TestNanstd:
         assert result == 0.0
 
     def test_with_nan_values(self):
-        a = np.array([1.0, np.nan, 2.0, np.nan, 3.0])
+        a = np.array([1.0, np.nan, 2.0, 3.0, 4.0])
         result = nanstd(a)
-        np.testing.assert_allclose(result, np.nanstd(np.array([1.0, np.nan, 2.0, np.nan, 3.0])))
+        np.testing.assert_allclose(result, np.nanstd(a))
+
+    def test_less_than_75_percent_valid_returns_nan(self):
+        a = np.array([1.0, np.nan, 2.0, np.nan, 3.0])
+        assert np.isnan(nanstd(a))
+        assert np.isnan(nanvar(a))
 
     def test_2d_with_axis(self):
         a = np.array([[1.0, 2.0], [3.0, 4.0]])
         result = nanstd(a, axis=0)
         np.testing.assert_allclose(result, np.array([1.0, 1.0]))
+
+
+class TestNanmax:
+    def test_matches_numpy_without_all_nan_warning(self):
+        # valid values per column: 3/4, 4/4, 0/4, 2/4
+        a = np.array([[1.0, 0.0, np.nan, -np.inf],
+                      [3.0, 2.0, np.nan, -5.0],
+                      [np.nan, -1.0, np.nan, np.nan],
+                      [2.0, 1.0, np.nan, np.nan]])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = nanmax(a, axis=0)
+        np.testing.assert_array_equal(result, [3.0, 2.0, np.nan, np.nan])
+
+    def test_axis_1(self):
+        a = np.array([[1.0, 2.0, 3.0, np.nan], [np.nan, np.nan, np.nan, 1.0]])
+        np.testing.assert_array_equal(nanmax(a, axis=1), [3.0, np.nan])
+
+    def test_no_warning_for_mean_var_std(self):
+        a = np.array([[np.nan, 1.0], [np.nan, 2.0]])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            for func in (nanmean, nanvar, nanstd):
+                result = func(a, axis=0)
+                assert np.isnan(result[0]) and not np.isnan(result[1])

@@ -15,7 +15,7 @@ from zipline.pipeline.data import USEquityPricing
 from sharadar.pipeline.engine import symbols, make_pipeline_engine
 from zipline.pipeline.filters import StaticAssets
 from sharadar.pipeline.factors import MarketCap, Fundamentals, FundamentalsTTM, Previous, StdDev, Beta, Sector
-import numpy as np
+from sharadar.util.numpy_invalid_values_util import nanmax
 from zipline.pipeline.factors import Returns, DailyReturns
 from zipline.pipeline.factors import AverageDollarVolume
 import scipy.stats as st
@@ -123,7 +123,7 @@ class HighestNDaysReturnLastZdays(CustomFactor):
     window_safe = False
 
     def compute(self, today, assets, out, ret):
-        out[:] = np.nanmax(ret, axis=0)
+        out[:] = nanmax(ret, axis=0)
 
 
 rmax5_21d = HighestNDaysReturnLastZdays()

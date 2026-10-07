@@ -29,6 +29,26 @@ from zipline.assets.asset_db_schema import (
 )
 from zipline.utils.memoize import lazyval
 
+from sharadar.util.sqlite_util import remove_wal_files
+
+
+def _sqlite_path(engine):
+    """Return the database file of a path or SQLite engine, None otherwise."""
+    if isinstance(engine, (str, os.PathLike)):
+        engine = os.fspath(engine)
+        return engine[len('sqlite:///'):] if engine.startswith('sqlite:///') else engine
+    url = getattr(engine, 'url', None)
+    if url is None or url.get_backend_name() != 'sqlite':
+        return None
+    return url.database
+
+
+def remove_wal_files_of(engine):
+    """Remove the -wal/-shm files of the SQLite database behind ``engine``."""
+    path = _sqlite_path(engine)
+    if path:
+        remove_wal_files(path)
+
 
 class SQLiteAssetFinder(AssetFinder):
 
@@ -42,8 +62,18 @@ class SQLiteAssetFinder(AssetFinder):
             to support live pipeline usage.
     """
     def __init__(self, engine):
+        # Leftover -wal/-shm files (e.g. from a killed ingest) are checkpointed before reading.
+        remove_wal_files_of(engine)
         super().__init__(engine)
         self.is_live_trading = False
+
+    def _compute_asset_lifetimes(self, **kwargs):
+        # zipline queries the equities without ORDER BY, so the sids come back in table
+        # (insertion) order. The pipeline engine relies on sorted sids (searchsorted in
+        # Slice/SingleAsset), otherwise it raises NonExistentAssetInTimeFrame.
+        lifetimes = super()._compute_asset_lifetimes(**kwargs)
+        order = np.argsort(lifetimes.sid, kind='stable')
+        return type(lifetimes)(*(field[order] for field in lifetimes))
 
     def _retrieve_asset_dicts(self, sids, asset_tbl, querying_equities):
         """Retrieve asset dictionaries, extending dates for live trading.
@@ -295,6 +325,12 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         super().__init__(engine)
         self._lock_retry_count = lock_retry_count
         self._lock_retry_delay = lock_retry_delay
+        remove_wal_files_of(self.engine)
+
+    def _release_db(self):
+        """Close the pooled connections and remove the -wal/-shm files left by WAL mode."""
+        self.engine.dispose()
+        remove_wal_files_of(self.engine)
 
     @staticmethod
     def _is_lock_error(error):
@@ -431,7 +467,10 @@ class SQLiteAssetDBWriter(AssetDBWriter):
                         mapping_data=equity_symbol_mappings,
                     )
 
-        self._execute_with_retry(run, "writing asset metadata")
+        try:
+            self._execute_with_retry(run, "writing asset metadata")
+        finally:
+            self._release_db()
 
     def _write_assets(self, asset_type, assets, txn, chunk_size, mapping_data=None):
         """Write asset data to the appropriate database tables.
@@ -597,25 +636,19 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         field = 'category'
 
         expected = [
-            ' Preferred',
-            ' Warrant',
             'ADR Common Stock',
             'ADR Common Stock Primary Class',
             'ADR Common Stock Secondary Class',
-            'ADR Common Stock Warrant',
             'ADR Preferred Stock',
             'CEF',
             'CEF Preferred',
-            'CEF Warrant',
             'Canadian Common Stock',
             'Canadian Common Stock Primary Class',
             'Canadian Common Stock Secondary Class',
-            'Canadian Common Stock Warrant',
             'Canadian Preferred Stock',
             'Domestic Common Stock',
             'Domestic Common Stock Primary Class',
             'Domestic Common Stock Secondary Class',
-            'Domestic Common Stock Warrant',
             'Domestic Preferred Stock',
             'ETD',
             'ETF',
@@ -654,8 +687,11 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             bool: True if actual values match expected, False otherwise.
         """
         sql = "SELECT DISTINCT(value) as r FROM equity_supplementary_mappings WHERE field = '%s' ORDER BY r;" % field
-        with self.engine.connect() as conn:
-            ret = [x[0] for x in conn.execute(text(sql)).fetchall()]
+        try:
+            with self.engine.connect() as conn:
+                ret = [x[0] for x in conn.execute(text(sql)).fetchall()]
+        finally:
+            self._release_db()
         ok = np.array_equal(ret, expected)
         if not ok:
             from sharadar.util.logger import log
