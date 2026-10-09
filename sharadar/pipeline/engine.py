@@ -89,7 +89,9 @@ class BundlePipelineEngine(SimplePipelineEngine):
         if root_mask is None:
             root_mask = super()._compute_root_mask(domain, start_date, end_date, extra_rows)
             log.info("Save root mask file: " + root_mask_filename)
-            root_mask.to_pickle(root_mask_filepath)
+            tmp = '%s.%d.tmp' % (root_mask_filepath, os.getpid())
+            root_mask.to_pickle(tmp)
+            os.replace(tmp, root_mask_filepath)
 
         return root_mask
 
@@ -374,15 +376,23 @@ class BundlePipelineEngine(SimplePipelineEngine):
             if not exists(term_filepath):
                 log.info("save " + term_filename + " to cache")
                 if isinstance(term_values, LabelArray):
-                    np.save(term_filepath, term_values.as_string_array(), allow_pickle=True, fix_imports=True)
+                    _atomic_np_save(term_filepath, term_values.as_string_array())
                 elif isinstance(term_values, AdjustedArray):
-                    np.save(term_filepath, term_values.data, allow_pickle=True, fix_imports=True)
+                    _atomic_np_save(term_filepath, term_values.data)
                 elif type(term_values) == np.ndarray:
-                    np.save(term_filepath, term_values, allow_pickle=True, fix_imports=True)
+                    _atomic_np_save(term_filepath, term_values)
                 else:
                     log.warn("Cannot save unknown type: %s" % str(type(term_values)))
 
         return out
+
+
+def _atomic_np_save(path, values):
+    """Write to a temp file and rename, so concurrent readers never see a partial file."""
+    tmp = "%s.%d.tmp" % (path, os.getpid())
+    with open(tmp, "wb") as f:
+        np.save(f, values, allow_pickle=True, fix_imports=True)
+    os.replace(tmp, path)
 
 
 def remove_cached_terms(dates):

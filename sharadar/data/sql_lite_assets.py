@@ -246,7 +246,7 @@ class SQLiteAssetFinder(AssetFinder):
         return pd.DataFrame(result).set_index('sid').reindex(sids, fill_value='NA').T.values
 
     # @cached
-    def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar=get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))):
+    def get_daily_metrics(self, sids, field_name, as_of_date=pd.Timestamp.today(), n=1, calendar=get_calendar('XNYS', start=pd.Timestamp('1997-01-02 00:00:00'))):
         """Retrieve daily metric values over a trading window.
 
         Args:

@@ -27,7 +27,7 @@ def last_trading_date(date=None, calendar=None):
         date = pd.to_datetime('today').strftime('%Y-%m-%d')
     
     if calendar is None:
-        calendar = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
+        calendar = get_calendar('XNYS', start=pd.Timestamp('1997-01-02 00:00:00'))
     
     dt = pd.to_datetime(date)
     if calendar.is_session(dt):

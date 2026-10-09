@@ -109,7 +109,7 @@ class TradingDayOfMonthRule(six.with_metaclass(ABCMeta, StatelessRule)):
 
         #TODO check why self.cal could be null
         if self.cal is None:
-            self.cal = get_calendar('XNYS', start=pd.Timestamp('2000-01-01 00:00:00'))
+            self.cal = get_calendar('XNYS', start=pd.Timestamp('1997-01-02 00:00:00'))
 
     def should_trigger(self, dt):
         dt_to_use = dt

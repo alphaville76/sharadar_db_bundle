@@ -367,7 +367,7 @@ def run(ctx,
             " '-t' / '--algotext'",
         )
 
-    trading_calendar = get_calendar(trading_calendar, start=pd.Timestamp('2000-01-01 00:00:00'))
+    trading_calendar = get_calendar(trading_calendar, start=pd.Timestamp('1997-01-02 00:00:00'))
 
     _benchmark_spec = BenchmarkSpec.from_cli_params(
         no_benchmark=no_benchmark,
