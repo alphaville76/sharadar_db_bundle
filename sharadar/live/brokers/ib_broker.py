@@ -185,7 +185,7 @@ class TWSConnection(EWrapper, EClient):
         log.info("Local-Broker Time Skew: {}".format(self.time_skew))
 
     def logRequest(self, fnName, fnParams):
-        log.info("Sending request %s" % (fnName))
+        log.debug("Sending request %s" % (fnName))
         if 'self' in fnParams:
             prms = dict(fnParams)
             del prms['self']
