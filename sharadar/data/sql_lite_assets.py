@@ -7,7 +7,6 @@ writing asset data with supplementary mappings.
 import os
 import time
 import warnings
-from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -30,6 +29,9 @@ from zipline.assets.asset_db_schema import (
 from zipline.utils.memoize import lazyval
 
 from sharadar.util.sqlite_util import remove_wal_files
+
+# Live trading: assets stay alive 5 days past end_date (weekends/holidays, lagging lastpricedate).
+LIVE_END_DATE_EXTENSION = pd.Timedelta(days=5)
 
 
 def _sqlite_path(engine):
@@ -73,7 +75,16 @@ class SQLiteAssetFinder(AssetFinder):
         # Slice/SingleAsset), otherwise it raises NonExistentAssetInTimeFrame.
         lifetimes = super()._compute_asset_lifetimes(**kwargs)
         order = np.argsort(lifetimes.sid, kind='stable')
-        return type(lifetimes)(*(field[order] for field in lifetimes))
+        lifetimes = type(lifetimes)(*(field[order] for field in lifetimes))
+        if self.is_live_trading:
+            # Same 5-day extension as _retrieve_asset_dicts, for the pipeline root mask:
+            # Sharadar's lastpricedate (end_date) may lag the ingested prices by a day,
+            # which would otherwise leave the live pipeline with an empty universe.
+            end = lifetimes.end.copy()
+            extendable = end < np.iinfo(np.int64).max - LIVE_END_DATE_EXTENSION.value
+            end[extendable] += LIVE_END_DATE_EXTENSION.value
+            lifetimes = lifetimes._replace(end=end)
+        return lifetimes
 
     def _retrieve_asset_dicts(self, sids, asset_tbl, querying_equities):
         """Retrieve asset dictionaries, extending dates for live trading.
@@ -91,8 +102,8 @@ class SQLiteAssetFinder(AssetFinder):
             for row in rows:
                 # when we use pipeline live the end date is always yesterday, so we add 5 days to keep this condition
                 # but also allowing to use pipeline live as well. 5 is a good number for weekends/holidays
-                row['end_date'] = row['end_date'] + timedelta(days=5)
-                row['auto_close_date'] = row['auto_close_date'] + timedelta(days=5)
+                row['end_date'] = row['end_date'] + LIVE_END_DATE_EXTENSION
+                row['auto_close_date'] = row['auto_close_date'] + LIVE_END_DATE_EXTENSION
 
         return rows
 

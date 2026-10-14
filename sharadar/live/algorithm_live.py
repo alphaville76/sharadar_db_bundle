@@ -145,9 +145,12 @@ class LiveTradingAlgorithm(TradingAlgorithm):
     def initialize(self, *args, **kwargs):
         if self.state_filename is None:
             raise ValueError("State filename cannot be none in live trading.")
+        state_path = os.path.abspath(self.state_filename)
         if os.path.isfile(self.state_filename):
-            log.info("Loading state from {}".format(self.state_filename))
+            log.info("Loading state from {}".format(state_path))
             load_context(self.state_filename, context=self)
+        else:
+            log.warn("State file {} not found: starting with an empty state.".format(state_path))
 
         self.initialized = False
 
@@ -325,8 +328,18 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         today = self.get_datetime().normalize()
         prev_session = self.trading_calendar.previous_open(today).tz_localize(None).normalize()
 
-        log.info('Today: {}'.format(prev_session))
+        log.info('Today: {}'.format(today.tz_localize(None) if today.tzinfo else today))
         log.info('Pipeline output date (previous session) : {}'.format(prev_session))
+
+        # With a stale bundle every asset ends before prev_session: the root mask is
+        # empty and the pipeline silently returns no stocks. Do not compute (and cache)
+        # such a result; return an empty frame and report the real cause.
+        last_bundle_session = self._last_bundle_session()
+        if last_bundle_session is not None and last_bundle_session < prev_session:
+            log.error('Bundle data is stale: last ingested session is %s, but pipeline %s needs '
+                      'data for %s. Pipeline output is empty; re-ingest the bundle and restart.' % (
+                          last_bundle_session.date(), name, prev_session.date()))
+            return pd.DataFrame(index=[], columns=list(pipeline.columns))
 
         try:
             data = self._pipeline_cache.get(name, prev_session)
@@ -344,6 +357,15 @@ class LiveTradingAlgorithm(TradingAlgorithm):
             # This happens if no assets passed the pipeline screen on a given
             # day.
             return pd.DataFrame(index=[], columns=data.columns)
+
+    def _last_bundle_session(self):
+        reader = getattr(self.broker, 'daily_bar_reader', None)
+        if reader is None:
+            return None
+        last = reader.last_available_dt
+        if pd.isnull(last):
+            return None
+        return pd.Timestamp(last).tz_localize(None).normalize()
 
     def _sync_last_sale_prices(self, dt=None):
         """

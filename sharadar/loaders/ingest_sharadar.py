@@ -547,8 +547,14 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
             # The date when this asset was created.
             start_date = sharadar_metadata.loc['firstpricedate']
 
-            # The last date we have trade data for this asset.
+            # The last date we have trade data for this asset. Sharadar's lastpricedate
+            # can lag SEP by a day: never end before the last price we are writing.
+            date_index = df_ticker.index.get_level_values('date')
+            start_date_df = date_index[0]
+            end_date_df = date_index[-1]
             end_date = sharadar_metadata.loc['lastpricedate']
+            if pd.isnull(end_date) or end_date < end_date_df:
+                end_date = end_date_df
 
             # The first date we have trade data for this asset.
             first_traded = start_date
@@ -578,9 +584,6 @@ def create_equities_df(df, tickers, sessions, sharadar_metadata_df, show_progres
                 )
 
             # Synch to the official exchange calendar, if necessary
-            date_index = df_ticker.index.get_level_values('date')
-            start_date_df = date_index[0]
-            end_date_df = date_index[-1]
             df_ticker_synch = _synch_ticker_to_calendar(sessions, start_date_df, end_date_df, df_ticker)
             if df_ticker_synch is not df_ticker:
                 repaired_prices.append(df_ticker_synch)

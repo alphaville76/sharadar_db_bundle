@@ -18,6 +18,22 @@ class TestSQLiteAssetFinder:
         asset_finder.is_live_trading = True
         assert asset_finder.is_live_trading is True
 
+    def test_live_lifetimes_extend_end_date(self, asset_finder, monkeypatch):
+        from zipline.assets.assets import AssetFinder, Lifetimes
+        import numpy as np
+        end = pd.Timestamp('2026-10-09').value
+        raw = Lifetimes(np.array([2, 1]), np.array([0, 0]), np.array([end, np.iinfo(np.int64).max]))
+        monkeypatch.setattr(AssetFinder, '_compute_asset_lifetimes', lambda self, **kw: raw)
+
+        backtest = asset_finder._compute_asset_lifetimes(country_codes=['US'])
+        assert list(backtest.sid) == [1, 2]
+        assert backtest.end[1] == end
+
+        asset_finder.is_live_trading = True
+        live = asset_finder._compute_asset_lifetimes(country_codes=['US'])
+        assert live.end[1] == pd.Timestamp('2026-10-14').value
+        assert live.end[0] == np.iinfo(np.int64).max
+
     def test_retrieve_asset_dicts_empty_sids(self, asset_finder):
         result = asset_finder._retrieve_asset_dicts([], asset_finder.equities, querying_equities=True)
         assert list(result) == []

@@ -176,6 +176,15 @@ class TestCreateEquitiesDf:
         assert result is df
         assert equities.loc[1, 'symbol'] == 'AAA'
 
+    def test_end_date_not_before_last_ingested_price(self):
+        """Sharadar's lastpricedate may lag SEP: end_date follows the last price."""
+        sessions = pd.date_range('2020-01-06', periods=10)
+        df = _make_df(sessions, sid=1, ticker='AAA',
+                      closes=np.arange(10.0), volumes=np.arange(10))
+        equities, _ = create_equities_df(df, ['AAA'], sessions, _make_metadata([1]), show_progress=False)
+        assert equities.loc[1, 'end_date'] == sessions[-1]
+        assert equities.loc[1, 'auto_close_date'] == sessions[-1] + pd.Timedelta(days=1)
+
 def test_unadjust_dividends_for_later_splits_only():
     ex_dates = pd.to_datetime(['2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04', '2020-01-02'])
     dividends = pd.DataFrame({

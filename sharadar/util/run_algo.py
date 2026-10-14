@@ -104,7 +104,7 @@ def _run(handle_data,
 
     if trading_calendar is None:
         trading_calendar = get_calendar('XNYS', start=pd.Timestamp('1997-01-02 00:00:00'))
-    log.info("Using trading calendar '%s'." % trading_calendar.default_start())
+    log.info("Using trading calendar '%s' (from %s)." % (trading_calendar.name, trading_calendar.first_session.date()))
 
     bundle_data = load_sharadar_bundle(bundle)
     now = pd.Timestamp.today().normalize()

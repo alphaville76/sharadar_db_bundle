@@ -29,3 +29,33 @@ class TestAlgorithmLiveSymbol:
         delta = timedelta(days=365*10)
         assert delta.total_seconds() == 365 * 10 * 24 * 3600
         assert delta.days == 3650
+
+class TestPipelineOutputStaleBundle:
+    """A bundle that ends before the previous session must not run the pipeline."""
+
+    def _algo(self, last_available_dt):
+        import exchange_calendars as xcals
+        algo = MagicMock()
+        algo.get_datetime.return_value = pd.Timestamp("2026-10-13 14:29", tz="UTC")
+        algo.trading_calendar = xcals.get_calendar("XNYS")
+        algo.broker.daily_bar_reader.last_available_dt = pd.Timestamp(last_available_dt)
+        algo._last_bundle_session = lambda: LiveTradingAlgorithm._last_bundle_session(algo)
+        algo._pipeline_cache.get.side_effect = KeyError
+        algo.run_pipeline.return_value = (
+            pd.DataFrame({"a": [1.0]}, index=pd.MultiIndex.from_tuples([(pd.Timestamp("2026-10-12"), 1)])),
+            pd.Timestamp("2026-10-12"))
+        return algo
+
+    def test_stale_bundle_returns_empty_without_running_pipeline(self):
+        algo = self._algo("2026-10-09")
+        pipeline = MagicMock(columns={"a": None, "b": None})
+        out = LiveTradingAlgorithm._pipeline_output(algo, pipeline, iter([1]), "data_pipe")
+        assert out.empty
+        assert list(out.columns) == ["a", "b"]
+        algo.run_pipeline.assert_not_called()
+
+    def test_fresh_bundle_runs_pipeline(self):
+        algo = self._algo("2026-10-12")
+        out = LiveTradingAlgorithm._pipeline_output(algo, MagicMock(), iter([1]), "data_pipe")
+        algo.run_pipeline.assert_called_once()
+        assert len(out) == 1
