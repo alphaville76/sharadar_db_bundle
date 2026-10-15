@@ -341,6 +341,18 @@ class LiveTradingAlgorithm(TradingAlgorithm):
                           last_bundle_session.date(), name, prev_session.date()))
             return pd.DataFrame(index=[], columns=list(pipeline.columns))
 
+        # Daily metrics (marketcap, ev) are published separately from prices and can lag
+        # them; the universe screen needs them for prev_session.
+        stale_metrics = {field: last for field, last in self._last_daily_metrics_sessions().items()
+                         if last is None or last < prev_session}
+        if stale_metrics:
+            log.error('Daily metrics are stale: %s, but pipeline %s needs data for %s. Pipeline '
+                      'output is empty; re-ingest the bundle and restart.' % (
+                          ', '.join('%s ends %s' % (f, l.date() if l is not None else 'n/a')
+                                    for f, l in stale_metrics.items()),
+                          name, prev_session.date()))
+            return pd.DataFrame(index=[], columns=list(pipeline.columns))
+
         try:
             data = self._pipeline_cache.get(name, prev_session)
         except KeyError:
@@ -366,6 +378,16 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         if pd.isnull(last):
             return None
         return pd.Timestamp(last).tz_localize(None).normalize()
+
+    def _last_daily_metrics_sessions(self):
+        finder = getattr(self, 'asset_finder', None)
+        if finder is None or not hasattr(finder, 'last_available_dt'):
+            return {}
+        result = {}
+        for field in ('marketcap', 'ev'):
+            last = finder.last_available_dt(field)
+            result[field] = None if pd.isnull(last) else pd.Timestamp(last).tz_localize(None).normalize()
+        return result
 
     def _sync_last_sale_prices(self, dt=None):
         """
