@@ -647,12 +647,15 @@ class SQLiteAssetDBWriter(AssetDBWriter):
         field = 'category'
 
         expected = [
+            ' Warrant',  # sic: Sharadar ships this category with a leading space
             'ADR Common Stock',
             'ADR Common Stock Primary Class',
             'ADR Common Stock Secondary Class',
+            'ADR Common Stock Warrant',
             'ADR Preferred Stock',
             'CEF',
             'CEF Preferred',
+            'CEF Warrant',
             'Canadian Common Stock',
             'Canadian Common Stock Primary Class',
             'Canadian Common Stock Secondary Class',
@@ -660,6 +663,7 @@ class SQLiteAssetDBWriter(AssetDBWriter):
             'Domestic Common Stock',
             'Domestic Common Stock Primary Class',
             'Domestic Common Stock Secondary Class',
+            'Domestic Common Stock Warrant',
             'Domestic Preferred Stock',
             'ETD',
             'ETF',

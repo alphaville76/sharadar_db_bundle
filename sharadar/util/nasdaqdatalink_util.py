@@ -154,18 +154,32 @@ def get_table_with_retry(table_name, retries=5, backoff=10, **kwargs):
             delay *= 2
 
 
+def _api_date(date):
+    """Format a date as 'YYYY-MM-DD'.
+
+    The NASDAQ Data Link API silently returns an empty result for filters like
+    '2026-10-14 00:00:00' (the str() of a pd.Timestamp), so dates must be sent
+    without the time component.
+    """
+    if date is None:
+        return None
+    return pd.Timestamp(date).strftime('%Y-%m-%d')
+
+
 def fetch_table_by_date(api_key, table_name, start, end=None, index_col=None):
     """
     Load data from nasdaqdatalink and correct them so that they are unadjusted.
     The index must be the date
     """
-
+    start, end = _api_date(start), _api_date(end)
     log.info(
         "Start loading Sharadar %s price data from %s to %s..." % (table_name, start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
     df = get_table_with_retry(table_name,
                               date={'gte': start, 'lte': end},
                               paginate=True)
+    if df.empty:
+        log.warning("No %s data returned from %s to %s." % (table_name, start, "today" if end is None else end))
     if index_col is not None:
         # the df['date'] dtype is already datetime64[ns]
         df.set_index(index_col, inplace=True)
@@ -183,12 +197,16 @@ def fetch_sf1_table_date(api_key, start, end=None):
     Returns:
         pd.DataFrame: SF1 quarterly and trailing data.
     """
+    start, end = _api_date(start), _api_date(end)
     log.info("Start loading Sharadar SF1 fundamentals data from %s to %s..." % (start, "today" if end is None else end))
     nasdaqdatalink.ApiConfig.api_key = api_key
-    return get_table_with_retry('SHARADAR/SF1',
-                                dimension=['ARQ', 'ART'],
-                                lastupdated={'gte': start, 'lte': end},
-                                paginate=True)
+    df = get_table_with_retry('SHARADAR/SF1',
+                              dimension=['ARQ', 'ART'],
+                              lastupdated={'gte': start, 'lte': end},
+                              paginate=True)
+    if df.empty:
+        log.warning("No SHARADAR/SF1 data returned from %s to %s." % (start, "today" if end is None else end))
+    return df
 
 
 def last_available_date():

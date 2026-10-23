@@ -7,6 +7,7 @@ SQLite databases compatible with the zipline-reloaded pipeline.
 from os import environ as env
 import os
 import re
+import time
 import pandas as pd
 import numpy as np
 import nasdaqdatalink
@@ -33,6 +34,8 @@ nasdaqdatalink.ApiConfig.api_key = env.get("NASDAQ_API_KEY", "")
 
 # SF1 dimensions stored in the bundle (fields '<name>_arq' and '<name>_art').
 SF1_DIMENSIONS = ['ARQ', 'ART']
+# Incremental SF1 fetches start this many days before the last stored date.
+SF1_LOOKBACK_DAYS = 7
 
 
 def _connect_for_bulk_insert(dbpath):
@@ -85,6 +88,128 @@ def must_fetch_entire_table(date):
     if pd.isnull(date):
         return True
     return pd.Timestamp(date) <= OLDEST_DATE_SEP
+
+
+MAX_FUNDAMENTALS_LAG_DAYS = 7
+# On catch-up, re-fetch this many extra calendar days before the stored end date,
+# to also pick up rows Sharadar published or revised late.
+CATCH_UP_LOOKBACK_DAYS = 7
+CATCH_UP_RETRIES = 2
+CATCH_UP_WAIT_SECONDS = 60
+
+
+def check_data_freshness(prices_end, metrics_end, fundamentals_end,
+                         max_fundamentals_lag_days=MAX_FUNDAMENTALS_LAG_DAYS):
+    """Compare the last dates stored in the bundle after an ingest.
+
+    Prices, daily metrics (SHARADAR/DAILY) and fundamentals (SF1) are fetched
+    incrementally and independently, so a silently empty download for one of
+    them would otherwise go unnoticed and make the tables drift apart.
+
+    Args:
+        prices_end: Last date in prices.sqlite.
+        metrics_end: Last start_date of the 'marketcap' daily metric.
+        fundamentals_end: Last start_date (datekey + 1 day) of 'revenue_arq'.
+        max_fundamentals_lag_days: Tolerated calendar-day lag of fundamentals
+            behind prices (filings are not published every session).
+
+    Returns:
+        dict[str, str]: Problems keyed by 'prices', 'metrics' or
+        'fundamentals'; empty if all dates are consistent.
+    """
+    problems = {}
+    if pd.isnull(prices_end):
+        return {'prices': "No price data in the bundle."}
+    prices_end = pd.Timestamp(prices_end)
+    if pd.isnull(metrics_end):
+        problems['metrics'] = "No daily metrics in the bundle (prices end %s)." % prices_end.date()
+    elif pd.Timestamp(metrics_end) < prices_end:
+        problems['metrics'] = ("Daily metrics end %s, before prices end %s."
+                               % (pd.Timestamp(metrics_end).date(), prices_end.date()))
+    if pd.isnull(fundamentals_end):
+        problems['fundamentals'] = "No fundamentals in the bundle (prices end %s)." % prices_end.date()
+    elif pd.Timestamp(fundamentals_end) < prices_end - pd.Timedelta(days=max_fundamentals_lag_days):
+        problems['fundamentals'] = ("Fundamentals end %s, more than %d days before prices end %s."
+                                    % (pd.Timestamp(fundamentals_end).date(), max_fundamentals_lag_days,
+                                       prices_end.date()))
+    return problems
+
+
+def _min_date(a, b):
+    """Earliest of two possibly-null dates (NaT/None are ignored)."""
+    dates = [pd.Timestamp(d) for d in (a, b) if pd.notnull(d)]
+    return min(dates) if dates else pd.NaT
+
+
+def update_fundamentals(sharadar_metadata_df, asset_dbpath, start_date):
+    """Fetch SF1 rows updated since ``start_date`` (or the whole table) and store them."""
+    if must_fetch_entire_table(start_date):
+        log.info("Fetch entire table.")
+        sf1_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
+        # Like the incremental fetch, keep only the dimensions used by the pipelines.
+        sf1_df = sf1_df[sf1_df['dimension'].isin(SF1_DIMENSIONS)]
+    else:
+        log.info("Start date: %s" % start_date)
+        sf1_df = fetch_sf1_table_date(env["NASDAQ_API_KEY"], start_date)
+    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+        insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
+
+
+def update_daily_metrics(sharadar_metadata_df, asset_dbpath, start_date):
+    """Fetch SHARADAR/DAILY rows since ``start_date`` (or the whole table) and store them."""
+    if must_fetch_entire_table(start_date):
+        log.info("Fetch entire table.")
+        daily_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
+    else:
+        log.info("Start date: %s" % start_date)
+        daily_df = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/DAILY', start_date)
+    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
+        insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
+
+
+def catch_up_stale_data(sharadar_metadata_df, asset_dbpath, prices_reader, asset_reader,
+                        retries=CATCH_UP_RETRIES, wait_seconds=CATCH_UP_WAIT_SECONDS,
+                        lookback_days=CATCH_UP_LOOKBACK_DAYS):
+    """Re-fetch daily metrics and/or fundamentals that lag behind prices.
+
+    Each retry re-downloads the stale table starting ``lookback_days`` before
+    its last stored date. Between retries it waits ``wait_seconds``, since
+    Sharadar sometimes publishes DAILY/SF1 later than SEP. Problems still
+    present after the last retry are logged as warnings.
+
+    Returns:
+        dict[str, pd.Timestamp]: Earliest re-fetch start per table
+        ('metrics'/'fundamentals'), used to invalidate the pipeline cache.
+    """
+    updaters = {
+        'metrics': (lambda: asset_reader.last_available_daily_metrics_dt, update_daily_metrics),
+        'fundamentals': (lambda: asset_reader.last_available_fundamentals_dt, update_fundamentals),
+    }
+    refetch_starts = {}
+    for attempt in range(retries + 1):
+        problems = check_data_freshness(prices_reader.last_available_dt,
+                                        asset_reader.last_available_daily_metrics_dt,
+                                        asset_reader.last_available_fundamentals_dt)
+        stale = [key for key in updaters if key in problems]
+        if not stale:
+            if attempt > 0:
+                log.info("Daily metrics and fundamentals are now up to date with prices.")
+            return refetch_starts
+        if attempt == retries:
+            for problem in problems.values():
+                log.warning(problem)
+            return refetch_starts
+        if attempt > 0 and wait_seconds > 0:
+            log.info("Waiting %d seconds before retrying..." % wait_seconds)
+            time.sleep(wait_seconds)
+        for key in stale:
+            last_dt_getter, update = updaters[key]
+            last_dt = last_dt_getter()
+            start = pd.NaT if pd.isnull(last_dt) else pd.Timestamp(last_dt) - pd.Timedelta(days=lookback_days)
+            log.warning("%s Re-fetching (attempt %d/%d)..." % (problems[key], attempt + 1, retries))
+            update(sharadar_metadata_df, asset_dbpath, start)
+            refetch_starts[key] = _min_date(refetch_starts.get(key), start)
+    return refetch_starts
 
 
 def fetch_data(start, end):
@@ -389,29 +514,22 @@ def _ingest(start, calendar=get_calendar('XNYS', start=pd.Timestamp('1997-01-02 
 
     start_date_fundamentals = asset_db_reader.last_available_fundamentals_dt
     log.info("Start creating Fundamentals dataframe...")
-    if must_fetch_entire_table(start_date_fundamentals):
-        log.info("Fetch entire table.")
-        sf1_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/SF1", parse_dates=['datekey', 'reportperiod'])
-        # Like the incremental fetch, keep only the dimensions used by the pipelines.
-        sf1_df = sf1_df[sf1_df['dimension'].isin(SF1_DIMENSIONS)]
-    else:
-        log.info("Start date: %s" % start_date_fundamentals)
-        sf1_df = fetch_sf1_table_date(env["NASDAQ_API_KEY"], start_date_fundamentals)
-    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
-        insert_fundamentals(sharadar_metadata_df, sf1_df, cursor, show_progress=True)
-    del sf1_df
+    # The stored date is datekey + 1, while SF1 is filtered by lastupdated: rows
+    # published or revised later with an earlier lastupdated would be skipped.
+    if pd.notnull(start_date_fundamentals):
+        start_date_fundamentals = start_date_fundamentals - pd.Timedelta(days=SF1_LOOKBACK_DAYS)
+    update_fundamentals(sharadar_metadata_df, asset_dbpath, start_date_fundamentals)
 
     start_date_metrics = asset_db_reader.last_available_daily_metrics_dt
     log.info("Start creating daily metrics dataframe...")
-    if must_fetch_entire_table(start_date_metrics):
-        log.info("Fetch entire table.")
-        daily_df = fetch_entire_table(env["NASDAQ_API_KEY"], "SHARADAR/DAILY", parse_dates=['date'])
-    else:
-        log.info("Start date: %s" % start_date_metrics)
-        daily_df = fetch_table_by_date(env["NASDAQ_API_KEY"], 'SHARADAR/DAILY', start_date_metrics)
-    with closing(_connect_for_bulk_insert(asset_dbpath)) as conn, conn, closing(conn.cursor()) as cursor:
-        insert_daily_metrics(sharadar_metadata_df, daily_df, cursor, show_progress=True)
-    del daily_df
+    update_daily_metrics(sharadar_metadata_df, asset_dbpath, start_date_metrics)
+
+    # If fundamentals or daily metrics still lag behind prices (e.g. an empty
+    # download or data published late by Sharadar), re-fetch them automatically.
+    refetch_starts = catch_up_stale_data(sharadar_metadata_df, asset_dbpath,
+                                         sql_daily_bar_reader, asset_db_reader)
+    start_date_fundamentals = _min_date(start_date_fundamentals, refetch_starts.get('fundamentals'))
+    start_date_metrics = _min_date(start_date_metrics, refetch_starts.get('metrics'))
 
     if universe:
         from sharadar.pipeline.universes import update_universe, TRADABLE_STOCKS_US, base_universe, context

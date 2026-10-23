@@ -101,3 +101,22 @@ class TestGetTableWithRetry:
         with pytest.raises(ValueError):
             util.get_table_with_retry('SHARADAR/TICKERS')
         assert len(calls) == 1
+
+class TestApiDateFormat:
+    """The API returns no rows for '2026-10-14 00:00:00'; dates must be 'YYYY-MM-DD'."""
+
+    def test_fetch_table_by_date_formats_timestamp(self, monkeypatch):
+        from sharadar.util import nasdaqdatalink_util as util
+        calls = []
+        monkeypatch.setattr(util, 'get_table_with_retry',
+                            lambda table, **kw: calls.append(kw) or pd.DataFrame({'date': [1]}))
+        util.fetch_table_by_date('key', 'SHARADAR/DAILY', pd.Timestamp('2026-10-14'))
+        assert calls[0]['date'] == {'gte': '2026-10-14', 'lte': None}
+
+    def test_fetch_sf1_table_date_formats_timestamp(self, monkeypatch):
+        from sharadar.util import nasdaqdatalink_util as util
+        calls = []
+        monkeypatch.setattr(util, 'get_table_with_retry',
+                            lambda table, **kw: calls.append(kw) or pd.DataFrame({'ticker': ['A']}))
+        util.fetch_sf1_table_date('key', pd.Timestamp('2026-10-15'), pd.Timestamp('2026-10-20'))
+        assert calls[0]['lastupdated'] == {'gte': '2026-10-15', 'lte': '2026-10-20'}

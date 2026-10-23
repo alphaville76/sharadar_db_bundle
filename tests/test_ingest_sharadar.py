@@ -202,3 +202,77 @@ def test_unadjust_dividends_for_later_splits_only():
 
     assert result['amount'].tolist() == [4.0, 40.0, 20.0, 20.0, 1.0]
     assert dividends['amount'].tolist() == [20.0, 20.0, 20.0, 20.0, 3.0]
+
+
+class TestCheckDataFreshness:
+    def test_consistent_dates(self):
+        from sharadar.loaders.ingest_sharadar import check_data_freshness
+        assert check_data_freshness(pd.Timestamp('2026-10-22'), pd.Timestamp('2026-10-22'),
+                                    pd.Timestamp('2026-10-23')) == {}
+
+    def test_stale_metrics(self):
+        from sharadar.loaders.ingest_sharadar import check_data_freshness
+        problems = check_data_freshness(pd.Timestamp('2026-10-22'), pd.Timestamp('2026-10-14'),
+                                        pd.Timestamp('2026-10-21'))
+        assert list(problems) == ['metrics'] and 'Daily metrics end 2026-10-14' in problems['metrics']
+
+    def test_stale_fundamentals(self):
+        from sharadar.loaders.ingest_sharadar import check_data_freshness
+        problems = check_data_freshness(pd.Timestamp('2026-10-22'), pd.Timestamp('2026-10-22'),
+                                        pd.Timestamp('2026-10-10'))
+        assert list(problems) == ['fundamentals'] and 'Fundamentals end 2026-10-10' in problems['fundamentals']
+
+    def test_missing_data(self):
+        from sharadar.loaders.ingest_sharadar import check_data_freshness
+        assert set(check_data_freshness(pd.Timestamp('2026-10-22'), pd.NaT, pd.NaT)) == {'metrics', 'fundamentals'}
+        assert list(check_data_freshness(pd.NaT, pd.NaT, pd.NaT)) == ['prices']
+
+
+class _FakeReaders:
+    """Stand-in for the price/asset readers, backed by mutable end dates."""
+
+    def __init__(self, prices, metrics, fundamentals):
+        self.last_available_dt = pd.Timestamp(prices)
+        self.last_available_daily_metrics_dt = pd.Timestamp(metrics)
+        self.last_available_fundamentals_dt = pd.Timestamp(fundamentals)
+
+
+class TestCatchUpStaleData:
+    def _patch(self, monkeypatch, readers, metrics_result=None, fundamentals_result=None):
+        from sharadar.loaders import ingest_sharadar as ingest
+        calls = []
+
+        def fake_metrics(meta, path, start):
+            calls.append(('metrics', start))
+            if metrics_result is not None:
+                readers.last_available_daily_metrics_dt = pd.Timestamp(metrics_result)
+
+        def fake_fundamentals(meta, path, start):
+            calls.append(('fundamentals', start))
+            if fundamentals_result is not None:
+                readers.last_available_fundamentals_dt = pd.Timestamp(fundamentals_result)
+
+        monkeypatch.setattr(ingest, 'update_daily_metrics', fake_metrics)
+        monkeypatch.setattr(ingest, 'update_fundamentals', fake_fundamentals)
+        monkeypatch.setattr(ingest.time, 'sleep', lambda s: None)
+        return ingest, calls
+
+    def test_nothing_to_do_when_fresh(self, monkeypatch):
+        readers = _FakeReaders('2026-10-22', '2026-10-22', '2026-10-23')
+        ingest, calls = self._patch(monkeypatch, readers)
+        assert ingest.catch_up_stale_data(None, 'db', readers, readers) == {}
+        assert calls == []
+
+    def test_refetches_only_stale_table_with_lookback(self, monkeypatch):
+        readers = _FakeReaders('2026-10-22', '2026-10-14', '2026-10-23')
+        ingest, calls = self._patch(monkeypatch, readers, metrics_result='2026-10-22')
+        starts = ingest.catch_up_stale_data(None, 'db', readers, readers, lookback_days=7)
+        assert calls == [('metrics', pd.Timestamp('2026-10-07'))]
+        assert starts == {'metrics': pd.Timestamp('2026-10-07')}
+
+    def test_gives_up_after_retries(self, monkeypatch):
+        readers = _FakeReaders('2026-10-22', '2026-10-22', '2026-10-01')
+        ingest, calls = self._patch(monkeypatch, readers)
+        starts = ingest.catch_up_stale_data(None, 'db', readers, readers, retries=2, lookback_days=0)
+        assert calls == [('fundamentals', pd.Timestamp('2026-10-01'))] * 2
+        assert starts == {'fundamentals': pd.Timestamp('2026-10-01')}
