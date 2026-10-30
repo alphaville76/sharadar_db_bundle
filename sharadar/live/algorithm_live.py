@@ -316,55 +316,56 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         log.info("Today's trading ended. The algo needs to be restarted daily.")
 
     def _pipeline_output(self, pipeline, chunks, name):
-        # This method is taken from TradingAlgorithm.
-        """
-        Internal implementation of `pipeline_output`.
+        """Return metrics for the latest session supported by prices and daily metrics.
 
-        For Live Algo's we have to get the previous session as the Pipeline wont work without,
-        it will extrapolate such that it tries to get data for get_datetime which
-        is today
-
+        Never use a session later than the previous trading session. If the bundle
+        lags, compute and cache the entire pipeline at the latest common session,
+        rather than mixing factor dates or treating stale data as an empty universe.
         """
         today = self.get_datetime().normalize()
         prev_session = self.trading_calendar.previous_open(today).tz_localize(None).normalize()
 
         log.info('Today: {}'.format(today.tz_localize(None) if today.tzinfo else today))
-        log.info('Pipeline output date (previous session) : {}'.format(prev_session))
-
-        # With a stale bundle every asset ends before prev_session: the root mask is
-        # empty and the pipeline silently returns no stocks. Do not compute (and cache)
-        # such a result; return an empty frame and report the real cause.
         last_bundle_session = self._last_bundle_session()
-        if last_bundle_session is not None and last_bundle_session < prev_session:
-            log.error('Bundle data is stale: last ingested session is %s, but pipeline %s needs '
-                      'data for %s. Pipeline output is empty; re-ingest the bundle and restart.' % (
-                          last_bundle_session.date(), name, prev_session.date()))
+        # Daily metrics (marketcap, ev) are published separately from prices and can lag
+        # them; use a session supported by every field.
+        metrics_sessions = self._last_daily_metrics_sessions()
+        missing_metrics = [field for field, last in metrics_sessions.items() if last is None]
+        if missing_metrics:
+            log.error('Daily metrics are unavailable: %s. Pipeline %s cannot select a usable '
+                      'session; output is empty. Re-ingest the bundle and restart.' % (
+                          ', '.join(missing_metrics), name))
             return pd.DataFrame(index=[], columns=list(pipeline.columns))
 
-        # Daily metrics (marketcap, ev) are published separately from prices and can lag
-        # them; the universe screen needs them for prev_session.
-        stale_metrics = {field: last for field, last in self._last_daily_metrics_sessions().items()
-                         if last is None or last < prev_session}
-        if stale_metrics:
-            log.error('Daily metrics are stale: %s, but pipeline %s needs data for %s. Pipeline '
-                      'output is empty; re-ingest the bundle and restart.' % (
-                          ', '.join('%s ends %s' % (f, l.date() if l is not None else 'n/a')
-                                    for f, l in stale_metrics.items()),
-                          name, prev_session.date()))
-            return pd.DataFrame(index=[], columns=list(pipeline.columns))
+        available_sessions = [prev_session, *metrics_sessions.values()]
+        if last_bundle_session is not None:
+            available_sessions.append(last_bundle_session)
+        output_session = self.trading_calendar.date_to_session(
+            min(available_sessions), direction='previous',
+        )
+        if output_session < prev_session:
+            availability = ', '.join('%s=%s' % (field, last.date())
+                                     for field, last in metrics_sessions.items())
+            log.warning('Bundle data is stale for pipeline %s: requested session %s, last '
+                        'ingested session %s, daily metrics [%s]. Using metrics calculated '
+                        'for the latest available trading session %s.' % (
+                            name, prev_session.date(),
+                            last_bundle_session.date() if last_bundle_session is not None else 'n/a',
+                            availability, output_session.date()))
+        log.info('Pipeline output date: {}'.format(output_session))
 
         try:
-            data = self._pipeline_cache.get(name, prev_session)
+            data = self._pipeline_cache.get(name, output_session)
         except KeyError:
             # Calculate the next block.
             data, valid_until = self.run_pipeline(
-                pipeline, prev_session, next(chunks),
+                pipeline, output_session, next(chunks),
             )
             self._pipeline_cache.set(name, data, valid_until)
 
-        # Now that we have a cached result, try to return the data for today.
+        # An actually empty universe is not a reason to reuse an older universe.
         try:
-            return data.loc[prev_session]
+            return data.loc[output_session]
         except KeyError:
             # This happens if no assets passed the pipeline screen on a given
             # day.
@@ -435,7 +436,6 @@ class LiveTradingAlgorithm(TradingAlgorithm):
         """
         # In Live mode a Pipeline can be run only for the current session (end_session = start_session)
         return self.engine.run_pipeline(pipeline, start_session, start_session), start_session
-
 
 
 

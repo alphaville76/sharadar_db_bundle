@@ -41,6 +41,14 @@ To ingest price and fundamental data every day at 21:30 using cron
 To run an algorithm
 > sharadar-zipline -f algo.py -s 2017-01-01 -e 2020-01-01
 
+Live pipeline output uses the previous trading session, or the latest earlier
+trading session supported by both ingested prices and daily metrics (`marketcap`
+and `ev`) when ingestion is delayed. The entire pipeline is calculated for that
+session and cached under its actual date; a warning reports the requested date,
+data availability and fallback date. No fallback is made solely because the
+universe screen selects no stocks. Missing daily metrics still produce an error
+and empty output because no usable date can be determined. Backtests are unchanged.
+
 
 To start a notebook 
 > cd notebook
