@@ -1,6 +1,16 @@
 import pytest
 import pandas as pd
 import zipfile
+from unittest.mock import Mock, call
+
+from nasdaqdatalink.errors.data_link_error import (
+    AuthenticationError,
+    ForbiddenError,
+    InternalServerError,
+    InvalidRequestError,
+    NotFoundError,
+    ServiceUnavailableError,
+)
 from sharadar.util.nasdaqdatalink_util import format_metadata_url, load_data_table
 
 class TestFormatMetadataUrl:
@@ -59,6 +69,82 @@ class TestLoadDataTable:
             load_data_table(str(zip_path))
 
 class TestGetTableWithRetry:
+    @pytest.mark.parametrize('error_type,status', [
+        (InternalServerError, 500),
+        (ServiceUnavailableError, 503),
+    ])
+    def test_retries_server_errors_with_exponential_backoff(self, monkeypatch, error_type, status):
+        from sharadar.util import nasdaqdatalink_util as util
+
+        error = error_type("Server unavailable", http_status=status)
+        expected = pd.DataFrame({'ticker': ['SPY']})
+        get_table = Mock(side_effect=[error, error, expected])
+        sleep = Mock()
+        warning = Mock()
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', get_table)
+        monkeypatch.setattr(util.time, 'sleep', sleep)
+        monkeypatch.setattr(util.log, 'warning', warning)
+
+        result = util.get_table_with_retry('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+
+        assert result is expected
+        assert get_table.call_args_list == [
+            call('SHARADAR/TICKERS', table=['SFP', 'SEP'], paginate=True)
+        ] * 3
+        assert sleep.call_args_list == [call(10), call(20)]
+        assert warning.call_count == 2
+        assert 'attempt 1/5' in warning.call_args_list[0].args[0]
+        assert 'SHARADAR/TICKERS' in warning.call_args_list[0].args[0]
+
+    @pytest.mark.parametrize('error_type', [InternalServerError, ServiceUnavailableError])
+    def test_server_error_exhausts_default_attempts(self, monkeypatch, error_type):
+        from sharadar.util import nasdaqdatalink_util as util
+
+        error = error_type("Server unavailable")
+        get_table = Mock(side_effect=error)
+        sleep = Mock()
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', get_table)
+        monkeypatch.setattr(util.time, 'sleep', sleep)
+
+        with pytest.raises(error_type) as exc_info:
+            util.get_table_with_retry('SHARADAR/TICKERS')
+
+        assert exc_info.value is error
+        assert get_table.call_count == 5
+        assert sleep.call_args_list == [call(10), call(20), call(40), call(80)]
+
+    @pytest.mark.parametrize('error_type', [
+        AuthenticationError, ForbiddenError, InvalidRequestError, NotFoundError,
+    ])
+    def test_permanent_api_error_not_retried(self, monkeypatch, error_type):
+        from sharadar.util import nasdaqdatalink_util as util
+
+        error = error_type("Invalid request or credentials")
+        get_table = Mock(side_effect=error)
+        sleep = Mock()
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', get_table)
+        monkeypatch.setattr(util.time, 'sleep', sleep)
+
+        with pytest.raises(error_type) as exc_info:
+            util.get_table_with_retry('SHARADAR/TICKERS')
+
+        assert exc_info.value is error
+        get_table.assert_called_once_with('SHARADAR/TICKERS')
+        sleep.assert_not_called()
+
+    def test_success_does_not_retry_or_sleep(self, monkeypatch):
+        from sharadar.util import nasdaqdatalink_util as util
+
+        expected = pd.DataFrame({'ticker': ['SPY']})
+        get_table = Mock(return_value=expected)
+        sleep = Mock()
+        monkeypatch.setattr(util.nasdaqdatalink, 'get_table', get_table)
+        monkeypatch.setattr(util.time, 'sleep', sleep)
+
+        assert util.get_table_with_retry('SHARADAR/TICKERS') is expected
+        get_table.assert_called_once_with('SHARADAR/TICKERS')
+        sleep.assert_not_called()
+
     def test_retries_on_chunked_encoding_error(self, monkeypatch):
         import requests
         from sharadar.util import nasdaqdatalink_util as util

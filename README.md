@@ -29,6 +29,12 @@ The new entry point is **sharadar-zipline** (it replaces *zipline*).
 For example to ingest data use:
 > sharadar-zipline ingest
 
+Nasdaq Data Link table requests during ingestion retry transient network failures and
+server errors (`InternalServerError` and `ServiceUnavailableError`) up to 5 total
+attempts, waiting 10, 20, 40 and 80 seconds between attempts. Each retry is logged
+with the table name, attempt number and delay. The original exception is propagated
+if all attempts fail; authentication and invalid-request errors fail immediately.
+
 To ingest price and fundamental data every day at 21:30 using cron
 > 30 21 * * *	cd $HOME/zipline/lib/python3.6/site-packages/sharadar_db_bundle && $HOME/zipline/bin/python sharadar/__main__.py ingest > $HOME/log/sharadar-zipline-cron.log 2>&1
 

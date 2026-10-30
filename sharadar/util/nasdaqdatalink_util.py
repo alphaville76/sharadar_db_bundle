@@ -12,6 +12,7 @@ import pandas as pd
 import nasdaqdatalink
 import requests
 from click import progressbar
+from nasdaqdatalink.errors.data_link_error import InternalServerError, ServiceUnavailableError
 from sharadar.util.logger import log
 from six.moves.urllib.parse import urlencode
 
@@ -126,11 +127,13 @@ TRANSIENT_ERRORS = (
     requests.exceptions.ChunkedEncodingError,
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
+    InternalServerError,
+    ServiceUnavailableError,
 )
 
 
 def get_table_with_retry(table_name, retries=5, backoff=10, **kwargs):
-    """Call ``nasdaqdatalink.get_table`` retrying on transient network errors.
+    """Call ``nasdaqdatalink.get_table`` retrying on network and server errors.
 
     Args:
         table_name: Fully qualified table name (e.g., 'SHARADAR/TICKERS').
@@ -140,6 +143,10 @@ def get_table_with_retry(table_name, retries=5, backoff=10, **kwargs):
 
     Returns:
         pd.DataFrame: The requested table data.
+
+    Raises:
+        Exception: The original error when attempts are exhausted, or immediately
+            for non-transient errors such as authentication or invalid requests.
     """
     delay = backoff
     for attempt in range(1, retries + 1):
