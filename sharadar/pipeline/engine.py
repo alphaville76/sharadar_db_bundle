@@ -382,7 +382,7 @@ class BundlePipelineEngine(SimplePipelineEngine):
                 elif type(term_values) == np.ndarray:
                     _atomic_np_save(term_filepath, term_values)
                 else:
-                    log.warn("Cannot save unknown type: %s" % str(type(term_values)))
+                    log.warning("Cannot save unknown type: %s" % str(type(term_values)))
 
         return out
 

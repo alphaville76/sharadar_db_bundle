@@ -121,7 +121,7 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
 
     tot_positions = sum([len(x) for x in perf.positions])
     if tot_positions == 0:
-        log.warn("No positions available")
+        log.warning("No positions available")
         return
 
     log.info("extract_rets_pos_txn_from_zipline")
@@ -178,38 +178,38 @@ def create_report(perf, filename, now, doc=None, duration=None, param=None, info
         try:
             fig0 = create_log_returns_chart(rets, benchmark_rets, perf)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
 
         try:
             log.info("create_returns_tear_sheet")
             fig1 = pf.create_returns_tear_sheet(rets, positions, transactions, benchmark_rets=benchmark_rets, return_fig=True)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
 
         try:
             log.info("create_position_tear_sheet")
             fig2 = pf.create_position_tear_sheet(rets, positions, return_fig=True)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
 
         try:
             log.info("create_txn_tear_sheet")
             fig3 = pf.create_txn_tear_sheet(rets, positions, transactions, return_fig=True)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
 
         try:
             log.info("create_interesting_times_tear_sheet")
             fig4 = pf.create_interesting_times_tear_sheet(rets, return_fig=True)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
 
         if round_trips:
             try:
                 log.info("create_round_trip_tear_sheet")
                 fig5 = pf.create_round_trip_tear_sheet(rets, positions, transactions, return_fig=True)
             except Exception as e:
-                log.warn(e)
+                log.warning(e)
 
     report_suffix = "_%s_%.2f_report.htm" % (now.strftime(DATETIME_FMT), 100. * perf_stats_series['Annual return'])
     reportfile = change_extension(filename, report_suffix)

@@ -57,7 +57,7 @@ def stop_loss_portfolio(context, data, log=None):
 
     if portfolio_return <= context.PARAM['loss_limit']:
         if log:
-            log.warn('Monthly loss (%.2f) exceeded the loss limit (%.2f): close all positions.' % (
+            log.warning('Monthly loss (%.2f) exceeded the loss limit (%.2f): close all positions.' % (
                 100.0 * portfolio_return, 100.0 * context.PARAM['loss_limit']))
         close_all(context, data)
         return True
@@ -86,7 +86,7 @@ def stop_loss_equities(context, data, log=None):
         pl_pct = (position.last_sale_price - cost_basis) / cost_basis
         if pl_pct <= context.PARAM['loss_limit']:
             if log:
-                log.warn('%s positions closed with a loss of %.2f.' % (stock, 100.0 * pl_pct))
+                log.warning('%s positions closed with a loss of %.2f.' % (stock, 100.0 * pl_pct))
             if data.can_trade(stock):
                 order_target(stock, 0)
 

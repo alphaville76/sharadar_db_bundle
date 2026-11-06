@@ -195,7 +195,7 @@ class SQLiteAssetFinder(AssetFinder):
         """
         result = self._get_result(sids, field_name, as_of_date, n, enforce_date=True)
         if len(result) == 0:
-            log.warn("No result: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
+            log.warning("No result: asset_finder().get_fundamentals(%s, %s, %s, n=%s)" %
                      (sids, field_name, as_of_date, n)
                      )
             return []

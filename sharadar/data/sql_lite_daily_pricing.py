@@ -557,7 +557,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
             ex_date = pd.Timestamp(input_dates[ix]).tz_localize(None)
             start_date = self._asset_finder.retrieve_asset(input_sids[ix]).start_date
             if ex_date != start_date:
-                log.warn(
+                log.warning(
                     "Couldn't compute ratio for dividend"
                     " sid={sid}, ex_date={ex_date:%Y-%m-%d}, start_date={start_date:%Y-%m-%d}, amount={amount:.3f}",
                     sid=input_sids[ix],
@@ -568,7 +568,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
         valid_ratio_mask = non_nan_ratio_mask & (ratio > 0)
         for ix in np.flatnonzero(non_nan_ratio_mask & ~valid_ratio_mask):
-            log.warn(
+            log.warning(
                 "Dividend ratio <= 0 for dividend"
                 " sid={sid}, ex_date={ex_date:%Y-%m-%d}, amount={amount:.3f}",
                 sid=input_sids[ix],

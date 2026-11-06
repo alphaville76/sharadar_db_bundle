@@ -593,7 +593,7 @@ def clear_cache_dir(cache_invalidation_start=None):
             match = filename_re.match(name)
             if match is None:
                 # Unrecognized filename format: be conservative and keep it.
-                log.warn("Could not parse cache filename, leaving it in place: %s" % name)
+                log.warning("Could not parse cache filename, leaving it in place: %s" % name)
             else:
                 end_date = pd.Timestamp(match.group(2))
                 # The term/root mask covers dates up to end_date; if that end
@@ -606,7 +606,7 @@ def clear_cache_dir(cache_invalidation_start=None):
                 os.remove(os.path.join(cache_dir, name))
                 removed += 1
             except OSError as e:
-                log.warn("Could not remove cache file %s: %s" % (name, e))
+                log.warning("Could not remove cache file %s: %s" % (name, e))
         else:
             kept += 1
     log.info("Cleared %d stale pipeline cache file(s) from %s (%d kept, unaffected by this ingest)" %

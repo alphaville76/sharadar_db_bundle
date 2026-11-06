@@ -181,7 +181,7 @@ def get_daily_metrics(asset_finder, assets, field, today, n, mult=1):
     metric = mult * asset_finder.get_daily_metrics(assets, field, today, n)
     if np.isnan(metric).all():
         # If all NaN (not ingested because delay in computation in SEP) then use the data of the previous day
-        log.warn("No data for %s on %s. Use data from previous day." % (field, today.date()))
+        log.warning("No data for %s on %s. Use data from previous day." % (field, today.date()))
         metric = mult * asset_finder.get_daily_metrics(assets, field, today, n + 1)[0, :]
     return metric
 

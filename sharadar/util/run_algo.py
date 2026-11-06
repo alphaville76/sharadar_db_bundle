@@ -237,7 +237,7 @@ def _run(handle_data,
                 backtest.run()
                 store_context(state_filename, context=backtest)
             else:
-                log.warn("State file already exists. Do not run the backtest.")
+                log.warning("State file already exists. Do not run the backtest.")
 
             # Change start and end to now for live trading
             start = pd.Timestamp.today().normalize()

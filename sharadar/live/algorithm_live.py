@@ -150,7 +150,7 @@ class LiveTradingAlgorithm(TradingAlgorithm):
             log.info("Loading state from {}".format(state_path))
             load_context(self.state_filename, context=self)
         else:
-            log.warn("State file {} not found: starting with an empty state.".format(state_path))
+            log.warning("State file {} not found: starting with an empty state.".format(state_path))
 
         self.initialized = False
 
