@@ -23,9 +23,9 @@ class TestLoggerHelpers:
             assert result == './log'
 
 
-class TestBacktestLogger:
-    def test_backtest_logger_creation(self):
-        from sharadar.util.logger import BacktestLogger
+class TestAlgoLogger:
+    def test_algo_logger_creation(self):
+        from sharadar.util.logger import AlgoLogger
         import pandas as pd
         
         with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as f:
@@ -35,7 +35,7 @@ class TestBacktestLogger:
             def mock_time():
                 return pd.Timestamp('2023-10-16 10:00:00')
             
-            logger = BacktestLogger(filepath, arena='backtest', record_time=mock_time)
+            logger = AlgoLogger(filepath, arena='backtest', record_time=mock_time)
             assert logger.arena == 'backtest'
             assert logger.record_time == mock_time
         finally:
@@ -46,15 +46,15 @@ class TestBacktestLogger:
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
-    def test_backtest_logger_default_record_time(self):
-        from sharadar.util.logger import BacktestLogger
+    def test_algo_logger_default_record_time(self):
+        from sharadar.util.logger import AlgoLogger
         
         with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as f:
             filepath = f.name
         
         try:
             # Should not raise even with default record_time
-            logger = BacktestLogger(filepath, arena='backtest')
+            logger = AlgoLogger(filepath, arena='backtest')
             assert logger.arena == 'backtest'
         finally:
             import glob
@@ -62,3 +62,36 @@ class TestBacktestLogger:
                 os.unlink(f)
             if os.path.exists(filepath):
                 os.unlink(filepath)
+
+    def test_previous_name_remains_compatible(self):
+        from sharadar.util.logger import AlgoLogger, BacktestLogger
+
+        assert BacktestLogger is AlgoLogger
+
+    def test_live_logging_uses_clock_and_sends_mail(self, tmp_path):
+        import datetime
+        from logbook import TestHandler
+        from sharadar.util.logger import AlgoLogger
+
+        now = datetime.datetime(2026, 11, 6, 14, 53)
+        logger = AlgoLogger(
+            str(tmp_path / 'algorithm.py'),
+            arena='live',
+            logname='LiveAlgorithm',
+            record_time=lambda: now,
+        )
+        handlers = list(logger.handlers)
+        logger.handlers.clear()
+        capture = TestHandler()
+        logger.handlers.append(capture)
+        try:
+            with patch('sharadar.util.logger.send_mail') as send_mail:
+                logger.debug('Debug message')
+                send_mail.assert_not_called()
+                logger.info('Live message')
+                send_mail.assert_called_once_with('LiveAlgorithm INFO', 'Live message')
+            assert capture.records[-1].time == now
+            assert capture.records[-1].message == 'Live message'
+        finally:
+            for handler in handlers:
+                handler.close()

@@ -54,6 +54,7 @@ multitasking==0.0.13
 Nasdaq-Data-Link==1.0.4
 ndindex==1.10.1
 networkx==3.7
+newrelic==14.2.0
 numexpr==2.14.2
 numpy==2.4.6
 packaging==26.3

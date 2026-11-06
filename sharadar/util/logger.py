@@ -3,16 +3,20 @@
 Provides two logger classes built on logbook:
 - SharadarDbBundleLogger: General-purpose logger for the bundle (writes to
   file, stdout, and optionally systemd journal on Linux).
-- BacktestLogger: Specialized logger for backtests and live trading that
-  timestamps log entries with the simulated trading day.
+- AlgoLogger: Logger for backtests and live trading with a configurable clock
+  and live-mode email notifications.
+- NewRelicLogHandler: Optional forwarding for any Logbook logger, using an
+  explicit algorithm name as the New Relic application name.
 """
 import datetime
 import os
 import subprocess
 import sys
+import warnings
+from importlib import import_module
 from os import environ as env
 
-from logbook import Logger, FileHandler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
+from logbook import Logger, FileHandler, Handler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
 from sharadar.util.mail import send_mail
 from zipline.api import get_datetime
 from pathlib import Path
@@ -71,7 +75,73 @@ class SharadarDbBundleLogger(Logger):
 log = SharadarDbBundleLogger()
 
 
-class BacktestLogger(Logger):
+class NewRelicLogHandler(Handler):
+    """Forward logs using NEW_RELIC_LICENSE_KEY and the supplied application name.
+
+    Insert this handler at index 0 of logger.handlers so non-bubbling console
+    handlers do not prevent forwarding. Existing file/console output is preserved.
+    Call shutdown() in a finally block at the end of the executable entry point.
+    Without a license key, warn and leave forwarding disabled. The optional
+    newrelic package (agent >= 8.5.0) is required only when a license is set.
+    Other NEW_RELIC_* settings remain configurable through the environment.
+
+    Example:
+        handler = NewRelicLogHandler(app_name='MyAlgorithm')
+        logger.handlers.insert(0, handler)
+        try:
+            run_algorithm()
+        finally:
+            handler.shutdown()
+    """
+
+    def __init__(self, app_name, level=DEBUG):
+        super().__init__(level=level, bubble=True)
+        if not isinstance(app_name, str) or not app_name.strip():
+            raise ValueError('New Relic application name must be a non-empty string.')
+        self.app_name = app_name.strip()
+        self.agent = None
+        self.application = None
+
+        if not env.get('NEW_RELIC_LICENSE_KEY', '').strip():
+            warnings.warn(
+                'New Relic log forwarding is disabled; set NEW_RELIC_LICENSE_KEY to enable it.',
+                RuntimeWarning, stacklevel=2,
+            )
+            return
+
+        try:
+            agent = import_module('newrelic.agent')
+        except ImportError as exc:
+            raise RuntimeError(
+                'NEW_RELIC_LICENSE_KEY is set, but the newrelic package could not be imported.'
+            ) from exc
+        if not hasattr(agent, 'record_log_event'):
+            raise RuntimeError('New Relic log forwarding requires Python agent 8.5.0 or newer.')
+
+        env['NEW_RELIC_APP_NAME'] = self.app_name
+        env.setdefault('NEW_RELIC_APPLICATION_LOGGING_ENABLED', 'true')
+        env.setdefault('NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED', 'true')
+        agent.initialize()
+        self.application = agent.application(name=self.app_name)
+        self.agent = agent
+
+    def emit(self, record):
+        if self.agent is not None:
+            self.agent.record_log_event(
+                record.message,
+                level=record.level_name,
+                application=self.application,
+            )
+
+    def shutdown(self, timeout=10):
+        """Flush pending data and stop the process-wide New Relic agent."""
+        if self.agent is not None:
+            self.agent.shutdown_agent(timeout=timeout)
+
+
+class AlgoLogger(Logger):
+    """Log backtest or live events using record_time (Zipline's clock by default)."""
+
     def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET, record_time=None):
         super().__init__(logname, level)
 
@@ -100,6 +170,10 @@ class BacktestLogger(Logger):
         record.time = self.record_time()
 
 
+# Compatibility for algorithms still importing the previous name.
+BacktestLogger = AlgoLogger
+
+
 if __name__ == '__main__':
     test_log = SharadarDbBundleLogger()
     test_log.info('Hello World!')
@@ -109,4 +183,4 @@ if __name__ == '__main__':
     import pandas as pd
     def log_time():
         return pd.to_datetime('today')
-    BacktestLogger(__file__, arena='live', logname='Myname', record_time=log_time).warn('Hello World!')
+    AlgoLogger(__file__, arena='live', logname='Myname', record_time=log_time).warn('Hello World!')

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sharadar.util import performance
 from sharadar.util.events import date_rules
-from sharadar.util.logger import BacktestLogger
+from sharadar.util.logger import AlgoLogger
 from sharadar.util.run_algo import run_algorithm
 from zipline.algorithm import time_rules
 # from sharadar.pipeline.arbitrage_pricing import TBillBeta, TBillBondSpreadBeta, CorpGvrnBondsSpreadBeta
@@ -15,7 +15,7 @@ from zipline.api import (
 )
 from zipline.api import record, symbol
 
-log = BacktestLogger(__file__)
+log = AlgoLogger(__file__)
 
 import talib
 

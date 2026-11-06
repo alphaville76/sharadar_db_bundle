@@ -4,7 +4,7 @@ import time
 import pandas as pd
 from sharadar.util import performance
 from sharadar.util.events import date_rules
-from sharadar.util.logger import BacktestLogger
+from sharadar.util.logger import AlgoLogger
 from sharadar.util.run_algo import run_algorithm
 from zipline.algorithm import time_rules
 from zipline.api import (
@@ -13,7 +13,7 @@ from zipline.api import (
     sid
 )
 
-log = BacktestLogger(__file__)
+log = AlgoLogger(__file__)
 
 import talib
 
