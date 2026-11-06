@@ -1,5 +1,6 @@
 ﻿import numpy as np
 import pandas as pd
+import pytest
 from sharadar.statistic.ann import NeuralNetwork
 
 
@@ -38,6 +39,7 @@ class TestNeuralNetwork:
         predictions = nn.predict(X)
         assert predictions.shape == (10, 2)
 
+    @pytest.mark.filterwarnings('error::scipy.optimize.OptimizeWarning')
     def test_fit_runs(self):
         np.random.seed(42)
         nn = NeuralNetwork(hidden_units=4, alpha=0.01)

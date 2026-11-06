@@ -39,6 +39,49 @@ def test_write_dividend_ratios_by_column_name(adjustments_path):
     assert rows(adjustments_path, 'dividends') == [(0, EX_DATE, 0.9974, 199994), (1, EX_DATE, 0.9869, 645225)]
 
 
+@pytest.mark.parametrize('integer_dtype', ['int32', 'int64', 'uint32', 'uint64'])
+def test_write_accepts_integer_subtypes(adjustments_path, integer_dtype):
+    writer = SQLiteDailyAdjustmentWriter(adjustments_path, None, None, None)
+    frame = pd.DataFrame({
+        'sid': np.array([1], dtype=integer_dtype),
+        'effective_date': np.array([EX_DATE], dtype=integer_dtype),
+        'ratio': np.array([0.99], dtype='float64'),
+    })
+
+    writer._write('dividends', SQLITE_ADJUSTMENT_COLUMN_DTYPES, frame)
+
+    assert rows(adjustments_path, 'dividends') == [(0, EX_DATE, 0.99, 1)]
+
+
+@pytest.mark.parametrize('column,dtype', [
+    ('sid', 'float64'),
+    ('effective_date', 'bool'),
+    ('ratio', 'int64'),
+    ('ratio', 'float32'),
+])
+def test_write_rejects_incorrect_dtypes(adjustments_path, column, dtype):
+    writer = SQLiteDailyAdjustmentWriter(adjustments_path, None, None, None)
+    frame = pd.DataFrame({
+        'sid': [1],
+        'effective_date': [EX_DATE],
+        'ratio': [0.99],
+    }).astype({column: dtype})
+
+    with pytest.raises(TypeError, match=f"column '{column}'"):
+        writer._write('dividends', SQLITE_ADJUSTMENT_COLUMN_DTYPES, frame)
+
+    assert rows(adjustments_path, 'dividends') == []
+
+
+@pytest.mark.parametrize('frame', [None, pd.DataFrame()])
+def test_write_empty_adjustments(adjustments_path, frame):
+    writer = SQLiteDailyAdjustmentWriter(adjustments_path, None, None, None)
+
+    writer._write('dividends', SQLITE_ADJUSTMENT_COLUMN_DTYPES, frame)
+
+    assert rows(adjustments_path, 'dividends') == []
+
+
 def test_write_dividend_payouts_with_timestamp_index(adjustments_path):
     writer = SQLiteDailyAdjustmentWriter(adjustments_path, None, None, None)
     frame = pd.DataFrame({

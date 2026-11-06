@@ -129,7 +129,7 @@ class NeuralNetwork(object):
 
         params_flat0 = self.ravel_parameters(self.parameters)
 
-        options = {'maxiter': 200, 'disp': False}
+        options = {'maxiter': 200}
 
         opt_res = optimize.minimize(self.cost_function_wrapper, params_flat0, \
                                     jac=True, method='L-BFGS-B', \
@@ -320,4 +320,3 @@ class NeuralNetwork(object):
         db1 = np.sum(dZ1.T, axis=1, keepdims=True) / m
 
         return {"dW1": dW1, "db1": db1, "dW2": dW2, "db2": db2}
-

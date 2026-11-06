@@ -391,7 +391,7 @@ def _atomic_np_save(path, values):
     """Write to a temp file and rename, so concurrent readers never see a partial file."""
     tmp = "%s.%d.tmp" % (path, os.getpid())
     with open(tmp, "wb") as f:
-        np.save(f, values, allow_pickle=True, fix_imports=True)
+        np.save(f, values, allow_pickle=True)
     os.replace(tmp, path)
 
 

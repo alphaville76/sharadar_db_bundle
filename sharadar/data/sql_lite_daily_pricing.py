@@ -441,10 +441,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
 
     def _write(self, tablename, expected_dtypes, frame):
         if frame is None or frame.empty:
-            # keeping the dtypes correct for empty frames is not easy
-            frame = pd.DataFrame(
-                np.array([], dtype=list(expected_dtypes.items())),
-            )
+            frame = pd.DataFrame(columns=expected_dtypes)
         else:
             if frozenset(frame.columns) != frozenset(expected_dtypes):
                 raise ValueError(
@@ -459,7 +456,7 @@ class SQLiteDailyAdjustmentWriter(SQLiteAdjustmentWriter):
             actual_dtypes = frame.dtypes
             for colname, expected in iteritems(expected_dtypes):
                 actual = actual_dtypes[colname]
-                if actual != expected:
+                if not np.issubdtype(actual, expected):
                     raise TypeError(
                         "Expected data of type {expected} for column"
                         " '{colname}', but got '{actual}'.".format(

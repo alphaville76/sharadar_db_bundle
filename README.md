@@ -8,7 +8,35 @@ Step 1. Make sure you can access Quandl, and you have a Quandl api key. I have s
 
 Step 2. Clone or download the code and install it using:
 
->python setup.py install 
+```bash
+~/zipline-reloaded-venv3.13/bin/python -m pip install -r requirements.txt
+~/zipline-reloaded-venv3.13/bin/python -m pip install .
+```
+
+### Dependency compatibility
+
+The pinned environment targets Python 3.13 and includes CPU-only PyTorch.
+Zipline 3.2.1 requires pandas below 3.0; Empyrical 0.7.1 requires Peewee below
+3.17.4. NumPy stays on 2.4.x and Matplotlib on 3.10.x to avoid deprecations
+in the pandas 2.x reporting stack. XGBoost stays at 2.0.0: newer Linux wheels
+introduce CUDA/NCCL dependencies and need a separate model/GPU migration review.
+The three explicitly selected releases remain Zipline 3.2.1, Pyfolio 0.10.2 and
+Empyrical 0.7.1. Runtime transitive dependencies are also pinned; prereleases
+are not selected.
+
+Run the offline test suite with:
+
+```bash
+~/zipline-reloaded-venv3.13/bin/python -m pytest -q --tb=short
+```
+
+It includes synthetic Zipline ingestion/backtesting, Pyfolio report generation,
+pipeline term cache persistence and binary-storage roundtrips. Cache writes use
+the current NumPy save API; existing `.npy` cache files remain readable.
+Live Interactive Brokers, Yahoo and Nasdaq
+connections still require separate validation against their external services.
+Previously serialized machine-learning models should be checked or retrained
+with the updated library versions before use.
 
 For zipline in order to build the cython files run:
 >python setup.py build_ext --inplace
