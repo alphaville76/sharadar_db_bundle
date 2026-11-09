@@ -19,6 +19,7 @@ from os import environ as env
 from logbook import Logger, FileHandler, Handler, DEBUG, INFO, NOTSET, StreamHandler, set_datetime_format
 from sharadar.util.mail import send_mail
 from zipline.api import get_datetime
+from zipline.utils.algo_instance import get_algo_instance
 from pathlib import Path
 
 # log in local time
@@ -140,13 +141,10 @@ class NewRelicLogHandler(Handler):
 
 
 class AlgoLogger(Logger):
-    """Log backtest or live events using record_time (Zipline's clock by default)."""
+    """Log with the live wall clock or Zipline's simulation clock."""
 
     def __init__(self, filename, arena='backtest', logname='Backtest', level=NOTSET, record_time=None):
         super().__init__(logname, level)
-
-        if record_time is None:
-            record_time = get_datetime
 
         path, ext = os.path.splitext(filename)
         now = datetime.datetime.now()
@@ -167,7 +165,24 @@ class AlgoLogger(Logger):
         super().process_record(record)
         if self.arena == 'live' and record.level >= INFO:
             send_mail(record.channel + ' ' + record.level_name, record.message)
-        record.time = self.record_time()
+        if self.record_time is not None:
+            record.time = self.record_time()
+        elif self.arena == 'live':
+            # current wall clock, in local time like the other sharadar logs
+            record.time = datetime.datetime.now()
+        else:
+            record.time = _simulation_time()
+
+
+def _simulation_time():
+    '''Zipline's clock; before the first bar (e.g. in initialize) it is a naive session date or unset.'''
+    algo = get_algo_instance()
+    dt = getattr(algo, 'datetime', None) if algo is not None else None
+    if dt is None:
+        return datetime.datetime.now(datetime.timezone.utc)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return get_datetime()
 
 
 # Compatibility for algorithms still importing the previous name.

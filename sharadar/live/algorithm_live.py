@@ -183,9 +183,12 @@ class LiveTradingAlgorithm(TradingAlgorithm):
 
         minutely_emission = True
         # All datetime in UTC without offset
-        execution_opens = trading_o_and_c[MARKET_OPEN].dt.tz_localize(None)
+        # Like zipline, the first bar is one minute after the open: zipline's asset calendars are
+        # right-sided, so at the open minute itself data.can_trade() is False for every asset.
+        market_opens = trading_o_and_c[MARKET_OPEN].dt.tz_localize(None)
+        execution_opens = market_opens + timedelta(minutes=1)
         execution_closes = trading_o_and_c[MARKET_CLOSE].dt.tz_localize(None)
-        before_trading_start_minutes = execution_opens - timedelta(minutes=_minutes_before_trading_starts)
+        before_trading_start_minutes = market_opens - timedelta(minutes=_minutes_before_trading_starts)
 
         # open/close for NYSE:
         # 9:30 am EDT (13:30 UTC) 4:00 pm EDT (20:00 UTC)

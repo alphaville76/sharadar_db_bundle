@@ -63,6 +63,78 @@ class TestAlgoLogger:
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+    def test_default_live_clock_uses_current_local_time(self, tmp_path):
+        import datetime
+        from logbook import TestHandler
+        from sharadar.util.logger import AlgoLogger
+
+        logger = AlgoLogger(str(tmp_path / 'live.py'), arena='live')
+        handlers = list(logger.handlers)
+        logger.handlers.clear()
+        capture = TestHandler()
+        logger.handlers.append(capture)
+        try:
+            with patch('sharadar.util.logger.get_datetime', side_effect=AssertionError), \
+                    patch('sharadar.util.logger.send_mail'):
+                logger.info('Live message')
+            timestamp = capture.records[-1].time
+            assert isinstance(timestamp, datetime.datetime)
+            # same local wall clock as the other sharadar logs
+            assert timestamp.tzinfo is None
+            assert abs(datetime.datetime.now() - timestamp) < datetime.timedelta(seconds=5)
+        finally:
+            for handler in handlers:
+                handler.close()
+            capture.close()
+
+    def test_default_backtest_clock_uses_zipline_time(self, tmp_path):
+        import datetime
+        from types import SimpleNamespace
+        from logbook import TestHandler
+        from sharadar.util.logger import AlgoLogger
+
+        expected = datetime.datetime(2026, 11, 6, 14, 53, tzinfo=datetime.timezone.utc)
+        logger = AlgoLogger(str(tmp_path / 'backtest.py'), arena='backtest')
+        handlers = list(logger.handlers)
+        logger.handlers.clear()
+        capture = TestHandler()
+        logger.handlers.append(capture)
+        try:
+            with patch('sharadar.util.logger.get_algo_instance', return_value=SimpleNamespace(datetime=expected)), \
+                    patch('sharadar.util.logger.get_datetime', return_value=expected):
+                logger.info('Backtest message')
+            assert capture.records[-1].time == expected
+        finally:
+            for handler in handlers:
+                handler.close()
+            capture.close()
+
+    def test_backtest_clock_outside_and_during_initialize(self, tmp_path):
+        import datetime
+        from types import SimpleNamespace
+        from logbook import TestHandler
+        from sharadar.util.logger import AlgoLogger
+
+        logger = AlgoLogger(str(tmp_path / 'backtest.py'), arena='backtest')
+        handlers = list(logger.handlers)
+        logger.handlers.clear()
+        capture = TestHandler()
+        logger.handlers.append(capture)
+        session = datetime.datetime(2000, 1, 3)
+        try:
+            with patch('sharadar.util.logger.get_datetime', side_effect=AssertionError):
+                with patch('sharadar.util.logger.get_algo_instance', return_value=None):
+                    logger.info('Before simulation')
+                assert capture.records[-1].time.utcoffset() == datetime.timedelta(0)
+                with patch('sharadar.util.logger.get_algo_instance',
+                           return_value=SimpleNamespace(datetime=session)):
+                    logger.info('In initialize')
+                assert capture.records[-1].time == session.replace(tzinfo=datetime.timezone.utc)
+        finally:
+            for handler in handlers:
+                handler.close()
+            capture.close()
+
     def test_previous_name_remains_compatible(self):
         from sharadar.util.logger import AlgoLogger, BacktestLogger
 
